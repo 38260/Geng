@@ -7,7 +7,7 @@ AI 文案单独走 :mod:`app.services.llm.service`，失败只影响它自己那
 from __future__ import annotations
 
 import math
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -450,6 +450,13 @@ def detail_payload(session: Session, meme: Meme) -> dict[str, Any] | None:
 
 def meta_payload(session: Session) -> dict[str, Any]:
     latest = session.scalar(select(Meme.data_updated_at).order_by(Meme.data_updated_at.desc()))
+    # 统计截至日：序列里真实有数据的第一天……最后一天。采集窗口刻意不含今天
+    # （今天没过完，头部样本会偏低、增幅会假跌），所以这里必须把"截至哪天"讲明白，
+    # 否则用户看到的就是"数据是过去的"。
+    data_through = session.scalar(
+        select(MemeDailyStats.stat_date).order_by(MemeDailyStats.stat_date.desc())
+    )
+    lag_days = (date.today() - data_through).days if data_through else None
     rows = _load_rows(session)
     total_certified = len(rows)
     sources = [meme.data_source or settings.data_source for meme, _, _ in rows]
@@ -466,6 +473,8 @@ def meta_payload(session: Session) -> dict[str, Any]:
         "is_demo": site_is_demo,
         "configured_source": settings.data_source,
         "data_updated_at": latest.isoformat() if isinstance(latest, datetime) else latest,
+        "data_through": data_through.isoformat() if data_through else None,
+        "data_lag_days": lag_days,
         "certified_count": total_certified,
         "candidate_count": candidate_count,
         "window_days": settings.analysis_window_days,
@@ -488,6 +497,7 @@ def meta_payload(session: Session) -> dict[str, Any]:
                 "真实采集口径：每日取 B 站该关键词下播放量最高的前 20 条相关视频作为样本，"
                 "所以「当日播放量」是该日头部内容的合计，不是全站绝对量；"
                 "跨日与跨梗比较用同一把尺子。"
+                "统计窗口不含今天——今天还没过完，头部样本会偏低、增幅会假跌。"
                 if site_source == "bilibili"
                 else (
                     "混合状态：配置的数据源是 " + settings.data_source +

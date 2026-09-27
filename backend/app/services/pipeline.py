@@ -173,6 +173,21 @@ def recompute_meme(session: Session, meme: Meme, *, window_days: int | None = No
     )
 
 
+def _delete_other_source(session, model, meme_id: int, source: str) -> int:
+    """删掉这个梗身上不属于当前数据源的旧行，返回删除行数。"""
+    rows = session.query(model).filter(model.meme_id == meme_id, model.data_source != source)
+    count = rows.count()
+    rows.delete(synchronize_session=False)
+    return count
+
+
+def _count_rows(session, model, meme_id: int, *, video_count_min: int | None = None) -> int:
+    query = session.query(model).filter(model.meme_id == meme_id)
+    if video_count_min is not None:
+        query = query.filter(model.video_count >= video_count_min)
+    return query.count()
+
+
 def collect_all(
     source: str | None = None,
     *,
@@ -203,6 +218,8 @@ def collect_all(
         "videos": 0,
         "skipped": 0,
         "dropped": 0,
+        "kept_snapshots": 0,   # 本次空窗、沿用上次真实快照的梗数
+        "thinned": 0,          # 本次采到但比上次薄的梗数
     }
     if not available:
         log.warning("数据源 %s 不可用：%s", collector.source, reason)
@@ -244,15 +261,35 @@ def collect_all(
             if not bundle.videos:
                 summary["empty"] = int(summary["empty"]) + 1
                 if purge_when_empty:
-                    # 宁可留空，也不要把演示数据混在"真实数据"里
-                    session.query(MemeDailyStats).filter(MemeDailyStats.meme_id == meme.id).delete()
-                    session.query(Video).filter(Video.meme_id == meme.id).delete()
-                    meme.data_source = collector.source
+                    # 只清掉"不是这个数据源"的旧行（演示数据不能混进真实数据），
+                    # 同源的上一份真实快照必须留着：B站搜索对同一个词两次返回
+                    # 结果差别很大，一次空窗就把上次采到的删掉等于越跑越薄。
+                    stale_stats = _delete_other_source(session, MemeDailyStats, meme.id, collector.source)
+                    stale_videos = _delete_other_source(session, Video, meme.id, collector.source)
+                    kept_days = _count_rows(session, MemeDailyStats, meme.id)
+                    summary["kept_snapshots"] = int(summary["kept_snapshots"]) + (1 if kept_days else 0)
                     meme.data_updated_at = datetime.now()
-                    log.info("梗「%s」窗口内无相关视频，已清空旧数据（不保留演示值）", meme.name)
+                    log.info(
+                        "梗「%s」本次窗口内无相关视频：%s",
+                        meme.name,
+                        f"清掉 {stale_stats + stale_videos} 行演示数据"
+                        if kept_days == 0
+                        else f"保留上次真实快照（{kept_days} 行）",
+                    )
                 else:
                     log.info("梗「%s」窗口内没有可用视频，保留原数据", meme.name)
                 continue
+
+            had_days = _count_rows(session, MemeDailyStats, meme.id, video_count_min=1)
+            new_days = sum(1 for stat in bundle.daily_stats if stat.video_count)
+            if had_days and new_days < had_days:
+                # 上游搜索抖动会让新序列比旧序列薄很多，这里只警告不拦截：
+                # 采集结果必须以本次为准，否则永远停在第一次的快照上。
+                summary["thinned"] = int(summary["thinned"]) + 1
+                log.warning(
+                    "梗「%s」本次只采到 %s 天内容（上次 %s 天），序列变薄",
+                    meme.name, new_days, had_days,
+                )
 
             session.query(MemeDailyStats).filter(MemeDailyStats.meme_id == meme.id).delete()
             session.query(Video).filter(Video.meme_id == meme.id).delete()

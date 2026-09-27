@@ -6,17 +6,18 @@ import { CalendarIcon, SearchIcon } from "@/components/icons";
 import { useMeta } from "@/hooks/useAppData";
 import { formatDateTime } from "@/utils/format";
 
-/** 参考图顶部通栏：日历图标 + 日期 + 「今日更新」两行。 */
-function DateChip({ updatedAt }: { updatedAt?: string | null }) {
-  const date = updatedAt ? new Date(updatedAt) : new Date();
-  const valid = !Number.isNaN(date.getTime());
-  const iso = valid ? formatDateTime(updatedAt ?? new Date().toISOString()).slice(0, 10) : "—";
+/** 参考图顶部通栏：日历图标 + 日期 + 两行小字。日期给的是"统计截至哪天"，不是"今天"。 */
+function DateChip({ through, updatedAt }: { through?: string | null; updatedAt?: string | null }) {
+  const iso = through?.slice(0, 10) || (updatedAt ? formatDateTime(updatedAt).slice(0, 10) : "—");
+  const tip = through
+    ? `统计窗口不含今天（今天没过完，头部样本会偏低、增幅会假跌）\n上次采集/重算：${formatDateTime(updatedAt)}`
+    : "还没有采集到统计数据";
   return (
-    <div className="hidden items-center gap-2 sm:flex">
+    <div className="hidden items-center gap-2 sm:flex" title={tip}>
       <CalendarIcon size={20} className="text-nav" />
       <div className="leading-tight">
         <div className="tabular text-[15px] font-bold text-ink">{iso}</div>
-        <div className="text-[11px] text-ink-mute">今日更新</div>
+        <div className="text-[11px] text-ink-mute">{through ? "数据截至" : "今日更新"}</div>
       </div>
     </div>
   );
@@ -111,7 +112,7 @@ export function TopBar({
 
         <div className="ml-auto flex shrink-0 items-center gap-3 lg:gap-4">
           {meta ? <DemoBadge isDemo={meta.is_demo} source={meta.data_source} /> : null}
-          <DateChip updatedAt={updatedAt ?? meta?.data_updated_at} />
+          <DateChip through={meta?.data_through} updatedAt={updatedAt ?? meta?.data_updated_at} />
           <div className="hidden h-7 w-px bg-line sm:block" />
           <Avatar />
         </div>

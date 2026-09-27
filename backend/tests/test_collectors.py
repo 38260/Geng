@@ -239,3 +239,94 @@ def test_collect_all_replaces_previous_source_for_a_meme(certified_meme, session
     assert stats and all(row.data_source == "bilibili" for row in stats)
     assert sum(row.video_count for row in stats) < 99, "旧的演示数据不应残留"
     assert session.get(Meme, certified_meme.id).data_source == "bilibili"
+
+
+class TermAwareClient(FakeClient):
+    """不同搜索词返回不同结果，用来验证"梗名太口语时会退回别名再查"。"""
+
+    def __init__(self, mapping: dict[str, list]):
+        super().__init__(rows=[])
+        self.mapping = mapping
+
+    def search_range(self, keyword, *, begin, end, order="click", page=1, page_size=20):
+        self.requested.append(f"{keyword}@{begin.date()}")
+        rows = [
+            row for row in self.mapping.get(keyword, [])
+            if begin.timestamp() <= row["pubdate"] < end.timestamp()
+        ]
+        return rows[:page_size], len(rows)
+
+
+def test_daily_collection_falls_back_to_alias_when_name_is_too_vague(certified_meme):
+    """梗名是常用口语时 B 站只会回一堆无关内容，这时必须用别名再查一轮。"""
+    alias = certified_meme.aliases[0]
+    client = TermAwareClient({
+        certified_meme.name: [_row(0, days_ago=1, title="周末去了趟郊外 vlog")],
+        alias: [
+            _row(1, days_ago=1, title=f"{alias}是什么梗"),
+            _row(2, days_ago=4, title=f"第一次看{alias}"),
+        ],
+    })
+    collector = BilibiliCollector(client=client, request_gap=0, enrich_limit=0)
+
+    stats, seen, dropped = collector.collect_daily(certified_meme, window_days=30)
+
+    assert sum(1 for row in stats if row.video_count) == 2, "别名那一版才算采到内容"
+    assert len(seen) == 2
+    assert any(entry.startswith(f"{alias}@") for entry in client.requested), "应该用别名补查过"
+    titles = " ".join(item["title"] for item in seen.values())
+    assert alias in titles and "vlog" not in titles, "梗名那轮采到的无关内容不该进结果"
+
+
+def test_alias_pass_is_skipped_when_name_already_shapes_series(certified_meme):
+    """梗名本身就能画出形状时，不该再多打 30 次接口。"""
+    name = certified_meme.name
+    client = TermAwareClient({
+        name: [_row(index, days_ago=index + 1, title=f"{name}名场面{index}") for index in range(9)],
+    })
+    collector = BilibiliCollector(client=client, request_gap=0, enrich_limit=0)
+
+    stats, _, _ = collector.collect_daily(certified_meme, window_days=30)
+
+    assert sum(1 for row in stats if row.video_count) == 9
+    assert all(entry.startswith(f"{name}@") for entry in client.requested), "不该再查别名"
+
+
+def test_purge_when_empty_keeps_previous_real_snapshot(certified_meme, session, monkeypatch):
+    """一次空窗不能把上次采到的真实快照删掉——B站搜索结果本身就会抖。"""
+    from app.collectors.base import CollectedBundle
+
+    session.add(
+        MemeDailyStats(
+            meme_id=certified_meme.id, stat_date=date.today() - timedelta(days=1),
+            video_count=3, view=30_000, reply=300, danmaku=900, data_source="bilibili",
+        )
+    )
+    session.add(
+        MemeDailyStats(
+            meme_id=certified_meme.id, stat_date=date.today() - timedelta(days=2),
+            video_count=9, view=900_000, data_source="mock",
+        )
+    )
+    session.commit()
+
+    class EmptyCollector:
+        source = "bilibili"
+
+        def is_available(self):
+            return True, "ok"
+
+        def collect(self, meme, *, window_days=30):
+            return CollectedBundle(daily_stats=[], videos=[], dropped_irrelevant=2)
+
+    monkeypatch.setattr("app.collectors.make_collector", lambda _source: EmptyCollector())
+
+    result = collect_all(
+        "bilibili", meme_ids=[certified_meme.id], window_days=30, purge_when_empty=True
+    )
+
+    session.expire_all()
+    rows = session.query(MemeDailyStats).filter(MemeDailyStats.meme_id == certified_meme.id).all()
+    assert result["empty"] == 1 and result["kept_snapshots"] == 1
+    assert [row.data_source for row in rows] == ["bilibili"], "真实快照留下，演示行清掉"
+    assert rows[0].video_count == 3

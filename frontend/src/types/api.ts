@@ -33,6 +33,10 @@ export interface Meta {
   data_source: DataSource;
   is_demo: boolean;
   data_updated_at: string | null;
+  /** 序列里最后一个有数据的日期（采集窗口不含今天，所以通常是昨天） */
+  data_through: string | null;
+  /** data_through 距今天几天；0 表示已含今天 */
+  data_lag_days: number | null;
   certified_count: number;
   candidate_count: number;
   source_breakdown: Partial<Record<DataSource, number>>;

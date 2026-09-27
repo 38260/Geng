@@ -31,6 +31,9 @@ log = get_logger(__name__)
 
 SOURCE = "bilibili"
 
+# 有内容天数达到这个数就认为序列已经能画出形状，不再为别名多打接口
+_ENOUGH_DAYS = 8
+
 
 class BilibiliCollector:
     source = SOURCE
@@ -105,12 +108,41 @@ class BilibiliCollector:
     def collect_daily(
         self, meme: Meme, *, window_days: int = 30
     ) -> tuple[list, dict, int]:
-        """逐日定向采集：每一天单独查一次，取当日播放量最高的相关样本。
+        """逐日定向采集，返回 (每日统计, 视频样本, 被剔除的无关条数)。
 
-        为什么必须这样：B 站搜索不带日期区间时，结果会被最近发布的内容占满，
+        搜索词先用梗名；梗名本身是常用口语时（「啊对对对」「这很难评」），
+        B 站会把结果模糊匹配到一堆无关内容，相关性过滤后什么都不剩，
+        整条序列就空掉了。这时退回用别名再查一轮，取有内容天数更多的那一版。
+        """
+        candidates = [meme.name] + [
+            alias for alias in (meme.aliases or []) if alias and alias != meme.name
+        ][:2]
+        best: tuple[list, dict, int] = ([], {}, 0)
+
+        def days_of(rows: list) -> int:
+            return sum(1 for row in rows if row.video_count)
+
+        for term in candidates:
+            stats, seen, filtered_out = self._daily_pass(meme, term, window_days=window_days)
+            if days_of(stats) > days_of(best[0]):
+                best = (stats, seen, filtered_out)
+            if days_of(best[0]) >= _ENOUGH_DAYS:
+                break
+            if term == candidates[0]:
+                log.info(
+                    "梗「%s」用梗名只查到 %s 天有内容，改用别名再查一轮（B站对口语梗名会模糊匹配到无关内容）",
+                    meme.name, days_of(stats),
+                )
+        return best
+
+    def _daily_pass(
+        self, meme: Meme, term: str, *, window_days: int = 30
+    ) -> tuple[list, dict, int]:
+        """用给定搜索词跑一遍逐日区间查询。
+
+        为什么必须逐日查：B 站搜索不带日期区间时，结果会被最近发布的内容占满，
         早期日期根本查不到 —— 直接聚合会得到"+23616%"这种被截断放大的假增长。
 
-        返回 (MemeDailyStats 列表, {bvid: 视频行}, 被相关性过滤剔除的条数)。
         注意口径：单日只取回 top 20，所以"当日播放量"是该日头部内容的合计，
         不是该梗全站绝对量；跨日、跨梗比较用同一把尺子，形状可信。
         """
@@ -118,7 +150,6 @@ class BilibiliCollector:
 
         terms = MemeTerms.from_meme(meme)
         threshold = settings.relevance_threshold
-        term = meme.name
         today = date.today()
         stats: list[MemeDailyStats] = []
         seen: dict[str, dict] = {}

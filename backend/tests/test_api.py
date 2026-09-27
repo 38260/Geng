@@ -61,6 +61,10 @@ def test_health_and_meta(client):
     assert payload["certified_count"] >= 30
     assert payload["candidate_count"] == 3
     assert payload["data_updated_at"]
+    # 新鲜度必须可机读：统计截至哪天、离今天几天，前端据此写"数据截至"
+    assert payload["data_through"] and len(payload["data_through"]) == 10
+    assert payload["data_lag_days"] >= 0
+    assert "不含今天" in payload["transparency"]["sampling"] or payload["is_demo"]
     assert [f["key"] for f in payload["filters"]] == ["all", "hot", "taking_off", "receding"]
     assert len(payload["lifecycle_stages"]) == 6
     assert payload["transparency"]["data_platform"] == "Bilibili"

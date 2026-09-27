@@ -72,6 +72,10 @@ check(
     "meta.is_demo 与 data_source 一致（真实数据不得标演示、演示数据必须标演示）",
 )
 check(meta and len(meta.get("lifecycle_stages", [])) == 6, "六个生命周期阶段")
+check(
+    meta and meta.get("data_through") and isinstance(meta.get("data_lag_days"), int),
+    f"meta 说明统计截至哪天（{meta.get('data_through')}，滞后 {meta.get('data_lag_days')} 天）",
+)
 
 lst = call("GET", "/api/memes?limit=10")
 items = (lst or {}).get("items", [])

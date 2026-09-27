@@ -250,8 +250,14 @@ export default function Settings() {
             <span className="text-[16px]">⚙️</span>
             <h2 className="text-[18px] font-bold">系统信息</h2>
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
+              {
+                label: "统计截至",
+                value: meta?.data_through
+                  ? `${meta.data_through}${meta.data_lag_days ? `（滞后 ${meta.data_lag_days} 天）` : ""}`
+                  : "—",
+              },
               { label: "当前版本", value: data.version },
               { label: "运行环境", value: data.environment },
               {

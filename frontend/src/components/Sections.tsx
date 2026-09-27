@@ -84,7 +84,17 @@ export function SectionHeader({
 export function TransparencyFooter({ meta }: { meta: Meta | null }) {
   return (
     <footer className="mt-10 flex flex-col gap-2 border-t border-line pt-5 text-[14px] text-ink-mute sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 whitespace-nowrap">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span>
+          统计截至：
+          <span className="tabular font-semibold text-ink-soft">
+            {meta?.data_through?.slice(0, 10) ?? "—"}
+          </span>
+        </span>
+        {meta?.data_through ? (
+          <span className="text-ink-faint">（采集窗口不含今天：今天还没过完，计入会算出假下跌）</span>
+        ) : null}
+        <span className="text-ink-faint">·</span>
         <span>数据更新于：{formatDateTime(meta?.data_updated_at)}</span>
       </div>
       <div className="flex flex-wrap items-center gap-2">

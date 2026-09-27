@@ -88,9 +88,15 @@ def fetch_up_index(
     max_pages: int = 8,
     page_size: int = 50,
     gap: float = 1.2,
-    retries: int = 3,
+    retries: int = 6,
+    not_before: datetime | None = None,
 ) -> tuple[list[UpVideo], int, int]:
-    """翻页拉某个 UP 主的投稿。返回 (视频列表, 成功页数, 被风控页数)。"""
+    """翻页拉某个 UP 主的投稿。返回 (视频列表, 成功页数, 被风控页数)。
+
+    空间投稿接口风控很凶：第 1 页（最新投稿）失败一次，就会拿到一整页老视频，
+    看起来"拉到了 150 条"其实全是过期的。所以 retries 给到 6，
+    并且允许传 not_before——只要这一页最旧的一条已经早于时间窗，就不必再往后翻。
+    """
     videos: list[UpVideo] = []
     pages_ok = 0
     blocked = 0
@@ -103,7 +109,10 @@ def fetch_up_index(
             except BilibiliBlocked as exc:
                 attempt += 1
                 blocked += 1
-                wait = 2.0 * attempt
+                if page == 1 and attempt > 2:
+                    # 首页拿不到就没法判断时间窗，后面的页再新也是旧的，直接报错
+                    raise RuntimeError(f"{author.name} 最新投稿取不到：{exc}") from exc
+                wait = min(2.0 * attempt, 10.0)
                 log.warning("%s 第 %s 页被风控（%s），%.1fs 后重试", author.name, page, str(exc)[:40], wait)
                 time.sleep(wait)
                 continue
@@ -124,6 +133,10 @@ def fetch_up_index(
                         play=int(row.get("play") or 0),
                     )
                 )
+            break
+
+        if not_before and videos and min(v.pubdate for v in videos if v.pubdate) < not_before:
+            log.info("%s：已翻到时间窗之前（%s），停止翻页", author.name, not_before.strftime("%Y-%m-%d"))
             break
         time.sleep(gap)
 

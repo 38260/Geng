@@ -15,10 +15,15 @@ export type LifecycleStage =
   | "obsolete";
 export type CatchUpStatus = "can_catch" | "caution" | "too_late";
 export type HomeFilter = "all" | "hot" | "taking_off" | "receding";
+/** 认证强度标签：准入是并集（任一 UP 介绍过就入池），标签仍区分谁做过 */
+export type CertLabel = "双 UP 认证" | "梗百科认证" | "梗指南认证" | "未认证";
 
 export interface Transparency {
   data_platform: string;
   certification: string[];
+  /** 准入规则原文（并集 / 认证窗口天数），设置页与详情页据此说明 */
+  certification_rule?: string;
+  cert_window_days?: number;
   hotness_algorithm: string;
   /** 真实采集的抽样口径说明 */
   sampling?: string;
@@ -38,6 +43,7 @@ export interface Meta {
   /** data_through 距今天几天；0 表示已含今天 */
   data_lag_days: number | null;
   certified_count: number;
+  /** 两位 UP 主都没介绍过的梗数（发现层并集之外，只能在梗管理里看到） */
   candidate_count: number;
   source_breakdown: Partial<Record<DataSource, number>>;
   window_days: number;
@@ -78,8 +84,12 @@ export interface MemeCard {
   thumbnail: Thumbnail;
   /** 这个梗自己的数据来源（真实采集和演示数据可能混在同一个库里） */
   meme_data_source: DataSource;
-  /** 双 UP 认证是否已在 B 站真实投稿中命中 */
+  /** 在线核验状态：证据是不是真从 B 站投稿里抓到的 */
   verification_state: "verified_both" | "partially_verified" | "unverified";
+  /** 认证强度标签：准入看并集（任一 UP 介绍过），标签仍区分双 UP / 单 UP */
+  cert_label: CertLabel;
+  certified_by: string[];
+  double_certified: boolean;
   certified_at: string | null;
   data_updated_at: string | null;
 }
@@ -168,7 +178,14 @@ export interface CertificationSide {
 export interface Certification {
   encyclopedia: CertificationSide;
   guide: CertificationSide;
+  /** 双 UP 徽章：两位都独立介绍过（交集） */
   certified: boolean;
+  /** 发现层准入：任一 UP 介绍过（并集） */
+  admitted: boolean;
+  certified_by: string[];
+  cert_label: CertLabel;
+  /** 认证证据看的是最近多少天（滚动窗口） */
+  cert_window_days: number;
   certified_at: string | null;
 }
 
@@ -292,6 +309,10 @@ export interface ManageListItem {
   description: string;
   status: string;
   certified: boolean;
+  /** 是否通过发现层准入（任一 UP 介绍过）——与 certified（双 UP 徽章）是两层 */
+  admitted: boolean;
+  cert_label: CertLabel;
+  certified_by: string[];
   data_source: DataSource;
   verification_state: string;
   hotness: number | null;
@@ -302,8 +323,15 @@ export interface ManageListItem {
 export interface ManageList {
   total: number;
   managed_count: number;
+  /** 双 UP 认证的梗数（徽章口径，交集） */
   certified_count: number;
+  /** 非双 UP 的梗数（含单 UP 入池的） */
   candidate_count: number;
+  /** 入池梗数（并集准入） */
+  in_pool_count: number;
+  /** 两位 UP 都没介绍过的梗数 */
+  out_of_pool_count: number;
+  cert_window_days: number;
   items: ManageListItem[];
 }
 
@@ -349,6 +377,9 @@ export interface ManageView {
   data_source: DataSource;
   status: string;
   certified: boolean;
+  admitted: boolean;
+  cert_label: CertLabel;
+  certified_by: string[];
   verification_state: string;
   card: MemeCard | null;
   note: string;

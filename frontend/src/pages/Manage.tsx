@@ -7,18 +7,28 @@ import { SectionHeader } from "@/components/Sections";
 import { StickerThumb } from "@/components/StickerThumb";
 import { EmptyState, ErrorState, LoadingCards } from "@/components/States";
 import { useAsync } from "@/hooks/useAsync";
-import type { MemeMetaPatch, ManageView, Thumbnail } from "@/types/api";
+import type { ManageListItem, MemeMetaPatch, ManageView, Thumbnail } from "@/types/api";
 import { compact } from "@/utils/format";
 
 const STATUS_TABS = [
   { key: "all", label: "全部" },
-  { key: "certified", label: "正式梗" },
-  { key: "candidate", label: "候选梗" },
+  { key: "certified", label: "已入池" },
+  { key: "candidate", label: "未入池" },
 ];
 
 const MAX_DESC = 600;
 const MAX_TERMS = 12;
 const MAX_TERM_LEN = 20;
+
+/**
+ * 认证标签的配色：双 UP 是绿，单 UP 是蓝（入了池但不是最强证据），
+ * 未认证才是金色告警——准入看并集，所以只有两位都没做过的才算"没进池"。
+ */
+function certChipClass(item: Pick<ManageListItem, "cert_label" | "admitted">): string {
+  if (item.cert_label === "双 UP 认证") return "bg-go-soft text-go";
+  if (item.admitted) return "bg-nav-soft text-nav";
+  return "bg-gold/20 text-[#B2750A]";
+}
 
 /** 封面到底是谁给的，得让人一眼看出来，别把人工挑的当成视频自带。 */
 function coverOrigin(view: ManageView): { label: string; cls: string } {
@@ -329,9 +339,16 @@ export default function Manage() {
                     {item.has_manual_cover ? (
                       <span className="chip shrink-0 bg-brand-soft px-1.5 py-0.5 text-[10px] text-brand">人工</span>
                     ) : null}
-                    {!item.certified ? (
-                      <span className="chip shrink-0 bg-gold/20 px-1.5 py-0.5 text-[10px] text-[#B2750A]">候选</span>
-                    ) : null}
+                    <span
+                      className={`chip shrink-0 px-1.5 py-0.5 text-[10px] ${certChipClass(item)}`}
+                      title={
+                        item.admitted
+                          ? `已入池：证据来自 ${item.certified_by.join("、")}（认证窗口 ${list.data?.cert_window_days ?? 90} 天滚动）`
+                          : "两位 UP 主都没介绍过，未通过发现层准入"
+                      }
+                    >
+                      {item.cert_label}
+                    </span>
                   </button>
                 </li>
               ))}
@@ -339,7 +356,11 @@ export default function Manage() {
           )}
           {list.data ? (
             <p className="mt-3 text-[12px] text-ink-faint">
-              共 {list.data.total} 个 · 人工封面 {list.data.managed_count} 个
+              共 {list.data.total} 个 · 入池 {list.data.in_pool_count} 个（双 UP{" "}
+              {list.data.certified_count} 个）· 未入池 {list.data.out_of_pool_count} 个 · 人工封面{" "}
+              {list.data.managed_count} 个
+              <br />
+              准入看并集：任一 UP 主在 {list.data.cert_window_days} 天内介绍过即入池
             </p>
           ) : null}
         </aside>
@@ -365,8 +386,18 @@ export default function Manage() {
                         ? "待采集"
                         : "演示数据"}
                   </span>
-                  {view.certified ? null : (
-                    <span className="chip bg-gold/20 text-[#B2750A]">候选梗，未进榜单</span>
+                  <span
+                    className={`chip ${certChipClass(view)}`}
+                    title={
+                      view.admitted
+                        ? `证据来自 ${view.certified_by.join("、")}`
+                        : "两位 UP 主都没介绍过，未通过发现层准入"
+                    }
+                  >
+                    {view.cert_label}
+                  </span>
+                  {view.admitted ? null : (
+                    <span className="chip bg-gold/20 text-[#B2750A]">未入池，不进榜单</span>
                   )}
                   <Link to={`/meme/${view.id}`} className="link-quiet ml-auto">
                     查看详情页

@@ -100,7 +100,7 @@ export function TransparencyFooter({ meta }: { meta: Meta | null }) {
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-ink-soft">Bilibili</span>
         <span className="text-ink-faint">|</span>
-        <span>梗百科</span>
+        <span title={meta?.transparency?.certification_rule ?? "梗百科 / 梗指南"}>梗百科</span>
         <span className="text-ink-faint">|</span>
         <span>梗指南</span>
         <span className="text-ink-faint">|</span>

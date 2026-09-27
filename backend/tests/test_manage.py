@@ -137,11 +137,13 @@ def test_rejects_oversized_and_unknown_fields(client):
     assert client.patch("/api/manage/memes/999999", json={"description": "x"}).status_code == 404
 
 
-def test_candidate_meme_is_manageable(client):
-    """候选梗没进榜单，但介绍和封面照样要能补。"""
+def test_out_of_pool_meme_is_manageable(client):
+    """两位 UP 都没介绍过的梗没进榜单，但介绍和封面照样要能补。"""
     db = _session()
     try:
-        candidate = db.query(Meme).filter(Meme.certified.is_(False)).first()
+        candidate = db.query(Meme).filter(
+            Meme.encyclopedia_confirmed.is_(False), Meme.guide_confirmed.is_(False)
+        ).first()
         assert candidate is not None
         meme_id = candidate.id
     finally:
@@ -151,6 +153,21 @@ def test_candidate_meme_is_manageable(client):
     saved = client.patch(f"/api/manage/memes/{meme_id}", json={"description": "候选阶段先写个介绍"})
     assert saved.status_code == 200
     assert saved.json()["meme"]["description"] == "候选阶段先写个介绍"
+
+
+def test_manage_list_labels_certification_strength(client):
+    """管理列表要能一眼看出"缺哪一边"，不然运营只会看到一片"未认证"。"""
+    managed = client.get("/api/manage/memes").json()
+    by_name = {item["name"]: item for item in managed["items"]}
+
+    assert by_name["新梗观察A"]["cert_label"] == "梗百科认证"
+    assert by_name["新梗观察A"]["admitted"] is True
+    assert by_name["新梗观察A"]["certified"] is False
+    assert by_name["新梗观察B"]["certified_by"] == ["梗指南"]
+    assert by_name["网友投稿梗"]["admitted"] is False
+    assert by_name["网友投稿梗"]["cert_label"] == "未认证"
+    assert managed["in_pool_count"] == managed["total"] - managed["out_of_pool_count"]
+    assert managed["cert_window_days"] == 90
 
 
 # --------------------------------------------------------------------------- #
@@ -233,7 +250,7 @@ def _snapshot(client, meme_id: int) -> tuple:
 
 
 def test_create_meme_is_candidate_and_stays_gated(client):
-    """手动新增的梗能进库、能被度量，但闸门照旧不让它上榜单。"""
+    """手动新增的梗能进库、能被度量，但未通过发现层准入就不该上榜单。"""
     created = client.post(
         "/api/manage/memes",
         json={"name": "临时新增梗", "description": "先记一笔", "aliases": ["临时梗"], "keywords": ["测试"]},
@@ -250,7 +267,7 @@ def test_create_meme_is_candidate_and_stays_gated(client):
     assert client.post("/api/manage/memes", json={"name": "超长名字".join("梗" * 25)}).status_code in (400, 422)
 
     public = {item["name"] for item in client.get("/api/memes?limit=100").json()["items"]}
-    assert "临时新增梗" not in public, "未认证梗不能出现在榜单"
+    assert "临时新增梗" not in public, "未入池的梗不能出现在榜单"
     managed = client.get("/api/manage/memes?status=candidate").json()
     assert "临时新增梗" in {item["name"] for item in managed["items"]}
 

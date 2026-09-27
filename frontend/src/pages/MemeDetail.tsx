@@ -105,6 +105,18 @@ function CertificationStrip({
     { key: "encyclopedia", label: "梗百科", side: certification.encyclopedia },
     { key: "guide", label: "梗指南", side: certification.guide },
   ];
+  const stateText =
+    verification === "verified_both"
+      ? "已在线核验"
+      : verification === "partially_verified"
+        ? `${certification.certified_by[0] ?? "单 UP"}已核验`
+        : "未在线核验";
+  const stateTitle =
+    verification === "verified_both"
+      ? "已在两位 UP 主的真实投稿中命中"
+      : verification === "partially_verified"
+        ? `只在一位 UP 主的真实投稿中命中（另一位没做过或被风控挡住）：${certification.certified_by.join("、")}`
+        : "梗库里的认证位来自人工整理；B 站投稿接口被风控时无法在线核验";
   return (
     <section className="card p-5">
       <div className="mb-3 flex items-center gap-2">
@@ -112,19 +124,30 @@ function CertificationStrip({
         <h3 className="text-[18px] font-bold">双 UP 梗认证</h3>
         <span
           className={`chip ml-auto ${
-            verification === "verified_both" ? "bg-go/10 text-go" : "bg-gold/20 text-[#B2750A]"
-          }`}
-          title={
             verification === "verified_both"
-              ? "已在两位 UP 主的真实投稿中命中"
-              : "认证位来自人工整理的梗库；B 站投稿接口被风控，尚未在线核验"
+              ? "bg-go/10 text-go"
+              : verification === "partially_verified"
+                ? "bg-flare/10 text-flare"
+                : "bg-gold/20 text-[#B2750A]"
+          }`}
+          title={stateTitle}
+        >
+          {stateText}
+        </span>
+        <span
+          className={`chip ${certification.certified ? "bg-go/10 text-go" : "bg-rail text-ink-mute"}`}
+          title={
+            certification.certified
+              ? "两位 UP 主都独立介绍过"
+              : `发现层按并集准入：任一 UP 主在 ${certification.cert_window_days} 天内介绍过即入池；这条只有 ${certification.certified_by.join("、") || "没有"} 的证据`
           }
         >
-          {verification === "verified_both" ? "已在线核验" : "未在线核验"}
+          {certification.cert_label}
         </span>
       </div>
       <p className="mb-3 text-[12px] leading-relaxed text-ink-mute">
-        只有 梗百科 与 梗指南 都独立发视频介绍过的梗，才会进入正式梗库参与热度与生命周期分析。
+        准入看并集：梗百科为主、梗指南补充，任一 UP 主在最近 {certification.cert_window_days} 天里真实介绍过就进梗库；
+        两位都独立介绍过的标「双 UP 认证」，只有一位的会写明是哪一位。
       </p>
       <ul className="space-y-2">
         {sides.map(({ key, label, side }) => (
@@ -135,7 +158,7 @@ function CertificationStrip({
                 {label}
                 <span className="ml-1.5 text-[11px] font-normal text-ink-faint">@{side.up_name}</span>
               </div>
-              <div className="truncate text-[12px] text-ink-mute">{side.video_title || "尚未发布介绍视频"}</div>
+              <div className="truncate text-[12px] text-ink-mute">{side.video_title || "没有介绍过这个梗"}</div>
               {side.linkable && side.video_url ? (
                 <a
                   href={side.video_url}
@@ -148,7 +171,7 @@ function CertificationStrip({
                 </a>
               ) : (
                 <span className="text-[11px] text-ink-faint">
-                  {side.video_title || "未在线核验到该 UP 主的对应投稿"}
+                  {side.video_title || (certification.admitted ? "未在该 UP 主的投稿中找到" : "未在线核验到该 UP 主的对应投稿")}
                 </span>
               )}
             </div>

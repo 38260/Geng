@@ -31,7 +31,10 @@ export function MemeCard({ item, rank }: { item: Card; rank: number }) {
         <StickerThumb thumbnail={item.thumbnail} ratio="6/5" emojiSize={48} rounded="rounded-xl" />
       </div>
 
-      <h3 className="mt-5 truncate text-[19px] font-bold leading-none" title={item.description}>
+      <h3
+        className="mt-5 truncate text-[19px] font-bold leading-none"
+        title={`${item.description || item.name}｜${item.cert_label}`}
+      >
         {item.name}
       </h3>
 
@@ -80,7 +83,9 @@ export function RecommendationCard({ item }: { item: Card }) {
           className="w-[104px] shrink-0"
         />
         <div className="min-w-0 flex-1 pt-0.5">
-          <h3 className="truncate text-[18px] font-bold leading-none">{item.name}</h3>
+          <h3 className="truncate text-[18px] font-bold leading-none" title={item.cert_label}>
+            {item.name}
+          </h3>
           <div className="mt-4 flex items-center gap-1 text-brand">
             <span className="text-[18px] leading-none">🔥</span>
             <span className="tabular text-[24px] font-black leading-none">{Math.round(item.hotness)}</span>

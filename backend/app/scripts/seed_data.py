@@ -26,7 +26,7 @@ from app.models import (
     init_db,
     reset_db,
 )
-from app.services.meme.certification import record_certification, recompute_certification
+from app.services.meme.certification import admitted, record_certification, recompute_certification
 from app.mock.catalogue import MEME_CATALOGUE, MemeSpec, stage_counts
 
 log = get_logger(__name__)
@@ -121,7 +121,7 @@ def seed(days: int | None = None, do_reset: bool = True, force: bool = False) ->
 
             purge_generated(session, meme)
 
-            if meme.certified:
+            if admitted(meme):
                 summary["certified"] += 1
                 # 演示数据也走一遍相关性打分：抽查列表里显示的分数得是真算出来的，
                 # 全留 0 会让人以为这些样本根本没通过过滤。
@@ -137,7 +137,7 @@ def seed(days: int | None = None, do_reset: bool = True, force: bool = False) ->
                 meme.data_updated_at = datetime.now()
             else:
                 summary["candidate"] += 1
-                log.info("跳过未认证梗：%s（梗百科=%s 梗指南=%s）",
+                log.info("跳过未入池梗：%s（梗百科=%s 梗指南=%s）",
                          meme.name, meme.encyclopedia_confirmed, meme.guide_confirmed)
 
         session.commit()

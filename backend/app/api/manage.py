@@ -13,6 +13,12 @@ from sqlalchemy import select
 from app.models import HotnessSnapshot, Meme, MemeStatus
 from app.schemas.api import MemeCreate, MemeMetaUpdate
 from app.services.meme import manage
+from app.services.meme.certification import (
+    admitted,
+    cert_label,
+    certified_by,
+    settings_cert_window_days,
+)
 from app.services.meme.query import covers_by_meme, thumbnail_for
 
 from .deps import SessionDep
@@ -61,6 +67,11 @@ def list_for_manage(
                 "description": meme.description or "",
                 "status": meme.status,
                 "certified": bool(meme.certified),
+                # 准入（并集）与认证强度（双 UP 徽章）分开给前端，
+                # 否则运营只会看到"没认证"，看不出是缺哪一边。
+                "admitted": admitted(meme),
+                "cert_label": cert_label(meme),
+                "certified_by": certified_by(meme),
                 "data_source": meme.data_source or "mock",
                 "verification_state": meme.verification_state or "unverified",
                 "hotness": round(hotness.score, 1) if hotness else None,
@@ -73,6 +84,9 @@ def list_for_manage(
         "managed_count": sum(1 for item in items if item["has_manual_cover"]),
         "certified_count": sum(1 for meme in rows if meme.certified),
         "candidate_count": sum(1 for meme in rows if not meme.certified),
+        "in_pool_count": sum(1 for meme in rows if admitted(meme)),
+        "out_of_pool_count": sum(1 for meme in rows if not admitted(meme)),
+        "cert_window_days": settings_cert_window_days(),
         "items": items,
     }
 

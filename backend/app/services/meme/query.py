@@ -10,7 +10,7 @@ import math
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.analytics import MemeTerms, match_videos, nickname
@@ -36,7 +36,14 @@ from app.models import (
 from app.mock.catalogue import spec_for
 
 from ..llm.service import generate_catch_up_advice, generate_trend_explanation
-from .certification import certification_progress
+from .certification import (
+    ENCYCLOPEDIA,
+    GUIDE,
+    cert_label,
+    certified_by,
+    certification_progress,
+    settings_cert_window_days,
+)
 
 log = get_logger(__name__)
 
@@ -139,22 +146,26 @@ def effective_source(sources: list[str]) -> tuple[str, bool]:
 
 
 def _load_rows(session: Session) -> list[tuple[Meme, HotnessSnapshot, LifecycleSnapshot]]:
-    """正式梗库 = 双 UP 认证通过 且 已有指标快照。
+    """榜单 = 通过发现层准入（任一 UP 主介绍过）且已有指标快照的梗。
 
-    真实模式下再加一道：数据必须真是 B 站采来的、认证必须真在线核验过（verified_both）。
-    手写演示梗的 certified 是自记自认的，跟琵琶曲、老叟戏顽童这种真梗同榜，
-    就是拿假数字压真热度。
+    真实模式下再加一道：数据必须真是 B 站采来的、认证证据必须真在 UP 主投稿里
+    抓到过（verified_both 或 partially_verified）。手写演示梗的 certified 是自记自认的，
+    跟琵琶曲、老叟戏顽童这种真梗同榜，就是拿假数字压真热度。
+    单 UP 的梗在这里不被排除，只有标签会写明它是"梗百科认证"还是"双 UP 认证"。
     """
     stmt = (
         select(Meme, HotnessSnapshot, LifecycleSnapshot)
         .join(HotnessSnapshot, HotnessSnapshot.meme_id == Meme.id)
         .join(LifecycleSnapshot, LifecycleSnapshot.meme_id == Meme.id)
-        .where(Meme.certified.is_(True), Meme.status == MemeStatus.CERTIFIED)
+        .where(
+            or_(Meme.encyclopedia_confirmed.is_(True), Meme.guide_confirmed.is_(True)),
+            Meme.status == MemeStatus.CERTIFIED,
+        )
     )
     if settings.data_source == "bilibili" and settings.leaderboard_require_verified:
         stmt = stmt.where(
             Meme.data_source == "bilibili",
-            Meme.verification_state == "verified_both",
+            Meme.verification_state.in_(("verified_both", "partially_verified")),
         )
     return list(session.execute(stmt))
 
@@ -191,6 +202,11 @@ def card_payload(
         "thumbnail": thumbnail_for(meme, real_cover),
         "meme_data_source": meme.data_source or settings.data_source,
         "verification_state": meme.verification_state or "unverified",
+        # 认证强度标签如实说明证据来自哪一位 UP：榜单不再要求"两位都做过"，
+        # 但用户必须能看出这条是双 UP 还是单 UP。
+        "cert_label": cert_label(meme),
+        "certified_by": certified_by(meme),
+        "double_certified": bool(meme.certified),
         "certified_at": meme.certified_at.isoformat() if meme.certified_at else None,
         "data_updated_at": meme.data_updated_at.isoformat() if meme.data_updated_at else None,
     })
@@ -473,8 +489,17 @@ def meta_payload(session: Session) -> dict[str, Any]:
     sources = [meme.data_source or settings.data_source for meme, _, _ in rows]
     source_breakdown = {key: sources.count(key) for key in sorted(set(sources))}
     site_source, site_is_demo = effective_source(sources)
+    # 候选 = 两位 UP 主都没介绍过（发现层并集之外），只能靠人工投稿进库。
+    # 只介绍过一位的梗已经算入池，不能跟"没人做过"的混成一类。
     candidate_count = len(
-        list(session.scalars(select(Meme.id).where(Meme.certified.is_(False))))
+        list(
+            session.scalars(
+                select(Meme.id).where(
+                    Meme.encyclopedia_confirmed.is_(False),
+                    Meme.guide_confirmed.is_(False),
+                )
+            )
+        )
     )
     return {
         "app_name": settings.app_name,
@@ -501,6 +526,12 @@ def meta_payload(session: Session) -> dict[str, Any]:
         "transparency": {
             "data_platform": "Bilibili",
             "certification": ["梗百科", "梗指南"],
+            "certification_rule": (
+                f"发现层并集准入：{ENCYCLOPEDIA.name}为主、{GUIDE.name}补，"
+                f"任一 UP 主在最近 {settings_cert_window_days()} 天内真实介绍过即入池；"
+                "两位都介绍过标记为「双 UP 认证」，只有一位则标明是哪一位"
+            ),
+            "cert_window_days": settings_cert_window_days(),
             "hotness_algorithm": "赶梗潮自定义热度指数（0-100，五因子加权）",
             "lifecycle_algorithm": "时间序列 + 阈值规则，不由 LLM 决定",
             "llm_role": "仅负责趋势解释与赶梗建议的文案，不参与计算",

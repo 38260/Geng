@@ -5,7 +5,7 @@
 一个只分析 **Bilibili 网络梗** 热度与生命周期的 Web 数据产品。
 
 ```
-B站数据 → 采集 → 清洗 → 梗匹配 → 双UP认证 → 时间序列聚合 → 热度指数 → 生命周期 → LongCat 解释 → FastAPI → React
+B站数据 → 采集 → 清洗 → 梗匹配 → 发现层准入（并集）+ 双UP认证标签 → 时间序列聚合 → 热度指数 → 生命周期 → LongCat 解释 → FastAPI → React
 ```
 
 分工：**数据负责证明，算法负责判断，LongCat 负责解释，UI 负责呈现。**
@@ -94,7 +94,7 @@ $env:VITE_API_TARGET="http://127.0.0.1:8010"; npm run dev
 | 路由 | 内容 |
 | --- | --- |
 | `/` | Hero + 筛选（全部/正在爆/快起飞/退潮中）+ 今日热榜 5 卡 + 精选推荐 + 数据透明度页脚 |
-| `/meme/:id` | 梗头卡（热度/阶段/赶梗状态/数据来源）、四项指标带增幅、ECharts 热度趋势 7/30 天、生命周期轨道、赶梗判断、趋势解释、相关视频、双 UP 认证证据 |
+| `/meme/:id` | 梗头卡（热度/阶段/赶梗状态/数据来源）、四项指标带增幅、ECharts 热度趋势 7/30 天、生命周期轨道、赶梗判断、趋势解释、相关视频、认证证据（含认证强度标签） |
 | `/library` | 全量已认证梗，筛选 + 搜索 + 排序 |
 | `/trends` | 热度榜表格（相对位置 + 增幅 + 赶梗结论） |
 | `/favorites` | 本机 localStorage 收藏，无账号体系 |
@@ -105,16 +105,26 @@ $env:VITE_API_TARGET="http://127.0.0.1:8010"; npm run dev
 
 ## 三、核心机制
 
-### 双 UP 梗认证（真实落在数据模型上，不是 README 里的一句话）
+### 梗库准入与双 UP 认证（两层，真实落在数据模型上）
 
 ```
-certified = encyclopedia_confirmed AND guide_confirmed
+准入（发现层，并集）= encyclopedia_confirmed OR guide_confirmed   → 进梗库、被采集、被算分、上榜
+认证（徽章，交集）  = encyclopedia_confirmed AND guide_confirmed  → 标签「双 UP 认证」
 ```
 
-* 梗百科 `space.bilibili.com/1544008396`、梗指南 `space.bilibili.com/94510621`
-* 证据存在 `meme_certifications` 表，撤销任一 UP 认证会自动退回 `candidate`
-* 分析管线入口 `require_certified()` 直接拒绝未认证梗；接口对未认证梗返回 409 并说明缺哪一边
-* 演示梗库里刻意保留 3 个未认证梗，用来验证这道闸门确实在工作
+* 梗百科 `space.bilibili.com/1544008396`（主来源，日更）、梗指南 `space.bilibili.com/94510621`（补充）
+* **认证窗口 90 天滚动**（`CERT_WINDOW_DAYS`）：介绍过没有看 90 天，报告/分析窗口仍是 30 天。
+  解说视频通常比梗的爆发期早 1~2 周，两个窗口合成一个就会漏掉正在热的梗
+* 准入为什么从交集改成并集（2026-09-27 实测）：90 天内梗百科单独介绍过 37 个梗、梗指南 22 个，
+  交集只剩 8 个——交集等于让日更 UP 的选题被周更 UP 的排期否决。
+  实测「闪身步」热度 81.0（当期最高）就因为只在梗百科做过而被挡在库外
+* 卡片与详情页如实标出证据来自哪一位：`cert_label` = 双 UP 认证 / 梗百科认证 / 梗指南认证，
+  `verification_state` = verified_both / partially_verified / unverified（只认真实抓到的投稿，
+  演示数据自记自认的 `confirmed` 一律算未核验）
+* 证据存在 `meme_certifications` 表；撤销一边只掉「双 UP」徽章，不会把梗踢出池子，
+  两位都没做过才退回 `candidate`
+* 分析管线入口 `require_certified()` 拒绝未入池梗；接口对未入池梗返回 409 并说明原因
+* 演示梗库里刻意保留单 UP 入池（新梗观察A/B）与未入池（网友投稿梗）各例，用来验证两层规则各在工作
 
 ### 梗热度指数（0-100，自有算法）
 
@@ -211,19 +221,25 @@ bash scripts/refresh-data.sh          # 全量重采 + 重算，末尾回报覆�
 LIMIT=5 bash scripts/refresh-data.sh  # 先拿 5 个梗试一下
 ```
 
-### 双 UP 认证：机制已实现，在线核验受风控限制
+### 梗库怎么长出来：发现层脚本 + 在线核验受风控限制
 
-`certified = 梗百科确认 AND 梗指南确认` 这条规则是真实代码，
-在线核验会去两位 UP 主的**真实投稿**里匹配梗名，命中才写真实 bvid。
+入库口径由 `app.scripts.list_recent_certified` 决定：翻两位 UP 主的真实投稿 →
+从标题抽梗名 → **并集入池**（写法不同的同一梗会保守合并）→ 带真实 bvid / 标题 / 发布时间入库 →
+逐日采集 → 重算。
 
-但本机实测：**只能拉到每位 UP 主最近约 150 条投稿**（`space/wbi/arc/search` 深翻页被 -352/412 挡住），
-而两位 UP 主近期覆盖的梗几乎不重叠 → 当前 28 个梗的 `verification_state` 全部是 `unverified`。
+```bash
+cd backend
+PYTHONIOENCODING=utf-8 python -m app.scripts.list_recent_certified --ingest   # 报告 30 天 / 认证 90 天
+```
 
-因此：
+但本机实测：**只能拉到每位 UP 主最近约 150~400 条投稿**（`space/wbi/arc/search` 深翻页被 -352/412 挡住），
+拉不到就如实记在报告的「缺口」一节里，不会拿旧证据凑数。因此：
 
-* 认证位目前来自**人工整理的梗名单**，不是在线核验结论 —— 详情页会明确显示「未在线核验」；
+* 只有一位的投稿被拉到，池子照样出（准入是并集），该梗标 `partially_verified`；
 * 演示阶段造的假 BV 号已全部清除，未核验的证据**不给可点开的链接**（`linkable=false`）；
-* 想要真实核验：在 `backend/.env` 填 `BILI_COOKIE`（浏览器登录 B 站后复制），
+* 手写演示梗的 `certified` 是自记自认的，不算真实证据，所以真实模式下 `verification_state=unverified`
+  的梗一律不进榜单（`LEADERBOARD_REQUIRE_VERIFIED`）；
+* 想要更完整的核验：在 `backend/.env` 填 `BILI_COOKIE`（浏览器登录 B 站后复制），
   再跑 `python -m app.scripts.rebuild_from_bilibili --pages 20 --refresh-index`，
   命中的梗会自动升级为「已在线核验」并带上真实投稿链接。
 
@@ -274,7 +290,7 @@ backend/
     schemas/      # 请求体模型
     services/
       llm/        # config / client / service（LongCat 走 OpenAI 兼容接口）
-      meme/       # certification（双 UP 闸门）、query（读侧组装）
+      meme/       # certification（准入并集 + 双 UP 徽章）、discovery（发现层并集）、query（读侧组装）
       pipeline.py # 采集 → 匹配 → 聚合 → 热度 → 生命周期
       settings_store.py  # 把前端填的配置写回 .env
     analytics/    # relevance / series / hotness / lifecycle / catch_up / aggregation
@@ -304,7 +320,7 @@ scripts/          # smoke_api.py / screenshot.sh / restart-backend.sh
 ### 数据
 
 - [x] 只分析 Bilibili，无抖音/小红书/微博等
-- [x] 只有双 UP 认证梗进入正式梗库（模型 + 管线 + 接口三处强制，且有测试）
+- [x] 梗库准入（并集）与双 UP 认证（交集徽章）两层规则，模型 + 管线 + 接口三处强制，且有测试
 - [x] 热度与生命周期均由算法计算，AI 不参与任何数值判断
 - [x] 演示/真实数据全站明确标注，接口与前端都带 `meme_data_source` 与 `verification_state`
 - [x] 真实数据已替换演示数据：28 个梗、约 1,100 条真实视频、逐日 30 天序列

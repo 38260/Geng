@@ -14,7 +14,10 @@ from app.models import Meme, reset_db
 
 from .conftest import make_video
 
-UNVERIFIED_NAMES = {"新梗观察A", "新梗观察B", "网友投稿梗"}
+# 两位 UP 主都没介绍过 → 未通过发现层准入，不得出现在榜单/详情
+OUT_OF_POOL_NAMES = {"网友投稿梗"}
+# 只有一位介绍过 → 并集准入通过，照样上榜，但标签必须写清是哪一位
+SINGLE_UP_NAMES = {"新梗观察A", "新梗观察B"}
 
 
 @pytest.fixture(scope="module")
@@ -59,7 +62,10 @@ def test_health_and_meta(client):
     assert payload["data_source"] == "mock"
     assert payload["is_demo"] is True, "演示数据必须被明确标记"
     assert payload["certified_count"] >= 30
-    assert payload["candidate_count"] == 3
+    # 候选 = 两位 UP 都没介绍过的（并集准入之外）；只有一位做过的已经算入池
+    assert payload["candidate_count"] == 1
+    assert payload["transparency"]["cert_window_days"] == 90
+    assert "并集" in payload["transparency"]["certification_rule"]
     assert payload["data_updated_at"]
     # 新鲜度必须可机读：统计截至哪天、离今天几天，前端据此写"数据截至"
     assert payload["data_through"] and len(payload["data_through"]) == 10
@@ -74,18 +80,32 @@ def test_health_and_meta(client):
 # --------------------------------------------------------------------------- #
 # 榜单
 # --------------------------------------------------------------------------- #
-def test_list_is_heat_sorted_and_only_certified(client):
+def test_list_is_heat_sorted_and_only_admitted(client):
     payload = client.get("/api/memes").json()
     scores = [item["hotness"] for item in payload["items"]]
     assert scores == sorted(scores, reverse=True)
     assert len(scores) == payload["total"]
-    assert not (set(item["name"] for item in payload["items"]) & UNVERIFIED_NAMES)
+    names = {item["name"] for item in payload["items"]}
+    assert not (names & OUT_OF_POOL_NAMES), "两位 UP 都没做过的梗不能上榜"
+    assert names & SINGLE_UP_NAMES == SINGLE_UP_NAMES, "并集准入：单 UP 也要能上榜"
     for item in payload["items"]:
         assert 0 <= item["hotness"] <= 100
         assert item["stage"] in {"sprouting", "rising", "explosive", "plateau", "receding", "obsolete"}
         assert item["catch_status"] in {"can_catch", "caution", "too_late"}
         assert item["nickname"]
         assert item["thumbnail"]["emoji"]
+        # 认证强度标签必须跟着卡片走，不能让单 UP 冒充双 UP
+        assert item["cert_label"] in {"双 UP 认证", "梗百科认证", "梗指南认证"}
+        assert item["certified_by"], "入池的梗至少要有一位 UP 证据"
+        assert item["double_certified"] is (len(item["certified_by"]) == 2)
+        assert item["cert_label"] == (
+            "双 UP 认证" if len(item["certified_by"]) == 2 else f"{item['certified_by'][0]}认证"
+        )
+
+    by_name = {item["name"]: item for item in payload["items"]}
+    assert by_name["新梗观察A"]["cert_label"] == "梗百科认证"
+    assert by_name["新梗观察A"]["certified_by"] == ["梗百科"]
+    assert by_name["新梗观察B"]["cert_label"] == "梗指南认证"
 
 
 def test_filters_map_to_lifecycle_stages(client):
@@ -225,19 +245,41 @@ def test_detail_does_not_call_the_llm(client, top_meme_id):
     assert insight["trend_explanation"] is None or insight["trend_explanation"]["status"] == "ok"
 
 
-def test_uncertified_meme_is_blocked(client):
+def test_out_of_pool_meme_is_blocked(client):
     from app.models import SessionLocal
 
     session = SessionLocal()
-    meme = session.query(Meme).filter(Meme.certified.is_(False)).first()
+    meme = session.query(Meme).filter(
+        Meme.encyclopedia_confirmed.is_(False), Meme.guide_confirmed.is_(False)
+    ).first()
     meme_id, meme_name = meme.id, meme.name
     session.close()
 
     response = client.get(f"/api/memes/{meme_id}")
     assert response.status_code == 409
-    assert "双 UP 认证" in response.json()["detail"]
+    assert "介绍过" in response.json()["detail"]
     assert meme_name not in [i["name"] for i in client.get("/api/memes?limit=100").json()["items"]]
     assert client.get("/api/memes/424242").status_code == 404
+
+
+def test_single_up_meme_is_viewable(client):
+    """准入放宽到并集之后，单 UP 的梗不能还被详情接口拦在门外。"""
+    from app.models import SessionLocal
+
+    session = SessionLocal()
+    meme = session.query(Meme).filter(
+        Meme.encyclopedia_confirmed.is_(True), Meme.guide_confirmed.is_(False)
+    ).first()
+    meme_id = meme.id
+    session.close()
+
+    payload = client.get(f"/api/memes/{meme_id}").json()
+    assert payload["meme"]["cert_label"] == "梗百科认证"
+    assert payload["meme"]["double_certified"] is False
+    cert = payload["certification"]
+    assert cert["admitted"] is True and cert["certified"] is False
+    assert cert["certified_by"] == ["梗百科"]
+    assert cert["cert_window_days"] == settings.cert_window_days
 
 
 # --------------------------------------------------------------------------- #
@@ -343,7 +385,8 @@ def test_settings_never_echo_the_key(client, monkeypatch, tmp_path):
 def test_recompute_job_is_idempotent(client):
     before = client.get("/api/memes?limit=5").json()["items"]
     result = client.post("/api/jobs/recompute").json()
-    assert result["ok"] is True and result["computed"] >= 30 and result["skipped"] == 3
+    # 并集准入之后只剩"两位 UP 都没做过"的那一个被跳过
+    assert result["ok"] is True and result["computed"] >= 30 and result["skipped"] == 1
     after = client.get("/api/memes?limit=5").json()["items"]
     assert [(i["id"], i["hotness"]) for i in before] == [(i["id"], i["hotness"]) for i in after]
 

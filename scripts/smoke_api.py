@@ -82,6 +82,14 @@ items = (lst or {}).get("items", [])
 check(len(items) > 0, "榜单非空")
 check([i["hotness"] for i in items] == sorted([i["hotness"] for i in items], reverse=True), "榜单按热度倒序")
 check(all(0 <= i["hotness"] <= 100 for i in items), "热度都在 0-100")
+check(
+    all(i.get("certified_by") for i in items),
+    "榜单每条都写明证据来自哪一位 UP（并集准入，单 UP 不冒充双 UP）",
+)
+check(
+    all((i["cert_label"] == "双 UP 认证") == i["double_certified"] for i in items),
+    "认证标签与双 UP 徽章一致",
+)
 
 for key, stages in (("hot", {"explosive"}), ("taking_off", {"sprouting", "rising"}), ("receding", {"receding", "obsolete"})):
     filtered = call("GET", f"/api/memes?filter={key}&limit=50")
@@ -105,7 +113,11 @@ if items:
     check(detail and set(detail) >= {"meme", "hotness", "lifecycle", "metrics", "certification", "videos", "trend", "insight"}, "详情结构完整")
     check(detail and sum(detail["hotness"]["weights"].values()) == 1.0, "热度权重合计为 1")
     check(detail and sum(1 for s in detail["lifecycle"]["stages"] if s["active"]) == 1, "生命周期只有一个当前阶段")
-    check(detail and detail["certification"]["certified"] is True, "详情梗已通过双 UP 认证")
+    check(detail and detail["certification"]["admitted"] is True, "详情梗已通过发现层准入（任一 UP 介绍过）")
+    check(
+        detail and detail["certification"]["cert_label"] in {"双 UP 认证", "梗百科认证", "梗指南认证"},
+        f"详情写明认证强度：{(detail or {}).get('certification', {}).get('cert_label')}",
+    )
     check(detail and all(v["relevance_score"] >= 0.5 for v in detail["videos"]), "相关视频都过相关性阈值")
     check(detail and len(detail["trend"]["points"]) == (detail["metrics"]["window_days"]), "趋势点数等于统计窗口")
     check("NaN" not in json.dumps(detail), "详情响应里没有 NaN")
@@ -143,9 +155,19 @@ call("POST", "/api/jobs/collect?source=douyin", expect=(422,), note="非法数�
 # 梗管理：只验证读写通道与边界，写回用"原值重写"以免改动当前数据集
 # --------------------------------------------------------------------------- #
 managed = call("GET", "/api/manage/memes")
-check(managed and managed["total"] >= (meta or {}).get("certified_count", 0), "管理列表覆盖正式梗")
-check(managed and managed["candidate_count"] >= 1, "管理列表包含候选梗（公开榜单不含）")
-check(managed and {"managed_count", "certified_count"} <= set(managed), "管理列表带人工维护计数")
+check(managed and managed["total"] >= (meta or {}).get("certified_count", 0), "管理列表覆盖榜单梗")
+check(
+    managed and {"managed_count", "certified_count", "in_pool_count", "out_of_pool_count"} <= set(managed),
+    "管理列表带人工维护计数与准入计数",
+)
+check(
+    managed and managed["in_pool_count"] == managed["total"] - managed["out_of_pool_count"],
+    f"准入自述一致：入池 {managed['in_pool_count']} / 未入池 {managed['out_of_pool_count']}",
+)
+check(
+    managed and managed["cert_window_days"] == (meta or {}).get("transparency", {}).get("cert_window_days"),
+    f"认证窗口两处口径一致：{managed['cert_window_days']} 天滚动",
+)
 
 mid = (items or [{}])[0].get("id")
 view = call("GET", f"/api/manage/memes/{mid}")

@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Query
 from app.config import HOME_FILTER_LABELS, settings
 from app.schemas.api import RefreshRequest
 from app.services.meme import query as q
+from app.services.meme.certification import ENCYCLOPEDIA, GUIDE, admitted
 
 from .deps import SessionDep
 
@@ -16,13 +17,17 @@ SORTS = {"hotness", "growth", "discussion", "name"}
 
 
 def _require_certified(meme_id: int, session):
+    """读侧闸门 = 发现层准入：任一 UP 主介绍过就能看；两位都没做过的不给指标页。"""
     meme = q.get_meme_or_none(session, meme_id)
     if meme is None:
         raise HTTPException(status_code=404, detail="梗不存在")
-    if not meme.certified:
+    if not admitted(meme):
         raise HTTPException(
             status_code=409,
-            detail=f"梗「{meme.name}」尚未通过双 UP 认证（梗百科 + 梗指南），未进入正式梗库",
+            detail=(
+                f"梗「{meme.name}」还没有任何一位梗解释 UP 主（{ENCYCLOPEDIA.name} / {GUIDE.name}）"
+                f"介绍过，未通过发现层准入，不进入榜单"
+            ),
         )
     return meme
 

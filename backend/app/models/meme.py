@@ -1,13 +1,14 @@
 """梗 / 双 UP 认证 数据模型。
 
-「双 UP 梗认证」是本项目最重要的数据规则，因此它不是一段 README 说明，而是
-真实落在数据模型上的约束：
+「梗库准入」与「双 UP 认证」是两个层次，都真实落在数据模型上，而不是 README 里的说法：
 
-    certified = 梗百科 confirmed AND 梗指南 confirmed
+    准入（发现层）= 梗百科 confirmed OR 梗指南 confirmed   → status == certified
+    认证（徽章）  = 梗百科 confirmed AND 梗指南 confirmed  → certified == True
 
-只有 ``certified == True`` 的梗才会进入正式梗库参与热度与生命周期分析，
-这一点由 :mod:`app.services.meme.certification` 在写入时强制，并由
-``Meme.is_official`` 在读侧把关。
+只有准入通过的梗才会被采集、算分并出现在榜单上；``certified`` 表示"两位 UP 主都
+独立做过"，作为可信度标签展示（双 UP 认证 / 梗百科认证 / 梗指南认证）。
+规则由 :mod:`app.services.meme.certification` 在写入时强制，读侧由
+``Meme.is_official`` 与查询层的闸门把关。
 """
 
 from __future__ import annotations

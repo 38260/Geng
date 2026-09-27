@@ -78,11 +78,18 @@ class Settings(BaseSettings):
     # 无论开关如何，接口和页面都会如实标出 verification_state。
     analysis_allow_unverified: bool = True
 
-    # 站点配置为真实数据源时，榜单/详情只收"真实采集到 + 双 UP 在线核验通过"的梗。
-    # 演示梗库是手写的，认证记录也是自造的，让它跟真梗同榜混排等于用假数字压真热度。
+    # 站点配置为真实数据源时，榜单/详情只收"真实采集到 + 至少一位 UP 主有真实投稿证据"的梗
+    # （verification_state 为 verified_both 或 partially_verified）。演示梗库是手写的，
+    # 认证记录也是自造的，让它跟真梗同榜混排等于用假数字压真热度。
     # 跑演示（DATA_SOURCE=mock）时这条不生效，否则演示产品会空掉。
     leaderboard_require_verified: bool = True
     relevance_threshold: float = 0.5
+
+    # ------------------------------- discovery -------------------------------- #
+    # 发现层认证窗口（滚动天数）。解说视频通常比梗的爆发期早 1~2 周，
+    # 用报告窗口（analysis_window_days=30）当认证窗口会把还在热的梗整条排除
+    # ——漏掉「老叟戏顽童」就是这么来的。所以认证窗口独立、且比报告窗口宽。
+    cert_window_days: int = 90
 
     @field_validator("cors_origins", mode="before")
     @classmethod

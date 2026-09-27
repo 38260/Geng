@@ -3,11 +3,11 @@
 说明：
 * 这里的梗名称/别名是真实存在于 B 站梗文化中的说法，但**所有数值都是演示数据**，
   由 :mod:`app.mock.curves` 按生命周期原型生成，页面上会明确标注「演示数据」。
-* ``certification`` 决定该梗能否进入正式梗库：
-    both    -> 梗百科 + 梗指南 都介绍过（certified=True）
-    enc     -> 只有梗百科介绍过（candidate，禁止进入分析）
-    guide   -> 只有梗指南介绍过（candidate，禁止进入分析）
-    none    -> 用户/运营提交但尚未认证（candidate）
+* ``certification`` 决定该梗在发现层的位置（准入看并集，认证徽章看交集）：
+    both    -> 两位 UP 都介绍过（certified=True，标签「双 UP 认证」）
+    enc     -> 只有梗百科介绍过（入池，标签「梗百科认证」）
+    guide   -> 只有梗指南介绍过（入池，标签「梗指南认证」）
+    none    -> 运营手工提交、两位 UP 都没做过（未入池，只在管理列表里）
 * ``scale`` 是"日均播放量级"，用来控制该梗的量级大小；``archetype`` 决定曲线形状。
 """
 
@@ -117,12 +117,12 @@ MEME_CATALOGUE: tuple[MemeSpec, ...] = (
     MemeSpec("特种兵式旅游", "obsolete", 1_800, "极限打卡式旅行叙事，已归于平静。",
              ("特种兵旅游",), ("旅行", "打卡"), emoji="🥾", color="#EDEDED"),
 
-    # ------------------- 未通过双 UP 认证（不得进入分析） ------------------- #
-    MemeSpec("新梗观察A", "rising", 20_000, "只有梗百科介绍过，等待梗指南认证，因此不得进入正式梗库。",
+    # ------------------- 发现层：单 UP 入池 / 无 UP 待补 ------------------- #
+    MemeSpec("新梗观察A", "rising", 20_000, "只有梗百科介绍过：按并集准入已经入池，标签是「梗百科认证」而不是「双 UP 认证」。",
              ("观察A",), ("测试",), certification="enc", emoji="🧪", color="#E8F5E9"),
-    MemeSpec("新梗观察B", "plateau", 15_000, "只有梗指南介绍过，属于候选梗。",
+    MemeSpec("新梗观察B", "plateau", 15_000, "只有梗指南介绍过，同样入池，标签为「梗指南认证」。",
              ("观察B",), ("测试",), certification="guide", emoji="🧪", color="#E3F2FD"),
-    MemeSpec("网友投稿梗", "explosive", 40_000, "尚无任何 UP 认证，仅有投稿记录。",
+    MemeSpec("网友投稿梗", "explosive", 40_000, "两位 UP 主都没介绍过，未通过发现层准入，只能待在管理列表里。",
              ("投稿",), ("待审",), certification="none", emoji="📮", color="#FFF3E0"),
 )
 

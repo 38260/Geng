@@ -22,6 +22,7 @@ from app.models import (
     Video,
 )
 
+from .certification import admitted, cert_label, certified_by
 from .query import _https, card_payload, cover_for_meme, manual_cover_for, thumbnail_for
 
 MAX_NAME_LEN = 20
@@ -179,6 +180,9 @@ def meme_view(session: Session, meme: Meme) -> dict[str, Any]:
         "data_source": meme.data_source or "pending",
         "status": meme.status,
         "certified": bool(meme.certified),
+        "admitted": admitted(meme),
+        "cert_label": cert_label(meme),
+        "certified_by": certified_by(meme),
         "verification_state": meme.verification_state or "unverified",
         "card": card_payload(meme, hotness, lifecycle, real_cover=auto_cover)
         if hotness and lifecycle

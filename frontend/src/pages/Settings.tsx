@@ -284,9 +284,10 @@ export default function Settings() {
               更多有趣的梗！
             </div>
             <div className="ml-auto text-right text-[11px] leading-relaxed text-ink-faint">
-              正式梗库 {meta?.certified_count ?? 0} 个
+              梗库 {meta?.certified_count ?? 0} 个（任一 UP 介绍过）
               <br />
-              候选 {meta?.candidate_count ?? 0} 个 · 窗口 {meta?.window_days ?? 0} 天
+              未入池 {meta?.candidate_count ?? 0} 个 · 分析窗口 {meta?.window_days ?? 0} 天 · 认证窗口{" "}
+              {meta?.transparency?.cert_window_days ?? 90} 天
             </div>
           </div>
         </section>

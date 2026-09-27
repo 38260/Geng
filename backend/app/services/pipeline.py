@@ -212,11 +212,15 @@ def collect_all(
     window_days: int | None = None,
     commit: bool = True,
     purge_when_empty: bool = False,
+    include_candidates: bool = True,
 ) -> dict[str, object]:
     """跑一遍采集 → 清洗 → 匹配 → 聚合 → 指标计算。
 
     一个梗只保留一份数据来源：采集某个梗时会先清掉它原来的行，
     避免演示数据和真实数据混在同一个时间序列里被重复计数。
+
+    采集范围默认含候选梗：闸门管的是"能不能上榜单"，不该管"能不能被度量"——
+    否则手动加进来的真热梗连数据都拿不到。指标计算那一步仍然逐条过闸门。
     """
     from app.collectors import make_collector
     from app.collectors.bilibili import BilibiliBlocked
@@ -245,7 +249,9 @@ def collect_all(
     try:
         # 覆盖"库里所有可分析的梗"，而不只是在线核验通过的——
         # 未核验的会带着 verification_state 如实出现在结果里
-        stmt = select(Meme).where(Meme.status == MemeStatus.CERTIFIED)
+        stmt = select(Meme)
+        if not include_candidates:
+            stmt = stmt.where(Meme.status == MemeStatus.CERTIFIED)
         if meme_ids:
             stmt = stmt.where(Meme.id.in_(meme_ids))
         memes = list(session.scalars(stmt.order_by(Meme.id)))

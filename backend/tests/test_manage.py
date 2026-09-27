@@ -230,3 +230,64 @@ def _snapshot(client, meme_id: int) -> tuple:
         )
     finally:
         db.close()
+
+
+def test_create_meme_is_candidate_and_stays_gated(client):
+    """手动新增的梗能进库、能被度量，但闸门照旧不让它上榜单。"""
+    created = client.post(
+        "/api/manage/memes",
+        json={"name": "临时新增梗", "description": "先记一笔", "aliases": ["临时梗"], "keywords": ["测试"]},
+    )
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["created"] is True
+    meme = body["meme"]
+    assert meme["status"] == "candidate" and meme["certified"] is False
+    assert meme["data_source"] == "pending", "新梗还没数据，不该被标成演示或真实数据"
+    assert meme["sample_videos"]["accepted"] == 0
+
+    assert client.post("/api/manage/memes", json={"name": "临时新增梗"}).status_code == 409
+    assert client.post("/api/manage/memes", json={"name": "超长名字".join("梗" * 25)}).status_code in (400, 422)
+
+    public = {item["name"] for item in client.get("/api/memes?limit=100").json()["items"]}
+    assert "临时新增梗" not in public, "未认证梗不能出现在榜单"
+    managed = client.get("/api/manage/memes?status=candidate").json()
+    assert "临时新增梗" in {item["name"] for item in managed["items"]}
+
+    from app.models import Meme, SessionLocal
+
+    db = SessionLocal()
+    try:
+        db.query(Meme).filter(Meme.id == meme["id"]).delete(synchronize_session=False)
+        db.commit()
+    finally:
+        db.close()
+
+
+def test_collect_covers_candidates_so_manual_memes_get_measured(monkeypatch):
+    """闸门管榜单，不管采集：候选梗也要能拿到真实序列。"""
+    from app.collectors.base import CollectedBundle
+    from app.services.pipeline import collect_all
+
+    seen: list[tuple[int, str]] = []
+
+    class Recorder:
+        source = "bilibili"
+
+        def is_available(self):
+            return True, "ok"
+
+        def collect(self, meme, *, window_days=30):
+            seen.append((meme.id, meme.status))
+            return CollectedBundle(daily_stats=[], videos=[])
+
+    monkeypatch.setattr("app.collectors.make_collector", lambda _source: Recorder())
+
+    collect_all("bilibili", window_days=30, include_candidates=True)
+    with_candidates = {status for _, status in seen}
+    seen.clear()
+    collect_all("bilibili", window_days=30, include_candidates=False)
+    only_certified = {status for _, status in seen}
+
+    assert "candidate" in with_candidates
+    assert only_certified == {"certified"}

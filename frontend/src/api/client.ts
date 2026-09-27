@@ -160,6 +160,12 @@ export const api = {
 
   manageMeme: (id: number) => request<ManageView>(`/api/manage/memes/${id}`),
 
+  createMeme: (body: { name: string; description?: string; aliases?: string[]; keywords?: string[] }) =>
+    request<{ created: boolean; meme: ManageView }>("/api/manage/memes", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
   saveMemeMeta: (id: number, body: MemeMetaPatch) =>
     request<MemeMetaResult>(`/api/manage/memes/${id}`, {
       method: "PATCH",

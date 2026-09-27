@@ -7,16 +7,24 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import HotnessSnapshot, LifecycleSnapshot, Meme, Video
+from app.models import (
+    HotnessSnapshot,
+    LifecycleSnapshot,
+    Meme,
+    MemeStatus,
+    Video,
+)
 
 from .query import _https, card_payload, cover_for_meme, manual_cover_for, thumbnail_for
 
+MAX_NAME_LEN = 20
 MAX_TERMS = 12
 MAX_TERM_LEN = 20
 MAX_DESC = 600
@@ -110,6 +118,46 @@ def sample_videos(session: Session, meme: Meme, limit: int = 8) -> dict[str, Any
     }
 
 
+def _unique_slug(session: Session, name: str) -> str:
+    base = re.sub(r"[^0-9a-z一-鿿]+", "-", name.lower()).strip("-")[:48] or "meme"
+    slug, index = base, 1
+    while session.query(Meme).filter(Meme.slug == slug).first() is not None:
+        index += 1
+        slug = f"{base}-{index}"
+    return slug
+
+
+def create_meme(session: Session, payload: dict[str, Any]) -> dict[str, Any]:
+    """手动加一个梗进库：默认是候选梗，闸门照旧拦着它上榜单。
+
+    存在的意义是"梗库入口不能只有两位 UP 的投稿交集"——站内自发跑起来的梗
+    （如「胆子真的肥嘟嘟的」）两位 UP 可能根本没做过，但它是真热梗，
+    得先能进库、被采集、被度量，认证状态另说。
+    """
+    name = str(payload.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="梗名不能为空")
+    if len(name) > MAX_NAME_LEN:
+        raise HTTPException(status_code=400, detail=f"梗名最长 {MAX_NAME_LEN} 字")
+    if session.query(Meme).filter(func.lower(Meme.name) == name.lower()).first():
+        raise HTTPException(status_code=409, detail=f"梗「{name}」已经在库里了")
+
+    meme = Meme(
+        name=name,
+        slug=_unique_slug(session, name),
+        description=str(payload.get("description") or "").strip()[:MAX_DESC],
+        aliases=_clean_terms(payload.get("aliases"), "别名"),
+        keywords=_clean_terms(payload.get("keywords"), "关键词"),
+        status=MemeStatus.CANDIDATE,
+        certified=False,
+        verification_state="unverified",
+        data_source="",          # 还没数据，等采集器如实回填
+    )
+    session.add(meme)
+    session.commit()
+    return {"created": True, "meme": meme_view(session, meme)}
+
+
 def meme_view(session: Session, meme: Meme) -> dict[str, Any]:
     """管理表单要的一次性读：当前值 + 自动封面 + 可挑的真实封面。"""
     hotness = session.get(HotnessSnapshot, meme.id)
@@ -127,7 +175,8 @@ def meme_view(session: Session, meme: Meme) -> dict[str, Any]:
         "effective_cover": thumbnail_for(meme, auto_cover)["image"],
         "cover_options": cover_options(session, meme),
         "sample_videos": sample_videos(session, meme),
-        "data_source": meme.data_source or "mock",
+        # 空 = 刚建好还没采到过任何数据，不能冒充"演示数据"也不能冒充"真实数据"
+        "data_source": meme.data_source or "pending",
         "status": meme.status,
         "certified": bool(meme.certified),
         "verification_state": meme.verification_state or "unverified",

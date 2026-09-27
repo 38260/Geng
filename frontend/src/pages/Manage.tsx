@@ -30,6 +30,72 @@ function coverOrigin(view: ManageView): { label: string; cls: string } {
 
 const sameList = (a: string[], b: string[]) => a.length === b.length && a.every((item, i) => item === b[i]);
 
+/** 站内自发跑起来的梗（两位 UP 没做过的）也要能进库被度量。 */
+function NewMemeForm({ onCreated }: { onCreated: (id: number) => void }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [terms, setTerms] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async () => {
+    const trimmed = name.trim();
+    if (!trimmed) return setError("先给梗起个名");
+    setBusy(true);
+    setError("");
+    try {
+      const extras = terms.split(/[,，、\s]+/).map((item) => item.trim()).filter(Boolean);
+      const result = await api.createMeme({ name: trimmed, aliases: extras, keywords: extras });
+      setName("");
+      setTerms("");
+      setOpen(false);
+      onCreated(result.meme.id);
+    } catch (exc) {
+      setError((exc as Error).message || "新增失败");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button type="button" className="btn-ghost mb-3 w-full rounded-full" onClick={() => setOpen(true)}>
+        ＋ 新增梗（两位 UP 没做过的热梗）
+      </button>
+    );
+  }
+
+  return (
+    <div className="card mb-3 space-y-2 p-3">
+      <input
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        placeholder="梗名，如：胆子真的肥嘟嘟的"
+        maxLength={20}
+        className="field h-10"
+      />
+      <input
+        value={terms}
+        onChange={(event) => setTerms(event.target.value)}
+        placeholder="别名/关键词，逗号分隔（用于搜到相关视频）"
+        className="field h-10"
+      />
+      <div className="flex items-center gap-2">
+        <button type="button" className="btn-primary h-9 rounded-full text-[13px]" onClick={submit} disabled={busy}>
+          {busy ? "加入中…" : "加入梗库"}
+        </button>
+        <button type="button" className="link-quiet" onClick={() => setOpen(false)}>
+          取消
+        </button>
+      </div>
+      {error ? <p className="text-[12px] text-brand">{error}</p> : null}
+      <p className="text-[11px] leading-relaxed text-ink-faint">
+        新加的梗默认是候选梗，不会直接上榜单；采集到数据后仍要过双 UP 认证才进正式梗库。
+      </p>
+    </div>
+  );
+}
+
 function TermList({
   label,
   hint,
@@ -198,6 +264,12 @@ export default function Manage() {
       <div className="flex flex-col gap-6 xl:flex-row">
         {/* ---------------- 左：梗列表 ---------------- */}
         <aside className="w-full shrink-0 xl:w-[300px]">
+          <NewMemeForm
+            onCreated={(id) => {
+              setSelected(id);
+              list.reload();
+            }}
+          />
           <div className="relative mb-3">
             <SearchIcon size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-mute" />
             <input
@@ -287,7 +359,11 @@ export default function Manage() {
                   <h2 className="text-[22px] font-black">{view.name}</h2>
                   <span className={`chip ${coverOrigin(view).cls}`}>{coverOrigin(view).label}</span>
                   <span className="chip bg-rail text-ink-mute">
-                    {view.data_source === "bilibili" ? "B站真实数据" : "演示数据"}
+                    {view.data_source === "bilibili"
+                      ? "B站真实数据"
+                      : view.data_source === "pending"
+                        ? "待采集"
+                        : "演示数据"}
                   </span>
                   {view.certified ? null : (
                     <span className="chip bg-gold/20 text-[#B2750A]">候选梗，未进榜单</span>

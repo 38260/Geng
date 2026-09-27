@@ -11,7 +11,7 @@ from fastapi import APIRouter, HTTPException, Query
 from sqlalchemy import select
 
 from app.models import HotnessSnapshot, Meme, MemeStatus
-from app.schemas.api import MemeMetaUpdate
+from app.schemas.api import MemeCreate, MemeMetaUpdate
 from app.services.meme import manage
 from app.services.meme.query import covers_by_meme, thumbnail_for
 
@@ -75,6 +75,12 @@ def list_for_manage(
         "candidate_count": sum(1 for meme in rows if not meme.certified),
         "items": items,
     }
+
+
+@router.post("/memes", status_code=201)
+def create_meme(body: MemeCreate, session: SessionDep):
+    """站内自发跑起来的梗（两位 UP 没做过的）也要能进库被度量。"""
+    return manage.create_meme(session, body.model_dump())
 
 
 @router.get("/memes/{meme_id}")

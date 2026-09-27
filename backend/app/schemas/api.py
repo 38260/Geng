@@ -26,6 +26,15 @@ class CatchUpAdviceRequest(TrendExplanationRequest):
     pass
 
 
+class MemeCreate(BaseModel):
+    """手动新增一个梗：名字必填，其余可后补。"""
+
+    name: str = Field(min_length=1, max_length=20)
+    description: str | None = Field(default=None, max_length=600)
+    aliases: list[str] | None = None
+    keywords: list[str] | None = None
+
+
 class MemeMetaUpdate(BaseModel):
     """梗元数据人工维护。不传的字段保持原样；只影响展示与检索，不影响任何算法指标。"""
 

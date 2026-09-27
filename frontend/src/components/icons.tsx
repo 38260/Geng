@@ -246,3 +246,11 @@ export const UserSolidIcon = (p: IconProps) => (
     <path d="M4.2 21c.6-4.1 3.8-6.4 7.8-6.4s7.2 2.3 7.8 6.4z" />
   </svg>
 );
+
+/** 梗管理：一枚实心标签（人工挂牌 = 只维护展示字段）。 */
+export const ManageSolidIcon = (p: IconProps) => (
+  <svg {...solid(p)}>
+    <path d="M13.7 2.6h6.1a1.6 1.6 0 0 1 1.6 1.6v6.1c0 .4-.2.8-.5 1.1l-8 8a1.6 1.6 0 0 1-2.2 0l-6-6a1.6 1.6 0 0 1 0-2.2l8-8c.3-.4.7-.6 1-.6z" />
+    <circle cx="17.1" cy="6.9" r="1.9" fill="#fff" />
+  </svg>
+);

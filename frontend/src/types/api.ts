@@ -45,8 +45,10 @@ export interface Meta {
 export interface Thumbnail {
   emoji: string;
   color: string;
-  /** 参考图裁出的真实封面；为空则退回表情贴纸 */
+  /** 真实封面（人工挑的或 B 站视频封面）；为空则退回表情贴纸 */
   image?: string;
+  /** true 表示这张封面是人工维护的，不是某条视频自动带出来的 */
+  manual?: boolean;
 }
 
 export interface MemeCard {
@@ -275,4 +277,68 @@ export interface SaveLLMResult {
   written_keys: string[];
   api_key_updated: boolean;
   config: LLMConfigView;
+}
+
+/* ------------------------------ 梗管理（人工维护） ------------------------------ */
+
+/** 管理列表的一行：正式梗与候选梗都在里面。 */
+export interface ManageListItem {
+  id: number;
+  name: string;
+  description: string;
+  status: string;
+  certified: boolean;
+  data_source: DataSource;
+  verification_state: string;
+  hotness: number | null;
+  has_manual_cover: boolean;
+  thumbnail: Thumbnail;
+}
+
+export interface ManageList {
+  total: number;
+  managed_count: number;
+  certified_count: number;
+  candidate_count: number;
+  items: ManageListItem[];
+}
+
+/** 可以挑来当封面的真实视频封面。 */
+export interface CoverOption {
+  cover: string;
+  bvid: string;
+  title: string;
+  view: number;
+  data_source: DataSource;
+}
+
+export interface ManageView {
+  id: number;
+  name: string;
+  slug: string;
+  description: string;
+  aliases: string[];
+  keywords: string[];
+  cover_url: string;
+  auto_cover: string;
+  effective_cover: string;
+  cover_options: CoverOption[];
+  data_source: DataSource;
+  status: string;
+  certified: boolean;
+  verification_state: string;
+  card: MemeCard | null;
+  note: string;
+}
+
+export interface MemeMetaPatch {
+  cover_url?: string;
+  description?: string;
+  aliases?: string[];
+  keywords?: string[];
+}
+
+export interface MemeMetaResult {
+  changed: string[];
+  meme: ManageView;
 }

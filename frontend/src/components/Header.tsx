@@ -127,6 +127,7 @@ export function MobileNav() {
     { to: "/library", label: "梗库" },
     { to: "/trends", label: "热度趋势" },
     { to: "/favorites", label: "我的收藏" },
+    { to: "/manage", label: "梗管理" },
     { to: "/settings", label: "系统设置" },
   ];
   return (

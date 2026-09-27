@@ -9,8 +9,9 @@ import MemeLibrary from "@/pages/MemeLibrary";
 import Settings from "@/pages/Settings";
 import Trends from "@/pages/Trends";
 
-// 详情页才用 ECharts，拆出去保证首页首屏体积。
+// 详情页才用 ECharts、梗管理是运营入口，都不该进首页首屏包，按需拆出去。
 const MemeDetail = lazy(() => import("@/pages/MemeDetail"));
+const Manage = lazy(() => import("@/pages/Manage"));
 
 export default function App() {
   return (
@@ -20,6 +21,14 @@ export default function App() {
         <Route path="/library" element={<MemeLibrary />} />
         <Route path="/trends" element={<Trends />} />
         <Route path="/favorites" element={<Favorites />} />
+        <Route
+          path="/manage"
+          element={
+            <Suspense fallback={<div className="p-8"><LoadingCards count={3} /></div>}>
+              <Manage />
+            </Suspense>
+          }
+        />
         <Route path="/settings" element={<Settings />} />
         <Route
           path="/meme/:id"

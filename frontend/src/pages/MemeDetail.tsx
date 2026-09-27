@@ -77,6 +77,11 @@ function HeadCard({
           >
             {meme.meme_data_source === "bilibili" ? "B站真实数据" : "演示数据"}
           </span>
+          {meme.thumbnail.manual ? (
+            <span className="chip bg-brand-soft px-2.5 py-1 text-[11px] text-brand" title="封面由人工在梗管理里指定，不是某条视频自带封面">
+              人工封面
+            </span>
+          ) : null}
         </div>
 
         <p className="mt-4 text-[15px] leading-relaxed text-ink-mute">

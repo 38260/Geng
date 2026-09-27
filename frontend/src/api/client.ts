@@ -8,8 +8,12 @@
 
 import type {
   LLMTestResult,
+  ManageList,
+  ManageView,
   MemeDetail,
   MemeList,
+  MemeMetaPatch,
+  MemeMetaResult,
   Meta,
   SaveLLMResult,
   SettingsView,
@@ -149,4 +153,16 @@ export const api = {
   recompute: () => request<{ ok: boolean; computed: number; skipped: number }>("/api/jobs/recompute", {
     method: "POST",
   }),
+
+  /* 梗管理：只改封面 / 介绍 / 别名 / 关键词，改不到算法结论 */
+  manageMemes: (params: { search?: string; status?: string } = {}) =>
+    request<ManageList>(`/api/manage/memes${query(params)}`),
+
+  manageMeme: (id: number) => request<ManageView>(`/api/manage/memes/${id}`),
+
+  saveMemeMeta: (id: number, body: MemeMetaPatch) =>
+    request<MemeMetaResult>(`/api/manage/memes/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
 };

@@ -130,6 +130,33 @@ check([i["hotness"] for i in after["items"]] == [i["hotness"] for i in items], "
 # 完整行为由 backend/tests/test_collectors.py 用假客户端覆盖。
 call("POST", "/api/jobs/collect?source=douyin", expect=(422,), note="非法数据源应被参数校验拦下")
 
+# --------------------------------------------------------------------------- #
+# 梗管理：只验证读写通道与边界，写回用"原值重写"以免改动当前数据集
+# --------------------------------------------------------------------------- #
+managed = call("GET", "/api/manage/memes")
+check(managed and managed["total"] >= (meta or {}).get("certified_count", 0), "管理列表覆盖正式梗")
+check(managed and managed["candidate_count"] >= 1, "管理列表包含候选梗（公开榜单不含）")
+check(managed and {"managed_count", "certified_count"} <= set(managed), "管理列表带人工维护计数")
+
+mid = (items or [{}])[0].get("id")
+view = call("GET", f"/api/manage/memes/{mid}")
+check(view and {"cover_url", "auto_cover", "effective_cover", "cover_options", "note"} <= set(view), "管理详情字段齐全")
+check(view and all(o["cover"].startswith("https://") for o in view["cover_options"]), "可挑封面都是完整 https 地址")
+check(view and view["note"] and "不会改动已算好的热度" in view["note"], "管理接口自述边界")
+
+for bad in [{"cover_url": "javascript:alert(1)"}, {"hotness": 100}, {"certified": True}, {}]:
+    call("PATCH", f"/api/manage/memes/{mid}", bad, expect=(400,), note=f"拒绝越界字段：{list(bad) or '空请求'}")
+
+same = call("PATCH", f"/api/manage/memes/{mid}", {"description": view["description"]})
+check(same and same["changed"] == ["description"], "原值写回也算一次有效保存")
+after_meta = call("GET", "/api/memes?limit=10")
+check(
+    [i["hotness"] for i in after_meta["items"]] == [i["hotness"] for i in items],
+    "改元数据后热度与榜单不变（人工改不到算法结论）",
+)
+missing = call("GET", "/api/manage/memes/999999", expect=(404,), note="不存在的梗应 404")
+check(missing and "梗不存在" in str(missing.get("detail", "")), "管理详情 404 说的是人话")
+
 passed = sum(1 for _, _, ok, _ in results if ok)
 for method, target, ok, note in results:
     flag = "PASS" if ok else "FAIL"

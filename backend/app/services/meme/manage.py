@@ -103,6 +103,9 @@ def sample_videos(session: Session, meme: Meme, limit: int = 8) -> dict[str, Any
     return {
         "accepted": len(rows),
         "views": sum(row.view for row in rows),
+        # 同一天多次采集只保留"头部样本更多"的那一次（不相加），所以这里可能
+        # 比某一天的 video_count 多出几条——列表是历次采样的去重合集，不是当日 Top20 本身。
+        "note": "列表是历次采集去重后的样本合集；某天的播放量取该天样本更多的那一次采集，不与其它次相加",
         "items": [
             {
                 "bvid": row.bvid,

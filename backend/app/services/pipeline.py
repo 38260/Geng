@@ -52,6 +52,56 @@ class MemeMetrics:
     data_version: str
 
 
+def _quality(row: MemeDailyStats) -> tuple[int, int]:
+    """同一天两次采集谁更好：先看头部样本条数，再看合计播放量。"""
+    return (int(row.video_count or 0), int(row.view or 0))
+
+
+def split_daily_stats(
+    session: Session, meme: Meme, incoming: list[MemeDailyStats], source: str
+) -> tuple[list[MemeDailyStats], int]:
+    """已经过完的那一天，只保留"更好的一次观测"，另一些日子用新采的。
+
+    B 站对同一个词、同一天两次返回的头部 20 条差别可以很大（接口抖动 / 风控降级），
+    而那天到底有哪些头部视频是既定事实。相加会把同一批视频算两遍，
+    直接替换又会让"琵琶曲 44.2 分 → 0 分"这种纯抖动看起来像热度崩了。
+    所以按天取更好的一次：样本更多的那天沿用旧数据，其余日子照常更新。
+    """
+    previous = {
+        row.stat_date: row
+        for row in session.scalars(
+            select(MemeDailyStats).where(
+                MemeDailyStats.meme_id == meme.id, MemeDailyStats.data_source == source
+            )
+        )
+    }
+    kept: list[MemeDailyStats] = []
+    reuse = 0
+    for row in incoming:
+        old = previous.get(row.stat_date)
+        if old is not None and _quality(old) > _quality(row):
+            reuse += 1
+            continue          # 旧的那次样本更多，这一天的行不动
+        kept.append(row)
+    return kept, reuse
+
+
+def purge_previous_series(session: Session, meme: Meme, source: str, keep_days: set) -> None:
+    """删掉本次要覆盖的那些天（其他数据源的行一律清掉，演示数据不进真实序列）。"""
+    stale = session.query(MemeDailyStats).filter(
+        MemeDailyStats.meme_id == meme.id, MemeDailyStats.data_source != source
+    )
+    stale.delete(synchronize_session=False)
+    stmt = session.query(MemeDailyStats).filter(MemeDailyStats.meme_id == meme.id)
+    if keep_days:
+        stmt = stmt.filter(~MemeDailyStats.stat_date.in_(keep_days))
+    stmt.delete(synchronize_session=False)
+    session.query(Video).filter(
+        Video.meme_id == meme.id, Video.data_source != source
+    ).delete(synchronize_session=False)
+    session.flush()
+
+
 def compute_data_version(end_day: str, heat: float, metrics: dict[str, Any]) -> str:
     """数据版本：底层数据明显变化时才让 AI 缓存失效。"""
     payload = "|".join(
@@ -240,6 +290,7 @@ def collect_all(
         "dropped": 0,
         "kept_snapshots": 0,   # 本次空窗、沿用上次真实快照的梗数
         "thinned": 0,          # 本次采到但比上次薄的梗数
+        "kept_better_days": 0,  # 沿用"更好的一次观测"的天数（同日不相加）
     }
     if not available:
         log.warning("数据源 %s 不可用：%s", collector.source, reason)
@@ -304,23 +355,42 @@ def collect_all(
 
             had_days = _count_rows(session, MemeDailyStats, meme.id, video_count_min=1)
             new_days = sum(1 for stat in bundle.daily_stats if stat.video_count)
+            # 已经过完的那一天只保留更好的一次观测：搜索抖动不该让一个梗从 44 分掉到 0 分
+            incoming, reuse = split_daily_stats(session, meme, bundle.daily_stats, collector.source)
+            keep_days = {row.stat_date for row in bundle.daily_stats} - {
+                row.stat_date for row in incoming
+            }
             if had_days and new_days < had_days:
-                # 上游搜索抖动会让新序列比旧序列薄很多，这里只警告不拦截：
-                # 采集结果必须以本次为准，否则永远停在第一次的快照上。
                 summary["thinned"] = int(summary["thinned"]) + 1
                 log.warning(
-                    "梗「%s」本次只采到 %s 天内容（上次 %s 天），序列变薄",
+                    "梗「%s」本次只采到 %s 天内容（上次 %s 天），%s",
                     meme.name, new_days, had_days,
+                    f"其中 {reuse} 天沿用更好的一次观测" if reuse else "本次更薄且无同日旧数据可留",
+                )
+            if reuse:
+                summary["kept_better_days"] = int(summary["kept_better_days"]) + reuse
+                log.info(
+                    "梗「%s」有 %s 天沿用更好的一次观测（同日多次采集取头部样本更多的那次，不相加）",
+                    meme.name, reuse,
                 )
 
-            session.query(MemeDailyStats).filter(MemeDailyStats.meme_id == meme.id).delete()
-            session.query(Video).filter(Video.meme_id == meme.id).delete()
-            session.flush()
+            purge_previous_series(session, meme, collector.source, keep_days)
 
-            for stat in bundle.daily_stats:
+            for stat in incoming:
                 stat.meme_id = meme.id
                 session.add(stat)
+            # 保留下来的那些天，它们的样本已经在库里：按 bvid 去重，别把同一条视频存两遍
+            kept_bvids = {
+                row.bvid
+                for row in session.scalars(
+                    select(Video).where(
+                        Video.meme_id == meme.id, Video.data_source == collector.source
+                    )
+                )
+            }
             for video in bundle.videos:
+                if video.bvid in kept_bvids:
+                    continue
                 video.meme_id = meme.id
                 session.add(video)
 

@@ -97,7 +97,13 @@ function HeadCard({
   );
 }
 
-function CertificationStrip({ certification }: { certification: Certification }) {
+function CertificationStrip({
+  certification,
+  verification,
+}: {
+  certification: Certification;
+  verification: string;
+}) {
   const sides = [
     { key: "encyclopedia", label: "梗百科", side: certification.encyclopedia },
     { key: "guide", label: "梗指南", side: certification.guide },
@@ -107,8 +113,17 @@ function CertificationStrip({ certification }: { certification: Certification })
       <div className="mb-3 flex items-center gap-2">
         <span className="text-[16px]">✅</span>
         <h3 className="text-[15px] font-bold">双 UP 梗认证</h3>
-        <span className="chip ml-auto bg-go/10 text-go">
-          {certification.certified ? "已进入正式梗库" : "候选，未进入分析"}
+        <span
+          className={`chip ml-auto ${
+            verification === "verified_both" ? "bg-go/10 text-go" : "bg-gold/20 text-[#B2750A]"
+          }`}
+          title={
+            verification === "verified_both"
+              ? "已在两位 UP 主的真实投稿中命中"
+              : "认证位来自人工整理的梗库；B 站投稿接口被风控，尚未在线核验"
+          }
+        >
+          {verification === "verified_both" ? "已在线核验" : "未在线核验"}
         </span>
       </div>
       <p className="mb-3 text-[12px] leading-relaxed text-ink-mute">
@@ -124,7 +139,7 @@ function CertificationStrip({ certification }: { certification: Certification })
                 <span className="ml-1.5 text-[11px] font-normal text-ink-faint">@{side.up_name}</span>
               </div>
               <div className="truncate text-[12px] text-ink-mute">{side.video_title || "尚未发布介绍视频"}</div>
-              {side.video_url ? (
+              {side.linkable && side.video_url ? (
                 <a
                   href={side.video_url}
                   target="_blank"
@@ -134,7 +149,11 @@ function CertificationStrip({ certification }: { certification: Certification })
                   <LinkIcon size={12} />
                   {side.bvid}
                 </a>
-              ) : null}
+              ) : (
+                <span className="text-[11px] text-ink-faint">
+                  {side.video_title || "未在线核验到该 UP 主的对应投稿"}
+                </span>
+              )}
             </div>
           </li>
         ))}
@@ -357,7 +376,10 @@ export default function MemeDetail() {
               </section>
 
               <div className="grid gap-5 xl:grid-cols-2">
-                <CertificationStrip certification={detail.data.certification} />
+                <CertificationStrip
+                  certification={detail.data.certification}
+                  verification={detail.data.meme.verification_state}
+                />
                 <CreatorsStrip
                   creators={detail.data.metrics.creators}
                   windowDays={detail.data.metrics.window_days}

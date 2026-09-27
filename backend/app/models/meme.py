@@ -67,6 +67,9 @@ class Meme(Base):
     certified: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     certified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    # 双 UP 认证的在线核验状态：verified_both / partially_verified / unverified
+    verification_state: Mapped[str] = mapped_column(String(24), default="unverified")
+
     # 这个梗的数据来自演示生成还是真实 B 站抓取（混跑时要能区分）
     data_source: Mapped[str] = mapped_column(String(16), default="mock", index=True)
 
@@ -128,6 +131,7 @@ class Meme(Base):
             "description": self.description,
             "status": self.status,
             "certified": self.certified,
+            "verification_state": self.verification_state,
             "data_source": self.data_source,
             "encyclopedia_confirmed": self.encyclopedia_confirmed,
             "guide_confirmed": self.guide_confirmed,
@@ -172,7 +176,11 @@ class MemeCertification(Base):
             "up_mid": self.up_mid,
             "bvid": self.bvid,
             "video_title": self.video_title,
-            "video_url": self.video_url or (f"https://www.bilibili.com/video/{self.bvid}" if self.bvid else ""),
+            # 只有真实抓取到的投稿才给可点开的链接；演示/未核验证据不给，避免点进 404
+            "linkable": self.data_source == "bilibili",
+            "video_url": (
+                self.video_url or (f"https://www.bilibili.com/video/{self.bvid}" if self.bvid else "")
+            ) if self.data_source == "bilibili" else "",
             "published_at": self.published_at.isoformat() if self.published_at else None,
             "confirmed": self.confirmed,
             "data_source": self.data_source,

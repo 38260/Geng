@@ -146,13 +146,28 @@ def recompute_certification(meme: Meme) -> Meme:
     return meme
 
 
+def analysis_allowed(meme: Meme) -> bool:
+    """该梗能否参与热度/生命周期计算。
+
+    严格口径是双 UP 认证通过；在线核验被风控挡住时，允许人工整理的候选梗
+    参与分析（由 ANALYSIS_ALLOW_UNVERIFIED 控制），但状态会一路带到前端如实标注。
+    """
+    from app.config import settings
+
+    if meme.certified:
+        return True
+    return bool(settings.analysis_allow_unverified) and meme.status == MemeStatus.CERTIFIED
+
+
 def require_certified(meme: Meme) -> None:
     """分析管线入口守卫：未认证梗不得参与热度/生命周期计算。"""
-    if not meme.certified:
-        raise NotCertifiedError(
-            f"梗「{meme.name}」未通过双 UP 认证"
-            f"（梗百科={meme.encyclopedia_confirmed}, 梗指南={meme.guide_confirmed}）"
-        )
+    if analysis_allowed(meme):
+        return
+    raise NotCertifiedError(
+        f"梗「{meme.name}」未通过双 UP 认证"
+        f"（梗百科={meme.encyclopedia_confirmed}, 梗指南={meme.guide_confirmed}，"
+        f"核验状态={meme.verification_state}）"
+    )
 
 
 def certification_progress(meme: Meme) -> dict[str, object]:

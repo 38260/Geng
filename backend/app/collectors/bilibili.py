@@ -24,6 +24,7 @@ from app.config import get_logger, settings
 log = get_logger(__name__)
 
 NAV_URL = "https://api.bilibili.com/x/web-interface/nav"
+SPI_URL = "https://api.bilibili.com/x/frontend/finger/spi"
 SEARCH_URL = "https://api.bilibili.com/x/web-interface/wbi/search/type"
 SPACE_ARCHIVE_URL = "https://api.bilibili.com/x/space/wbi/arc/search"
 
@@ -75,6 +76,7 @@ class BiliClient:
     _img_key: str = ""
     _sub_key: str = ""
     _key_ts: float = 0.0
+    _fetched_cookie: str = ""
 
     def headers(self) -> dict[str, str]:
         headers = {
@@ -82,9 +84,34 @@ class BiliClient:
             "Referer": "https://www.bilibili.com/",
             "Accept": "application/json, text/plain, */*",
         }
-        if self.cookie:
-            headers["Cookie"] = self.cookie
+        cookie = self.cookie or self._fetched_cookie
+        if cookie:
+            headers["Cookie"] = cookie
         return headers
+
+    def bootstrap_fingerprint(self, retries: int = 3) -> bool:
+        """匿名取一次设备指纹（buvid3/buvid4）。
+
+        B 站的 space/搜索接口对完全没有 Cookie 的请求经常直接 412/-352，
+        带上这个公开端点下发的指纹后大部分能放行。取不到就返回 False，
+        由调用方决定是降级还是要求用户填 BILI_COOKIE。
+        """
+        if self.cookie or self._fetched_cookie:
+            return True
+        for attempt in range(retries):
+            try:
+                response = httpx.get(SPI_URL, headers=self.headers(), timeout=self.timeout)
+                payload = response.json() if response.status_code == 200 else {}
+            except Exception:  # noqa: BLE001 - 指纹取不到不算致命错误
+                payload = {}
+            data = payload.get("data") or {}
+            if data.get("b_3"):
+                self._fetched_cookie = f"buvid3={data['b_3']}; buvid4={data.get('b_4', '')}"
+                log.info("已取得 B 站匿名设备指纹 buvid3=***")
+                return True
+            time.sleep(1.2 * (attempt + 1))
+        log.warning("取不到 B 站设备指纹，部分接口可能被风控")
+        return False
 
     def _get_payload(self, url: str, params: dict[str, str] | None = None) -> dict:
         """返回完整响应体（不预设 code==0），供 nav 这类"未登录也带数据"的接口使用。"""
@@ -162,12 +189,13 @@ class BiliClient:
 
     # ------------------------------------------------------------------ #
     def probe(self) -> tuple[bool, str]:
-        """只读探测：能不能拿到签名密钥。"""
+        """只读探测：能不能拿到签名密钥（顺带把设备指纹准备好）。"""
+        self.bootstrap_fingerprint()
         try:
             self.wbi_keys(refresh=True)
         except BilibiliBlocked as exc:
             return False, str(exc)
-        return True, "WBI 签名可用"
+        return True, "WBI 签名 + 设备指纹可用"
 
     def search_videos(self, keyword: str, *, pages: int = 1, order: str = "pubdate") -> list[dict]:
         """B 站定向搜索（梗库驱动，不是全站下载）。"""
@@ -184,11 +212,53 @@ class BiliClient:
             time.sleep(0.6 + random.random() * 0.5)  # 限流：别把人家接口打爆
         return results
 
-    def space_videos(self, mid: int, *, page_size: int = 30) -> list[dict]:
-        """某个 UP 主的投稿列表，用于双 UP 认证的真实证据。"""
+    def search_range(
+        self,
+        keyword: str,
+        *,
+        begin: "datetime",
+        end: "datetime",
+        order: str = "click",
+        page: int = 1,
+        page_size: int = 20,
+    ) -> tuple[list[dict], int]:
+        """按发布时间区间搜索，返回 (结果行, B站给出的结果总数)。
+
+        这是拿到"逐日"序列的唯一可靠途径：不带区间时搜索结果会被最近的
+        内容占满，早期日期直接看不见。
+        """
+        data = self.signed_get(
+            SEARCH_URL,
+            {
+                "search_type": "video",
+                "keyword": keyword,
+                "page": page,
+                "ps": page_size,
+                "order": order,
+                "pubtime_begin_s": int(begin.timestamp()),
+                "pubtime_end_s": int(end.timestamp()),
+            },
+        )
+        rows = data.get("result") or []
+        try:
+            total = int(data.get("numResults") or len(rows))
+        except (TypeError, ValueError):
+            total = len(rows)
+        return rows, total
+
+    def space_videos(self, mid: int, *, page_size: int = 50, page: int = 1) -> list[dict]:
+        """某个 UP 主的投稿列表（按发布时间倒序）。"""
         data = self.signed_get(
             SPACE_ARCHIVE_URL,
-            {"mid": mid, "ps": page_size, "pn": 1, "order": "pubdate", "platform": "web"},
+            {"mid": mid, "ps": page_size, "pn": page, "order": "pubdate", "platform": "web"},
+        )
+        return ((data.get("list") or {}).get("vlist")) or []
+
+    def space_search(self, mid: int, keyword: str, *, page_size: int = 20) -> list[dict]:
+        """在某个 UP 主的投稿里搜关键词——双 UP 认证就靠它。"""
+        data = self.signed_get(
+            SPACE_ARCHIVE_URL,
+            {"mid": mid, "ps": page_size, "pn": 1, "search_keyword": keyword, "platform": "web"},
         )
         return ((data.get("list") or {}).get("vlist")) or []
 

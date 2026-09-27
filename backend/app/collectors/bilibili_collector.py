@@ -1,9 +1,12 @@
-"""真实 B 站采集器：梗库驱动 + 定向搜索 + 逐条补齐指标。
+"""真实 B 站采集器：梗库驱动 + 逐日定向搜索 + 相关性过滤。
 
 流程（对应文档 §七 的"正确方式"）：
 
-    已认证梗 → 名称/别名 → B站搜索 → 时间窗口过滤 → 逐条补齐指标
-    → 相关性过滤（在管线里）→ 去重 → 每日聚合
+    已认证梗 → 梗名 → 对最近 30 天逐日查询（带发布时间区间，按播放排序）
+    → 相关性打分过滤 → 当日聚合 → 头部视频逐条补齐点赞/投币/收藏
+
+为什么要逐日查：B 站搜索不带日期区间时，结果会被最近发布的内容占满，
+早期日期根本查不到，直接聚合会算出 "+23616%" 这种被截断放大的假增长。
 
 明确不做的事：
 * 不下载全站视频；
@@ -14,14 +17,14 @@
 from __future__ import annotations
 
 import time
-from datetime import datetime, timedelta
+from datetime import date, datetime, time as _time, timedelta
 
-from app.config import get_logger
-from app.models import CertRole, Meme
+from app.config import get_logger, settings
+from app.models import Meme
 
 from .base import CollectedBundle, CertificationEvidence
 from .bilibili import BilibiliBlocked, BiliClient, get_client, parse_search_row
-from ..analytics.aggregation import aggregate_videos
+from ..analytics.relevance import MemeTerms, score_text
 from ..services.meme.certification import UP_AUTHORS
 
 log = get_logger(__name__)
@@ -31,14 +34,14 @@ SOURCE = "bilibili"
 
 class BilibiliCollector:
     source = SOURCE
-    aggregates_from_videos = True
+    aggregates_from_videos = False
 
     def __init__(
         self,
         client: BiliClient | None = None,
         *,
         pages_per_term: int = 2,
-        enrich_limit: int = 25,
+        enrich_limit: int = 12,
         request_gap: float = 0.35,
     ) -> None:
         self.client = client or get_client()
@@ -99,47 +102,125 @@ class BilibiliCollector:
         return stats
 
     # ------------------------------------------------------------------ #
+    def collect_daily(
+        self, meme: Meme, *, window_days: int = 30
+    ) -> tuple[list, dict, int]:
+        """逐日定向采集：每一天单独查一次，取当日播放量最高的相关样本。
+
+        为什么必须这样：B 站搜索不带日期区间时，结果会被最近发布的内容占满，
+        早期日期根本查不到 —— 直接聚合会得到"+23616%"这种被截断放大的假增长。
+
+        返回 (MemeDailyStats 列表, {bvid: 视频行}, 被相关性过滤剔除的条数)。
+        注意口径：单日只取回 top 20，所以"当日播放量"是该日头部内容的合计，
+        不是该梗全站绝对量；跨日、跨梗比较用同一把尺子，形状可信。
+        """
+        from app.models import MemeDailyStats
+
+        terms = MemeTerms.from_meme(meme)
+        threshold = settings.relevance_threshold
+        term = meme.name
+        today = date.today()
+        stats: list[MemeDailyStats] = []
+        seen: dict[str, dict] = {}
+        filtered_out = 0
+
+        for offset in range(1, window_days + 1):          # 不含今天（今天还没过完）
+            day = today - timedelta(days=offset)
+            begin = datetime.combine(day, _time.min)
+            end = begin + timedelta(days=1)
+            try:
+                rows, total = self.client.search_range(term, begin=begin, end=end, order="click")
+            except BilibiliBlocked as exc:
+                log.warning("梗「%s」%s 采集被拒：%s", term, day, exc)
+                raise
+            except Exception as exc:  # noqa: BLE001 - 单日失败不该毁掉整条序列
+                log.warning("梗「%s」%s 查询异常：%s", term, day, exc)
+                rows, total = [], 0
+
+            parsed = []
+            for row in rows:
+                item = parse_search_row(row)
+                if not item.get("bvid"):
+                    continue
+                # 搜索会把短词模糊匹配到一大堆无关内容，先按相关性打分过滤
+                result = score_text(terms, item["title"], item.get("description", ""),
+                                    [item.get("tag") or ""])
+                item["relevance_score"] = result.score
+                item["matched_terms"] = result.matched_terms
+                if result.score < threshold:
+                    filtered_out += 1
+                    continue
+                parsed.append(item)
+            for item in parsed:
+                seen.setdefault(item["bvid"], item)
+
+            authors = {item.get("author") for item in parsed if item.get("author")}
+            stats.append(
+                MemeDailyStats(
+                    stat_date=day,
+                    video_count=len(parsed),
+                    creator_count=len(authors) or (1 if parsed else 0),
+                    view=sum(int(item.get("view") or 0) for item in parsed),
+                    like=0,
+                    coin=0,
+                    favorite=0,
+                    reply=sum(int(item.get("reply") or 0) for item in parsed),
+                    danmaku=sum(int(item.get("danmaku") or 0) for item in parsed),
+                    search_total=total,
+                    data_source=SOURCE,
+                )
+            )
+            time.sleep(self.request_gap)
+
+        stats.sort(key=lambda row: row.stat_date)
+        return stats, seen, filtered_out
+
     def collect(self, meme: Meme, *, window_days: int = 30) -> CollectedBundle:
+        """逐日采集 + 头部视频样本补齐，产出与 MockCollector 同构的 bundle。"""
         from app.models import Video
 
-        terms = meme.match_terms()[:4]  # 名称 + 别名，够定向了，别把接口打爆
-        cutoff = datetime.now() - timedelta(days=window_days)
+        stats, seen, filtered_out = self.collect_daily(meme, window_days=window_days)
+        active = [row for row in stats if row.video_count > 0]
+        log.info(
+            "梗「%s」逐日采集：%s/%s 天有内容，累计样本视频 %s 条",
+            meme.name, len(active), len(stats), len(seen),
+        )
 
-        rows = self._search(terms)
-        fresh = [row for row in rows.values() if row["publish_time"] >= cutoff]
-        log.info("梗「%s」搜索到 %s 条，窗口内 %s 条", meme.name, len(rows), len(fresh))
-
-        # 播放量高的先补指标
-        fresh.sort(key=lambda row: row["view"], reverse=True)
-        extra = self._enrich([row["bvid"] for row in fresh])
+        # 视频列表：按播放量取头部若干条，逐条补齐点赞/投币/收藏
+        ranked = sorted(seen.values(), key=lambda item: int(item.get("view") or 0), reverse=True)
+        enriched = self._enrich([item["bvid"] for item in ranked])
 
         videos: list[Video] = []
-        for row in fresh:
-            merged = extra.get(row["bvid"], {})
+        for item in ranked:
+            merged = enriched.get(item["bvid"], {})
             videos.append(
                 Video(
-                    bvid=row["bvid"],
-                    aid=row.get("aid"),
-                    title=row["title"][:250],
-                    description=merged.get("description") or row.get("description", ""),
-                    author=row.get("author", ""),
-                    author_mid=merged.get("author_mid") or row.get("author_mid"),
-                    cover=row.get("cover", ""),
+                    bvid=item["bvid"],
+                    aid=item.get("aid"),
+                    title=str(item.get("title") or "")[:250],
+                    description=merged.get("description") or str(item.get("description") or ""),
+                    author=str(item.get("author") or ""),
+                    author_mid=merged.get("author_mid") or item.get("author_mid"),
+                    cover=str(item.get("cover") or ""),
                     tags=merged.get("tags", []),
-                    publish_time=row["publish_time"],
+                    publish_time=item["publish_time"],
                     crawl_time=datetime.now(),
                     duration_seconds=merged.get("duration_seconds", 0),
-                    view=merged.get("view", row.get("view", 0)),
+                    view=merged.get("view", int(item.get("view") or 0)),
                     like=merged.get("like", 0),
                     coin=merged.get("coin", 0),
                     favorite=merged.get("favorite", 0),
-                    reply=merged.get("reply", row.get("reply", 0)),
-                    danmaku=merged.get("danmaku", row.get("danmaku", 0)),
+                    reply=merged.get("reply", int(item.get("reply") or 0)),
+                    danmaku=merged.get("danmaku", int(item.get("danmaku") or 0)),
+                    relevance_score=float(item.get("relevance_score") or 0.0),
+                    matched_terms=list(item.get("matched_terms") or []),
                     data_source=SOURCE,
                 )
             )
 
-        return CollectedBundle(daily_stats=aggregate_videos(meme.id, videos, data_source=SOURCE), videos=videos)
+        return CollectedBundle(
+            daily_stats=stats, videos=videos, dropped_irrelevant=filtered_out
+        )
 
     # ------------------------------------------------------------------ #
     def collect_certification(self, meme: Meme) -> list[CertificationEvidence]:

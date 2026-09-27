@@ -107,6 +107,7 @@ def card_payload(meme: Meme, hotness: HotnessSnapshot, lifecycle: LifecycleSnaps
         "catch_confidence": round(lifecycle.catch_confidence, 2),
         "thumbnail": thumbnail_for(meme),
         "meme_data_source": meme.data_source or settings.data_source,
+        "verification_state": meme.verification_state or "unverified",
         "certified_at": meme.certified_at.isoformat() if meme.certified_at else None,
         "data_updated_at": meme.data_updated_at.isoformat() if meme.data_updated_at else None,
     })
@@ -400,5 +401,12 @@ def meta_payload(session: Session) -> dict[str, Any]:
             "hotness_algorithm": "赶梗潮自定义热度指数（0-100，五因子加权）",
             "lifecycle_algorithm": "时间序列 + 阈值规则，不由 LLM 决定",
             "llm_role": "仅负责趋势解释与赶梗建议的文案，不参与计算",
+            "sampling": (
+                "真实采集口径：每日取 B 站该关键词下播放量最高的前 20 条相关视频作为样本，"
+                "所以「当日播放量」是该日头部内容的合计，不是全站绝对量；"
+                "跨日与跨梗比较用同一把尺子。"
+                if settings.data_source == "bilibili"
+                else "演示数据：数值由生命周期原型生成，不是真实抓取结果。"
+            ),
         },
     }

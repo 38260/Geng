@@ -39,6 +39,9 @@ class MemeDailyStats(Base):
     reply: Mapped[int] = mapped_column(Integer, default=0)
     danmaku: Mapped[int] = mapped_column(Integer, default=0)
 
+    # B 站搜索给出的该日结果总数（含模糊匹配，仅作"讨论面有多宽"的辅助信号）
+    search_total: Mapped[int] = mapped_column(Integer, default=0)
+
     # 当日热度指数（0-100），由算法预计算，接口不再现算
     hotness: Mapped[float] = mapped_column(Float, default=0.0)
 
@@ -66,6 +69,7 @@ class MemeDailyStats(Base):
             "favorite": self.favorite,
             "reply": self.reply,
             "danmaku": self.danmaku,
+            "search_total": self.search_total,
             "interaction": self.interaction,
             "discussion": self.discussion,
             "hotness": round(self.hotness, 1),

@@ -20,6 +20,8 @@ export interface Transparency {
   data_platform: string;
   certification: string[];
   hotness_algorithm: string;
+  /** 真实采集的抽样口径说明 */
+  sampling?: string;
   lifecycle_algorithm: string;
   llm_role: string;
 }
@@ -68,6 +70,8 @@ export interface MemeCard {
   thumbnail: Thumbnail;
   /** 这个梗自己的数据来源（真实采集和演示数据可能混在同一个库里） */
   meme_data_source: DataSource;
+  /** 双 UP 认证是否已在 B 站真实投稿中命中 */
+  verification_state: "verified_both" | "partially_verified" | "unverified";
   certified_at: string | null;
   data_updated_at: string | null;
 }
@@ -149,6 +153,8 @@ export interface CertificationSide {
   published_at?: string | null;
   confirmed: boolean;
   data_source?: string;
+  /** 只有真实抓取到的投稿才允许渲染成可点开的链接 */
+  linkable?: boolean;
 }
 
 export interface Certification {

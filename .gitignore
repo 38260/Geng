@@ -22,6 +22,8 @@ backend/data/*.db-shm
 backend/data/*.db-wal
 backend/data/*.sqlite3
 backend/data/*.sqlite
+backend/data/up_index.json
+backend/data/rebuild_report.json
 data/*.db
 *.log
 logs/

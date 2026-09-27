@@ -93,6 +93,9 @@ export function TransparencyFooter({ meta }: { meta: Meta | null }) {
           <div>热度算法：{meta?.transparency.hotness_algorithm ?? "—"}</div>
           <div>生命周期：{meta?.transparency.lifecycle_algorithm ?? "—"}</div>
           <div className="sm:col-span-2">AI 角色：{meta?.transparency.llm_role ?? "—"}</div>
+          {meta?.transparency.sampling ? (
+            <div className="sm:col-span-2">{meta.transparency.sampling}</div>
+          ) : null}
           <div className="sm:col-span-2">
             正式梗库 {meta?.certified_count ?? 0} 个 · 候选（未通过双 UP 认证）{meta?.candidate_count ?? 0} 个 · 统计窗口 {meta?.window_days ?? 0} 天
           </div>

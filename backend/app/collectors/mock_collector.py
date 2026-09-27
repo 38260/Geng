@@ -78,7 +78,7 @@ class MockCollector:
             out.append(
                 CertificationEvidence(
                     role=role,
-                    bvid=f"BV1cert{seed % 10000:04d}{offset}",
+                    bvid="",  # 演示证据不伪造可点开的 BV 号
                     video_title=_CERT_TITLES[role].format(name=meme.name),
                     published_at=published,
                     confirmed=True,

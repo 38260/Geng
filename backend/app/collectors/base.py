@@ -30,6 +30,8 @@ class CollectedBundle:
     daily_stats: list[MemeDailyStats] = field(default_factory=list)
     videos: list[Video] = field(default_factory=list)
     certifications: list[CertificationEvidence] = field(default_factory=list)
+    # 采集阶段按相关性打分剔除掉的无关视频数（B站搜索会把短词模糊匹配到一堆无关内容）
+    dropped_irrelevant: int = 0
 
 
 class Collector(Protocol):

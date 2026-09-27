@@ -20,9 +20,17 @@ B站数据 → 采集 → 清洗 → 梗匹配 → 双UP认证 → 时间序列�
 cd backend
 pip install -r requirements.txt
 cp .env.example .env              # 需要真实 AI 文案时填 LLM_API_KEY
-python -m app.scripts.seed_data   # 灌演示数据（幂等，可反复跑）
+python -m app.scripts.seed_data   # 建梗库骨架（幂等，可反复跑）
 python -m app.scripts.run_pipeline --report   # 算热度/生命周期并打印榜单
 uvicorn app.main:app --port 8010
+```
+
+想用真实 B 站数据替换演示数据（本机已验证可跑通，约 15 分钟）：
+
+```bash
+python -m app.scripts.rebuild_from_bilibili   # 逐日真实采集 + 在线核验 + 重算
+# 可选：在 backend/.env 填 BILI_COOKIE 后加 --pages 20 --refresh-index，
+# 才能把双 UP 认证从"未在线核验"升级为"已核验 + 真实投稿链接"
 ```
 
 > 端口用 8010 是因为本机 8000 已被另一个服务占用；换端口不影响功能，下一步告诉前端即可。
@@ -115,9 +123,58 @@ LLM 只能润色这句话，**不能改状态**：模型返回的 `status` 与�
 
 ---
 
-## 四、数据来源与诚实性
+## 四、当前数据集：真实 B 站数据
 
-* 默认 `DATA_SOURCE=mock`，**全站标注「演示数据」**，页脚写明更新时间，不伪装实时
+本仓库当前数据库里的指标**全部来自 B 站真实抓取**（`backend/.env` 里 `DATA_SOURCE=bilibili`）：
+
+| 项目 | 实测结果 |
+| --- | --- |
+| 采集到的真实视频 | 2,500+ 条候选，相关性过滤后保留约 1,100 条 |
+| 被剔除的无关视频 | 1,446 条（短词会被 B 站模糊匹配到大量无关内容） |
+| 有真实数据的梗 | 28 个（另 8 个近 30 天无相关视频，已清空而非保留演示值） |
+| 榜首示例 | 哈基米 66.6 / 上升期 / +89%（真实播放量最高单条 643.3 万） |
+
+重建整个数据集（约 15 分钟，会覆盖现有数据）：
+
+```bash
+cd backend
+python -m app.scripts.seed_data                # 先建梗库骨架
+python -m app.scripts.rebuild_from_bilibili    # 在线核验 + 逐日真实采集 + 重算指标
+```
+
+### 真实采集的统计口径（重要，别误读）
+
+* **逐日区间查询**：对每个梗的最近 30 天，每天单独查一次 B 站搜索
+  （`pubtime_begin_s/pubtime_end_s` + `order=click`），取当日播放量最高的前 20 条相关视频作为样本。
+  所以「当日播放量」是**该日头部内容的合计**，不是该梗全站绝对量；跨日、跨梗用同一把尺子，形状与排序可信。
+* 为什么不一次搜完再聚合：不带日期区间时搜索结果会被最近发布的内容占满，早期日期根本查不到，
+  直接聚合会算出 **+23616%** 这种被截断放大的假增长（第一版就是这么翻车的）。
+* 日统计的互动量 = 评论 + 弹幕（搜索接口给得到的字段）；点赞/投币/收藏只对头部视频逐条补齐，
+  用于详情页视频卡展示，不回灌日统计，避免两个口径混用。
+* 不含"今天"：当天还没过完，计入会让最后一天假性下跌。
+
+### 双 UP 认证：机制已实现，在线核验受风控限制
+
+`certified = 梗百科确认 AND 梗指南确认` 这条规则是真实代码，
+在线核验会去两位 UP 主的**真实投稿**里匹配梗名，命中才写真实 bvid。
+
+但本机实测：**只能拉到每位 UP 主最近约 150 条投稿**（`space/wbi/arc/search` 深翻页被 -352/412 挡住），
+而两位 UP 主近期覆盖的梗几乎不重叠 → 当前 28 个梗的 `verification_state` 全部是 `unverified`。
+
+因此：
+
+* 认证位目前来自**人工整理的梗名单**，不是在线核验结论 —— 详情页会明确显示「未在线核验」；
+* 演示阶段造的假 BV 号已全部清除，未核验的证据**不给可点开的链接**（`linkable=false`）；
+* 想要真实核验：在 `backend/.env` 填 `BILI_COOKIE`（浏览器登录 B 站后复制），
+  再跑 `python -m app.scripts.rebuild_from_bilibili --pages 20 --refresh-index`，
+  命中的梗会自动升级为「已在线核验」并带上真实投稿链接。
+
+---
+
+## 五、数据来源与诚实性
+
+* `DATA_SOURCE` 决定全站标注：`mock` 显示「演示数据」，`bilibili` 显示「B站真实数据」，
+  两者都不会互相冒充；每个梗还额外带 `meme_data_source`，混跑时也能分清
 * 演示数据按生命周期原型生成曲线（上升/爆发/平稳/退潮/过气各有形状），
   且「当日播放量 = 当日视频数 × 单条播放量」自洽，过气梗近两周真的归零
 * 梗名称/别名取自真实存在的 B 站梗文化说法，但**所有数值都是生成的**
@@ -148,7 +205,7 @@ curl -X POST "http://127.0.0.1:8010/api/jobs/collect?source=bilibili&limit=3"
 
 ---
 
-## 五、目录结构
+## 六、目录结构
 
 ```
 backend/
@@ -177,7 +234,7 @@ scripts/          # smoke_api.py / screenshot.sh / restart-backend.sh
 
 ---
 
-## 六、验收清单
+## 七、验收清单
 
 ### 产品
 
@@ -191,7 +248,8 @@ scripts/          # smoke_api.py / screenshot.sh / restart-backend.sh
 - [x] 只分析 Bilibili，无抖音/小红书/微博等
 - [x] 只有双 UP 认证梗进入正式梗库（模型 + 管线 + 接口三处强制，且有测试）
 - [x] 热度与生命周期均由算法计算，AI 不参与任何数值判断
-- [x] Mock 数据全站明确标注，接口与前端都带 `data_source`
+- [x] 演示/真实数据全站明确标注，接口与前端都带 `meme_data_source` 与 `verification_state`
+- [x] 真实数据已替换演示数据：28 个梗、约 1,100 条真实视频、逐日 30 天序列
 
 ### AI
 
@@ -217,7 +275,7 @@ scripts/          # smoke_api.py / screenshot.sh / restart-backend.sh
 
 ---
 
-## 七、安全
+## 八、安全
 
 * `backend/.env` 已在 `.gitignore`，仓库里只有 `.env.example`
 * 日志经 `SecretRedactionFilter` 脱敏，`api_key=` / `Bearer` / `sk-` 形态会被替换

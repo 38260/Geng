@@ -21,7 +21,6 @@ from sqlalchemy.orm import Session
 from app.analytics import (
     MemeTerms,
     Series,
-    aggregate_videos,
     build_input,
     classify,
     compute_hotness,
@@ -181,6 +180,7 @@ def collect_all(
     limit: int | None = None,
     window_days: int | None = None,
     commit: bool = True,
+    purge_when_empty: bool = False,
 ) -> dict[str, object]:
     """跑一遍采集 → 清洗 → 匹配 → 聚合 → 指标计算。
 
@@ -210,7 +210,9 @@ def collect_all(
 
     session = SessionLocal()
     try:
-        stmt = select(Meme).where(Meme.certified.is_(True))
+        # 覆盖"库里所有可分析的梗"，而不只是在线核验通过的——
+        # 未核验的会带着 verification_state 如实出现在结果里
+        stmt = select(Meme).where(Meme.status == MemeStatus.CERTIFIED)
         if meme_ids:
             stmt = stmt.where(Meme.id.in_(meme_ids))
         memes = list(session.scalars(stmt.order_by(Meme.id)))
@@ -229,19 +231,27 @@ def collect_all(
             # 再用剩下的视频做每日聚合，否则统计会被无关样本灌水。
             terms = MemeTerms.from_meme(meme)
             kept, dropped = match_videos(terms, bundle.videos)
+            dropped = dropped + [None] * int(getattr(bundle, "dropped_irrelevant", 0) or 0)
             if dropped:
                 bundle.videos = kept
                 summary["dropped"] = int(summary["dropped"]) + len(dropped)
                 log.info("梗「%s」相关性过滤：保留 %s 条，剔除 %s 条", meme.name, len(kept), len(dropped))
 
-            # 只有"统计本来就是从视频聚合出来的"采集器才需要重算，
-            # 否则演示数据会被 12 条视频样本压成一条断掉的曲线。
-            if getattr(collector, "aggregates_from_videos", True):
-                bundle.daily_stats = aggregate_videos(meme.id, kept, data_source=collector.source)
+            # 注意：不重算日统计。两个采集器都自己产出按日的统计
+            # （演示器给完整曲线，B站器逐日区间查询），
+            # 用"过滤后的视频列表"反推会把序列压断。
 
             if not bundle.videos:
                 summary["empty"] = int(summary["empty"]) + 1
-                log.info("梗「%s」窗口内没有可用视频，保留原数据", meme.name)
+                if purge_when_empty:
+                    # 宁可留空，也不要把演示数据混在"真实数据"里
+                    session.query(MemeDailyStats).filter(MemeDailyStats.meme_id == meme.id).delete()
+                    session.query(Video).filter(Video.meme_id == meme.id).delete()
+                    meme.data_source = collector.source
+                    meme.data_updated_at = datetime.now()
+                    log.info("梗「%s」窗口内无相关视频，已清空旧数据（不保留演示值）", meme.name)
+                else:
+                    log.info("梗「%s」窗口内没有可用视频，保留原数据", meme.name)
                 continue
 
             session.query(MemeDailyStats).filter(MemeDailyStats.meme_id == meme.id).delete()

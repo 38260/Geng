@@ -73,6 +73,10 @@ class Settings(BaseSettings):
 
     # ------------------------------- analytics -------------------------------- #
     analysis_window_days: int = 30
+    # 双 UP 在线核验被 B 站风控挡住时（缺 BILI_COOKIE），是否仍允许
+    # "人工整理但尚未在线核验"的梗参与分析。关掉后正式梗库会只剩在线核验通过的梗。
+    # 无论开关如何，接口和页面都会如实标出 verification_state。
+    analysis_allow_unverified: bool = True
     relevance_threshold: float = 0.5
 
     @field_validator("cors_origins", mode="before")

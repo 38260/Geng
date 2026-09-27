@@ -146,7 +146,10 @@ def test_detail_shape(client, top_meme_id):
     assert cert["certified"] is True
     assert cert["encyclopedia"]["up_name"] == "梗百科" and cert["encyclopedia"]["confirmed"]
     assert cert["guide"]["up_name"] == "梗指南" and cert["guide"]["confirmed"]
-    assert cert["encyclopedia"]["video_url"].startswith("https://www.bilibili.com/video/")
+    # 演示阶段的认证证据不得伪装成可点开的真实链接
+    assert cert["encyclopedia"]["linkable"] is False
+    assert cert["encyclopedia"]["video_url"] == ""
+    assert cert["encyclopedia"]["confirmed"] is True
 
     # 相关视频都过了相关性阈值
     assert 0 < len(payload["videos"]) <= 4

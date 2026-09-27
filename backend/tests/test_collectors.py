@@ -90,6 +90,19 @@ class FakeClient:
             raise BilibiliBlocked("HTTP 412")
         return self.rows
 
+    def search_range(self, keyword, *, begin, end, order="click", page=1, page_size=20):
+        """模拟 B 站的发布时间区间过滤。"""
+        self.requested.append(f"{keyword}@{begin.date()}")
+        if self.blocked:
+            from app.collectors.bilibili import BilibiliBlocked
+
+            raise BilibiliBlocked("HTTP 412")
+        rows = [
+            row for row in self.rows
+            if begin.timestamp() <= row["pubdate"] < end.timestamp()
+        ]
+        return rows[:page_size], len(rows)
+
     def _get_payload(self, url, params):
         return {
             "data": {
@@ -149,20 +162,24 @@ def test_bilibili_collector_builds_consistent_daily_stats(certified_meme):
         _row(2, days_ago=9, title=f"第一次看{name}"),
         _row(3, days_ago=120, title=f"窗口外的老视频 {name}"),
     ]
-    collector = BilibiliCollector(client=FakeClient(rows=rows), request_gap=0)
+    collector = BilibiliCollector(client=FakeClient(rows=rows), request_gap=0, enrich_limit=10)
     bundle = collector.collect(certified_meme, window_days=30)
 
     assert len(bundle.videos) == 3, "窗口外的视频不应进入统计"
     assert all(video.data_source == "bilibili" for video in bundle.videos)
     assert bundle.videos[0].like == 200 and bundle.videos[0].coin == 60, "详情接口应补齐点赞/投币"
 
+    # 逐日采集会产出完整窗口（含没有内容的日子），这样增长率才有可比的分母
+    assert len(bundle.daily_stats) == 30
     by_day = {stat.stat_date: stat for stat in bundle.daily_stats}
-    assert len(by_day) == 2
-    recent = max(by_day)
+    assert sum(1 for stat in bundle.daily_stats if stat.video_count == 0) == 28
+    recent = max(day for day, stat in by_day.items() if stat.video_count)
     assert by_day[recent].video_count == 2
-    assert by_day[recent].view == 10_000          # 5000 + 5000
+    # 日统计用的是搜索接口给的播放量（1000+2000）；详情接口补齐的点赞/投币
+    # 只写进视频列表，不回灌日统计，避免两个口径混用
+    assert by_day[recent].view == 3_000
     assert by_day[recent].creator_count == 2      # 两个不同 UP 主
-    assert by_day[min(by_day)].video_count == 1
+    assert by_day[recent].search_total == 2       # B站给出的当日结果总数
 
 
 def test_collect_all_drops_irrelevant_search_results(certified_meme, session, monkeypatch):

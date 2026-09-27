@@ -91,6 +91,8 @@ def card_payload(meme: Meme, hotness: HotnessSnapshot, lifecycle: LifecycleSnaps
         "slug": meme.slug,
         "description": meme.description,
         "aliases": meme.aliases or [],
+        "keywords": meme.keywords or [],
+        "data_source": settings.data_source,
         "hotness": round(hotness.score, 1),
         "stage": lifecycle.stage,
         "stage_label": lifecycle.stage_label,

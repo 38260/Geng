@@ -88,13 +88,13 @@ def trend_explanation(body: TrendExplanationRequest, session: SessionDep):
 
     if not body.data:
         raise HTTPException(status_code=400, detail="需要 meme_id 或 data")
-    text = rule_based_trend(body.data)
     return {
         "kind": "trend_explanation",
         "status": "ok",
+        "available": True,
         "source": "rule",
         "data_version": "adhoc",
-        "text": text,
+        "result": {"text": rule_based_trend(body.data)},
         "note": "直接传 data 时只走算法兜底，不调用 LLM",
     }
 

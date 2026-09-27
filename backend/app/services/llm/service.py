@@ -57,13 +57,19 @@ class InsightOutput:
         return self.status == InsightStatus.OK
 
     def to_dict(self) -> dict[str, Any]:
+        """注意：结果一律嵌在 ``result`` 里。
+
+        赶梗建议本身也带一个 status 字段（can_catch/...），平铺会和
+        "AI 是否可用" 撞名，所以这里不展开。
+        """
         payload: dict[str, Any] = {
             "kind": self.kind,
             "status": self.status,
+            "available": self.available,
             "source": self.source,
             "data_version": self.data_version,
             "generated_at": self.generated_at.isoformat(),
-            **self.result,
+            "result": self.result,
         }
         if self.model:
             payload["model"] = self.model

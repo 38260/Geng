@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import pytest
+
 from app.mock.catalogue import ALL_STAGES, MEME_CATALOGUE, spec_for
+from .conftest import make_stats
+
 from app.mock.curves import (
     activity_curve,
     build_daily_points,
@@ -77,3 +81,21 @@ def test_catalogue_covers_all_six_stages_and_stays_certifiable():
     assert uncertified, "需要保留未认证梗，才能验证双 UP 闸门"
     for name in uncertified:
         assert spec_for(name).certification in {"enc", "guide", "none"}
+
+
+def test_seed_refuses_to_overwrite_real_collection(session, meme_factory):
+    """演示数据是整库重建，绝不能悄悄盖掉真实采集结果。"""
+    from app.scripts.seed_data import real_footprint, seed
+
+    meme = meme_factory(name="真实采集过的梗")
+    for row in make_stats(meme.id, [80_000] * 3):
+        row.data_source = "bilibili"
+        session.add(row)
+    session.flush()
+
+    memes, rows = real_footprint(session)
+    assert memes >= 1 and rows >= 3
+
+    with pytest.raises(RuntimeError) as err:
+        seed(do_reset=False)
+    assert "--force" in str(err.value)

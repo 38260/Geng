@@ -43,7 +43,7 @@ B站数据 → 采集 → 清洗 → 梗匹配 → 双UP认证 → 时间序列�
 cd backend
 pip install -r requirements.txt
 cp .env.example .env              # 需要真实 AI 文案时填 LLM_API_KEY
-python -m app.scripts.seed_data   # 建梗库骨架（幂等，可反复跑）
+python -m app.scripts.seed_data   # 建梗库骨架（幂等；库里有真实采集数据时会拒绝，除非 --force）
 python -m app.scripts.run_pipeline --report   # 算热度/生命周期并打印榜单
 uvicorn app.main:app --port 8010
 ```
@@ -177,7 +177,7 @@ LLM 只能润色这句话，**不能改状态**：模型返回的 `status` 与�
 
 ```bash
 cd backend
-python -m app.scripts.seed_data                # 先建梗库骨架
+python -m app.scripts.seed_data                # 先建梗库骨架（有真实数据时会被拦下）
 python -m app.scripts.rebuild_from_bilibili    # 在线核验 + 逐日真实采集 + 重算指标
 ```
 

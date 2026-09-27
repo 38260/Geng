@@ -59,9 +59,39 @@ def purge_generated(session, meme: Meme) -> None:
     session.commit()
 
 
-def seed(days: int | None = None, do_reset: bool = True) -> dict[str, int]:
+def real_footprint(session=None) -> tuple[int, int]:
+    """库里还留着多少 B 站真实采集的数据（梗数、日统计行数）。"""
+    from sqlalchemy import func
+
+    own = session is None
+    session = session or SessionLocal()
+    try:
+        init_db()
+        memes = session.query(func.count(func.distinct(MemeDailyStats.meme_id))).filter(
+            MemeDailyStats.data_source == "bilibili"
+        ).scalar()
+        rows = session.query(func.count(MemeDailyStats.stat_date)).filter(
+            MemeDailyStats.data_source == "bilibili"
+        ).scalar()
+        return int(memes or 0), int(rows or 0)
+    finally:
+        if own:
+            session.close()
+
+
+def seed(days: int | None = None, do_reset: bool = True, force: bool = False) -> dict[str, int]:
     window_days = days or settings.analysis_window_days
     collector = MockCollector()
+
+    if not force:
+        # 演示数据是整库重建（reset_db 会 drop 所有表），拿它盖掉真实采集
+        # 结果是致命的——本项目就翻过一次这个车。所以默认拒绝，要覆盖得显式 --force。
+        memes, rows = real_footprint()
+        if rows:
+            raise RuntimeError(
+                f"库里还有 {memes} 个梗 / {rows} 行 B 站真实采集数据，"
+                "演示数据会整库重建并删掉它们。确认要覆盖请加 --force。"
+            )
 
     if do_reset:
         reset_db()
@@ -121,9 +151,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="赶梗潮 · 演示数据生成")
     parser.add_argument("--days", type=int, default=settings.analysis_window_days)
     parser.add_argument("--no-reset", action="store_true", help="保留表结构，仅覆盖演示数据")
+    parser.add_argument("--force", action="store_true", help="确认覆盖库里的 B 站真实采集数据")
     args = parser.parse_args(argv)
 
-    summary = seed(days=args.days, do_reset=not args.no_reset)
+    try:
+        summary = seed(days=args.days, do_reset=not args.no_reset, force=args.force)
+    except RuntimeError as exc:
+        print(f"已中止：{exc}")
+        return 2
     print(
         "演示数据写入完成："
         f"梗 {summary['memes']} 个（正式 {summary['certified']} / 候选 {summary['candidate']}），"

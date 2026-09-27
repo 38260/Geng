@@ -89,8 +89,13 @@ for key, stages in (("hot", {"explosive"}), ("taking_off", {"sprouting", "rising
     # 不要求每个筛选都有结果：真实数据可能当下没有"正在爆"的梗，那也应该返回空
     check(got <= stages, f"筛选 {key} 只返回 {sorted(stages)}（实际 {sorted(got) or '空'}）")
 
-searched = call("GET", "/api/memes?search=赛博木鱼")
-check([i["name"] for i in (searched or {}).get("items", [])] == ["电子木鱼"], "别名搜索命中")
+probe = (items or [{}])[0]
+probe_alias = (probe.get("aliases") or [probe.get("name", "")])[0]
+searched = call("GET", f"/api/memes?search={urllib.parse.quote(str(probe_alias))}")
+check(
+    probe_alias and probe.get("name") in [i["name"] for i in (searched or {}).get("items", [])],
+    f"用别名「{probe_alias}」能搜到它自己（{probe.get('name')}）",
+)
 call("GET", "/api/memes?filter=douyin", expect=(400,), note="非法筛选应 400")
 call("GET", "/api/memes/999999", expect=(404,), note="不存在的梗应 404")
 

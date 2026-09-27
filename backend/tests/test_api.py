@@ -355,3 +355,14 @@ def test_no_response_leaks_a_secret(client):
         text = client.get(path).text
         assert "sk-" not in text, path
         assert not math.isnan(0.0)
+
+
+def test_real_mode_does_not_rank_demo_memes(client, monkeypatch):
+    """配置成真实数据源时，手写演示梗不能和真梗同榜——假数字会压住真热度。"""
+    assert client.get("/api/memes?limit=100").json()["total"] >= 30
+
+    monkeypatch.setattr(settings, "data_source", "bilibili")
+    assert client.get("/api/memes?limit=100").json()["total"] == 0, "演示梗该被请出榜单"
+
+    monkeypatch.setattr(settings, "leaderboard_require_verified", False)
+    assert client.get("/api/memes?limit=100").json()["total"] >= 30, "关掉开关就回到旧行为"

@@ -10,7 +10,7 @@ import math
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.analytics import MemeTerms, match_videos, nickname
@@ -139,13 +139,23 @@ def effective_source(sources: list[str]) -> tuple[str, bool]:
 
 
 def _load_rows(session: Session) -> list[tuple[Meme, HotnessSnapshot, LifecycleSnapshot]]:
-    """正式梗库 = 双 UP 认证通过 且 已有指标快照。"""
+    """正式梗库 = 双 UP 认证通过 且 已有指标快照。
+
+    真实模式下再加一道：数据必须真是 B 站采来的、认证必须真在线核验过（verified_both）。
+    手写演示梗的 certified 是自记自认的，跟琵琶曲、老叟戏顽童这种真梗同榜，
+    就是拿假数字压真热度。
+    """
     stmt = (
         select(Meme, HotnessSnapshot, LifecycleSnapshot)
         .join(HotnessSnapshot, HotnessSnapshot.meme_id == Meme.id)
         .join(LifecycleSnapshot, LifecycleSnapshot.meme_id == Meme.id)
         .where(Meme.certified.is_(True), Meme.status == MemeStatus.CERTIFIED)
     )
+    if settings.data_source == "bilibili" and settings.leaderboard_require_verified:
+        stmt = stmt.where(
+            Meme.data_source == "bilibili",
+            Meme.verification_state == "verified_both",
+        )
     return list(session.execute(stmt))
 
 
@@ -450,14 +460,15 @@ def detail_payload(session: Session, meme: Meme) -> dict[str, Any] | None:
 
 def meta_payload(session: Session) -> dict[str, Any]:
     latest = session.scalar(select(Meme.data_updated_at).order_by(Meme.data_updated_at.desc()))
-    # 统计截至日：序列里真实有数据的第一天……最后一天。采集窗口刻意不含今天
+    rows = _load_rows(session)
+    # 统计截至日：只看"榜单里这些梗"的序列最后一天。采集窗口刻意不含今天
     # （今天没过完，头部样本会偏低、增幅会假跌），所以这里必须把"截至哪天"讲明白，
-    # 否则用户看到的就是"数据是过去的"。
+    # 否则用户看到的就是"数据是过去的"。取可见梗而不是全库，免得被演示数据顶高。
+    visible_ids = [meme.id for meme, _, _ in rows]
     data_through = session.scalar(
-        select(MemeDailyStats.stat_date).order_by(MemeDailyStats.stat_date.desc())
+        select(func.max(MemeDailyStats.stat_date)).where(MemeDailyStats.meme_id.in_(visible_ids or [-1]))
     )
     lag_days = (date.today() - data_through).days if data_through else None
-    rows = _load_rows(session)
     total_certified = len(rows)
     sources = [meme.data_source or settings.data_source for meme, _, _ in rows]
     source_breakdown = {key: sources.count(key) for key in sorted(set(sources))}

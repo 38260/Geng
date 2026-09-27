@@ -102,6 +102,8 @@ def record_certification(
     data_source: str = "mock",
 ) -> Meme:
     """登记某个 UP 主介绍过该梗的证据，并重算认证结果。"""
+    if role not in UP_AUTHORS:
+        raise ValueError(f"unknown certification role: {role}")
     author = UP_AUTHORS[role]
     cert = get_or_create_certification(session, meme, role)
     cert.bvid = bvid or cert.bvid

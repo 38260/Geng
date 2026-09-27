@@ -13,7 +13,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -36,13 +36,13 @@ MEME_CATALOGUE: tuple[MemeSpec, ...] = (
              ("赛博木鱼", "电子功德"), ("木鱼", "功德", "赛博"), emoji="🪵", color="#FFE9D6"),
     MemeSpec("我不是黄豆", "explosive", 190_000, "用变黄表情包自嘲「我不是黄豆」的二次创作潮，常配魔性 BGM。",
              ("黄豆", "变黄了"), ("黄豆", "表情包"), emoji="🫘", color="#FFF3C4"),
-    MemeSpec("哈基米", "explosive", 175_000, "源自猫咪视频的洗脑旋律，被大量剪辑成萌宠与整活混剪。",
+    MemeSpec("哈基米", "rising", 175_000, "源自猫咪视频的洗脑旋律，被大量剪辑成萌宠与整活混剪。",
              ("哈基米你呀", "hajimi"), ("哈基米", "猫", "洗脑"), emoji="🐱", color="#FFE4EF"),
-    MemeSpec("泼天的富贵", "explosive", 150_000, "形容突然降临的流量与好运，常用于品牌与素人爆火叙事。",
+    MemeSpec("泼天的富贵", "rising", 150_000, "形容突然降临的流量与好运，常用于品牌与素人爆火叙事。",
              ("接住泼天富贵", "泼天富贵"), ("富贵", "流量"), emoji="💰", color="#FFF0BF"),
-    MemeSpec("这很难评", "explosive", 132_000, "面对离谱内容时的万能回应句式，衍生出大量反应向视频。",
+    MemeSpec("这很难评", "plateau", 132_000, "面对离谱内容时的万能回应句式，衍生出大量反应向视频。",
              ("我祝他成功吧",), ("难评",), emoji="🤔", color="#E7EEFF"),
-    MemeSpec("无敌是多么寂寞", "explosive", 121_000, "配合夸张战绩的卡点梗，游戏区与舞蹈区同时使用。",
+    MemeSpec("无敌是多么寂寞", "rising", 121_000, "配合夸张战绩的卡点梗，游戏区与舞蹈区同时使用。",
              ("无敌",), ("寂寞", "卡点"), emoji="🕺", color="#E4F6FF"),
 
     # ---------------------------- 📈 上升期 ---------------------------- #

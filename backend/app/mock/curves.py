@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-import math
+
 import random
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -40,7 +40,8 @@ def _rise_then_flat(days: int, peak_idx: int, peak: float, floor: float, decay: 
     return out
 
 
-def activity_curve(archetype: str, days: int = DEFAULT_DAYS) -> list[float]:
+def activity_curve(archetype: str, days: int = DEFAULT_DAYS, seed: int = 0) -> list[float]:
+    rng = random.Random(seed)
     if archetype == "sprouting":
         # 长期沉寂 -> 最近一周才冒头，绝对量很小
         head = [0.05] * (days - 9)
@@ -54,18 +55,18 @@ def activity_curve(archetype: str, days: int = DEFAULT_DAYS) -> list[float]:
         return _geom(days, 0.10, 5.2)
 
     if archetype == "plateau":
-        base = _geom(days, 1.05, 1.12)
-        wobble = [1 + 0.06 * math.sin(i / 2.3) for i in range(days)]
-        return [b * w for b, w in zip(base, wobble)]
+        # 用独立小噪声而不是正弦：正弦会在窗口尾部留下系统性下滑，
+        # 让"平稳期"被误判成"退潮期"。
+        return [1.0 * rng.uniform(0.94, 1.06) for _ in range(days)]
 
     if archetype == "receding":
         # 高位 -> 持续下滑
         return _rise_then_flat(days, peak_idx=8, peak=2.6, floor=0.9, decay=0.945)
 
     if archetype == "obsolete":
-        # 早期有一点量，最近两周几乎归零
+        # 早期有一点量，最近两周几乎归零：偶尔冒出一条考古向二创，但成不了气候
         head = _geom(10, 1.4, 0.35)
-        tail = [0.02 + 0.02 * (0.5 + 0.5 * math.sin(i * 1.7)) * 0.6 for i in range(days - 10)]
+        tail = [0.55 if i % 5 == 4 else 0.0 for i in range(days - 10)]
         return head + tail
 
     raise ValueError(f"unknown archetype: {archetype}")
@@ -95,6 +96,14 @@ class DailyPoint:
     reply: int
     danmaku: int
 
+    @property
+    def interaction(self) -> int:
+        return self.like + self.coin + self.favorite + self.reply + self.danmaku
+
+    @property
+    def discussion(self) -> int:
+        return self.reply + self.danmaku
+
 
 def build_daily_points(
     *,
@@ -106,7 +115,7 @@ def build_daily_points(
 ) -> list[DailyPoint]:
     """scale = 该梗"基准日"的日均播放量级。"""
     rng = random.Random(seed)
-    curve = activity_curve(archetype, days)
+    curve = activity_curve(archetype, days, seed)
     end_day = end_day or date.today()
     base_videos = max(2, int(round(scale / 25_000)))
     # 单条视频的单日播放量：保证「当日播放量 = 当日视频数 × 单条播放量」自洽，

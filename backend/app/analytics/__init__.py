@@ -31,6 +31,7 @@ __all__ = [
     "LifecycleResult",
     "build_input",
     "classify",
+    "nickname",
     "CatchUpResult",
     "decide",
     "STATUSES",

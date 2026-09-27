@@ -13,7 +13,11 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from .stats import MemeDailyStats
+    from .video import Video
 
 from sqlalchemy import (
     JSON,

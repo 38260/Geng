@@ -406,6 +406,51 @@ export default function Manage() {
                 />
               </div>
 
+              <div className="card p-5">
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <h3 className="text-[18px] font-bold">这个梗采信了哪些视频</h3>
+                  <span className="text-[12px] text-ink-faint">
+                    共 {view.sample_videos.accepted} 条 · 播放合计 {compact(view.sample_videos.views)}
+                    ；列表里的每一条都真的进了热度计算
+                  </span>
+                </div>
+                {view.sample_videos.items.length ? (
+                  <ul className="mt-3 space-y-2">
+                    {view.sample_videos.items.map((video) => (
+                      <li key={video.bvid} className="flex items-start gap-3 rounded-xl bg-rail px-3 py-2.5">
+                        <span className="min-w-0 flex-1">
+                          <a
+                            href={video.url}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                            className="line-clamp-1 text-[14px] font-semibold hover:text-nav"
+                          >
+                            {video.title}
+                          </a>
+                          <span className="mt-0.5 block truncate text-[12px] text-ink-faint">
+                            @{video.author} · {compact(video.view)}播放 · 命中词：
+                            {video.matched_terms.join("、") || "—"}
+                          </span>
+                        </span>
+                        <span
+                          className={`chip shrink-0 ${
+                            video.relevance_score >= 0.8 ? "bg-go-soft text-go" : "bg-gold/20 text-[#B2750A]"
+                          }`}
+                          title="相关性打分：命中梗名最高，短别名/关键词只能算弱证据"
+                        >
+                          {video.relevance_score.toFixed(2)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-3 rounded-xl bg-rail px-3.5 py-3 text-[13px] text-ink-mute">
+                    这个梗目前一条采信样本都没有——热度不会计入榜单。多半是梗名/别名太口语，
+                    B 站搜回来的都是字面撞车的无关内容；可以在上面改别名或关键词后重采。
+                  </p>
+                )}
+              </div>
+
               <div className="card flex flex-wrap items-center gap-3 p-4">
                 <button type="button" className="btn-primary rounded-full" onClick={save} disabled={!dirty || busy}>
                   {busy ? "保存中…" : dirty ? "保存修改" : "没有改动"}

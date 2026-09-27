@@ -53,6 +53,12 @@ def test_read_manage_view_and_cover_options(client):
     assert view["cover_options"] == []
     assert "不会改动已算好的热度" in view["note"]
 
+    # 采信样本：让人能抽查"这个梗的分数到底是哪些视频撑起来的"
+    samples = view["sample_videos"]
+    assert samples["accepted"] >= 1 and samples["items"]
+    assert all(item["relevance_score"] >= 0.5 for item in samples["items"]), "入库样本都得过阈值"
+    assert all(item["url"] for item in samples["items"])
+
 
 def test_patch_updates_only_metadata(client):
     meme_id = client.get("/api/memes?limit=1").json()["items"][0]["id"]

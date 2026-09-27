@@ -80,6 +80,36 @@ def cover_options(session: Session, meme: Meme, limit: int = 12) -> list[dict[st
     return out
 
 
+def sample_videos(session: Session, meme: Meme, limit: int = 8) -> dict[str, Any]:
+    """这个梗到底采信了哪些视频——数据像不对，先来这里抽查。
+
+    表里存的就是过了相关性阈值的样本（过滤发生在写入前），所以这里
+    列出来的每一条都真的进了热度计算。
+    """
+    rows = list(
+        session.scalars(
+            select(Video).where(Video.meme_id == meme.id).order_by(Video.view.desc())
+        )
+    )
+    return {
+        "accepted": len(rows),
+        "views": sum(row.view for row in rows),
+        "items": [
+            {
+                "bvid": row.bvid,
+                "title": row.title,
+                "view": row.view,
+                "author": row.author,
+                "url": row.url,
+                "relevance_score": round(row.relevance_score or 0.0, 2),
+                "matched_terms": list(row.matched_terms or []),
+                "data_source": row.data_source,
+            }
+            for row in rows[:limit]
+        ],
+    }
+
+
 def meme_view(session: Session, meme: Meme) -> dict[str, Any]:
     """管理表单要的一次性读：当前值 + 自动封面 + 可挑的真实封面。"""
     hotness = session.get(HotnessSnapshot, meme.id)
@@ -96,6 +126,7 @@ def meme_view(session: Session, meme: Meme) -> dict[str, Any]:
         "auto_cover": auto_cover,
         "effective_cover": thumbnail_for(meme, auto_cover)["image"],
         "cover_options": cover_options(session, meme),
+        "sample_videos": sample_videos(session, meme),
         "data_source": meme.data_source or "mock",
         "status": meme.status,
         "certified": bool(meme.certified),

@@ -316,6 +316,24 @@ export interface CoverOption {
   data_source: DataSource;
 }
 
+/** 梗管理里的"采信样本"：这些视频真的进了热度计算。 */
+export interface SampleVideo {
+  bvid: string;
+  title: string;
+  view: number;
+  author: string;
+  url: string;
+  relevance_score: number;
+  matched_terms: string[];
+  data_source: DataSource;
+}
+
+export interface SampleVideos {
+  accepted: number;
+  views: number;
+  items: SampleVideo[];
+}
+
 export interface ManageView {
   id: number;
   name: string;
@@ -327,6 +345,7 @@ export interface ManageView {
   auto_cover: string;
   effective_cover: string;
   cover_options: CoverOption[];
+  sample_videos: SampleVideos;
   data_source: DataSource;
   status: string;
   certified: boolean;

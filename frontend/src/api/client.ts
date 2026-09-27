@@ -20,6 +20,8 @@ import type {
 
 const BASE = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
 const TIMEOUT_MS = 15000;
+/** AI 文案是慢操作（LLM 可能要 20s），单独放宽，别让它误判成网络故障 */
+const AI_TIMEOUT_MS = 45000;
 
 export class ApiError extends Error {
   status: number;
@@ -49,9 +51,9 @@ function sanitize<T>(value: T): T {
   return value;
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+async function request<T>(path: string, init?: RequestInit, timeoutMs = TIMEOUT_MS): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${BASE}${path}`, {
       ...init,
@@ -70,17 +72,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
 
     if (!response.ok) {
+      const typed = payload as { detail?: string; error?: string } | null;
+      // Vite 代理在后端挂掉时回 500 且不带我们的错误结构 —— 说人话
+      const looksLikeProxyError =
+        response.status === 500 && !typed?.detail && !typed?.error;
       const detail =
-        (payload as { detail?: string; error?: string } | null)?.detail ??
-        (payload as { error?: string } | null)?.error ??
-        `请求失败（${response.status}）`;
+        typed?.detail ??
+        typed?.error ??
+        (looksLikeProxyError
+          ? "后端不可达：可能没启动，或端口和 VITE_API_TARGET 不一致"
+          : `请求失败（${response.status}）`);
       throw new ApiError(response.status, String(detail));
     }
     return sanitize(payload) as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
     if ((error as Error)?.name === "AbortError") {
-      throw new ApiError(0, "请求超时，请检查后端是否在 8000 端口运行");
+      throw new ApiError(0, "请求超时，请确认后端已启动（默认 http://127.0.0.1:8010）");
     }
     throw new ApiError(0, "网络不可用，请确认后端服务已启动");
   } finally {
@@ -115,9 +123,10 @@ export const api = {
     request<{ trend_explanation: InsightRecord; catch_up_advice: InsightRecord }>(
       `/api/memes/${id}/insight`,
       { method: "POST", body: JSON.stringify({ refresh }) },
+      AI_TIMEOUT_MS,
     ),
 
-  llmTest: () => request<LLMTestResult>("/api/llm/test", { method: "POST" }),
+  llmTest: () => request<LLMTestResult>("/api/llm/test", { method: "POST" }, AI_TIMEOUT_MS),
 
   llmModels: () => request<{ models: string[] }>("/api/llm/models"),
 

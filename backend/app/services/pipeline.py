@@ -231,9 +231,13 @@ def collect_all(
             kept, dropped = match_videos(terms, bundle.videos)
             if dropped:
                 bundle.videos = kept
-                bundle.daily_stats = aggregate_videos(meme.id, kept, data_source=collector.source)
                 summary["dropped"] = int(summary["dropped"]) + len(dropped)
                 log.info("梗「%s」相关性过滤：保留 %s 条，剔除 %s 条", meme.name, len(kept), len(dropped))
+
+            # 只有"统计本来就是从视频聚合出来的"采集器才需要重算，
+            # 否则演示数据会被 12 条视频样本压成一条断掉的曲线。
+            if getattr(collector, "aggregates_from_videos", True):
+                bundle.daily_stats = aggregate_videos(meme.id, kept, data_source=collector.source)
 
             if not bundle.videos:
                 summary["empty"] = int(summary["empty"]) + 1

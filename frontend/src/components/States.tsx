@@ -35,7 +35,9 @@ export function ErrorState({
         {hint ? <span className="ml-1 text-ink-faint">（{hint}）</span> : null}
       </p>
       <p className="text-[12px] text-ink-faint">
-        后端启动命令：<code className="rounded bg-dusk/10 px-1.5 py-0.5">cd backend && uvicorn app.main:app --port 8000</code>
+        后端启动命令：<code className="rounded bg-dusk/10 px-1.5 py-0.5">cd backend && uvicorn app.main:app --port 8010</code>
+        ；端口被占用时换一个，并让前端指向它：
+        <code className="rounded bg-dusk/10 px-1.5 py-0.5">VITE_API_TARGET=http://127.0.0.1:&lt;端口&gt; npm run dev</code>
       </p>
       {onRetry ? (
         <button type="button" className="btn-ghost" onClick={onRetry}>

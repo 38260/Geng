@@ -34,6 +34,7 @@ class MockCollector:
     """按梗的生命周期原型生成 30 天时间序列 + 相关视频样本。"""
 
     source = SOURCE
+    aggregates_from_videos = False
 
     def is_available(self) -> tuple[bool, str]:
         return True, "演示数据始终可用"

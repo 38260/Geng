@@ -37,6 +37,11 @@ class Collector(Protocol):
 
     source: str
 
+    # True  = 每日统计由本次采到的视频聚合而来（真实采集：一次抓取即一份快照）
+    # False = 采集器自己就产出按日统计（演示数据：模拟"每天爬一次"积累出的序列）
+    # 关掉这一项，管线就不会拿稀疏的视频样本去重算 30 天曲线。
+    aggregates_from_videos: bool
+
     def collect(self, meme: Meme, *, window_days: int) -> CollectedBundle:
         ...
 

@@ -59,8 +59,10 @@ class Settings(BaseSettings):
     llm_model: str = "LongCat-2.5-Preview"
     llm_temperature: float = 0.3
     llm_max_tokens: int = 300
-    llm_timeout: float = 30.0
-    llm_max_retries: int = 3
+    # 最坏耗时 ≈ timeout * (retries + 1) + 退避；默认控制在 21s 左右，
+    # 前端 AI 卡片有"生成中"状态，不阻塞页面
+    llm_timeout: float = 10.0
+    llm_max_retries: int = 2
     llm_backoff_base: float = 0.8
     # When the LLM is unavailable we still answer with an algorithm-written
     # sentence so the product loop never breaks. Set to false for a strict

@@ -31,6 +31,7 @@ SOURCE = "bilibili"
 
 class BilibiliCollector:
     source = SOURCE
+    aggregates_from_videos = True
 
     def __init__(
         self,

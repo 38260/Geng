@@ -41,16 +41,20 @@ def session():
         db.close()
 
 
+_MEME_SEQ = {"n": 0}
+
+
 @pytest.fixture()
 def meme_factory(session):
-    counter = {"n": 0}
+    """部分用例会 commit（AI 缓存路径），所以序号用模块级计数器避免 slug 撞车。"""
 
     def _make(name: str | None = None, **kwargs) -> Meme:
-        counter["n"] += 1
-        name = name or f"测试梗{counter['n']}"
+        _MEME_SEQ["n"] += 1
+        index = _MEME_SEQ["n"]
+        name = name or f"测试梗{index}"
         meme = Meme(
             name=name,
-            slug=kwargs.pop("slug", f"test-{counter['n']}"),
+            slug=kwargs.pop("slug", f"test-{index}"),
             aliases=kwargs.pop("aliases", [f"{name}别名"]),
             keywords=kwargs.pop("keywords", ["测试"]),
             description=kwargs.pop("description", "单元测试用梗"),

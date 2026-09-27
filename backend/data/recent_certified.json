@@ -1,89 +1,90 @@
 {
-  "generated_at": "2026-09-27T21:47:48",
+  "generated_at": "2026-09-27T22:47:27",
+  "rule": "并集准入：任一 UP 主在认证窗口内介绍过即入池；双 UP 只是标签",
   "recent": {
     "梗百科": [
       {
         "meme": "【梗百科】拳击猫是啥梗？国际爆火出处在国内？！",
         "name": "拳击猫",
         "date": "2026-09-26",
-        "play": 340146,
+        "play": 345932,
         "bvid": "BV15vhR6dEEG"
       },
       {
         "meme": "【梗百科】尴尬狗是啥梗？",
         "name": "尴尬狗",
         "date": "2026-09-25",
-        "play": 668919,
+        "play": 673832,
         "bvid": "BV1ubh26ZEsb"
       },
       {
         "meme": "【梗百科】闪身步是啥梗？",
         "name": "闪身步",
         "date": "2026-09-21",
-        "play": 643162,
+        "play": 646133,
         "bvid": "BV1tihq6wENf"
       },
       {
         "meme": "【梗百科】XX在哪？最优骑士小碎步是啥梗？",
         "name": "xx在哪？最优骑士小碎步",
         "date": "2026-09-20",
-        "play": 631527,
+        "play": 632671,
         "bvid": "BV12Aeq6vEpv"
       },
       {
         "meme": "【梗百科】驾考宝典是啥梗？！",
         "name": "驾考宝典",
         "date": "2026-09-19",
-        "play": 365915,
+        "play": 366589,
         "bvid": "BV1vTeS6nEht"
       },
       {
         "meme": "【梗百科】大脚忍者是啥梗？原来是个外网梗？！",
         "name": "大脚忍者",
         "date": "2026-09-15",
-        "play": 402951,
+        "play": 403611,
         "bvid": "BV1mgen69Ewc"
       },
       {
         "meme": "【梗百科】琵琶曲是啥梗？",
         "name": "琵琶曲",
         "date": "2026-09-14",
-        "play": 1401663,
+        "play": 1404941,
         "bvid": "BV1mtY164EUu"
       },
       {
         "meme": "【梗百科】学功夫 练武术是啥梗？",
         "name": "学功夫 练武术",
         "date": "2026-09-12",
-        "play": 573472,
+        "play": 574217,
         "bvid": "BV1aaY96dERK"
       },
       {
         "meme": "【梗百科】Verity是啥梗？国内外都爆火的笑脸小球？",
         "name": "verity",
         "date": "2026-09-11",
-        "play": 398236,
+        "play": 398560,
         "bvid": "BV1p2Y766Em8"
       },
       {
         "meme": "【梗百科】狼王撕衣是啥梗？",
         "name": "狼王撕衣",
         "date": "2026-09-05",
-        "play": 1188080,
+        "play": 1188905,
         "bvid": "BV1G6tm6bEBT"
       },
       {
         "meme": "【梗百科】松针大油边是啥梗？",
         "name": "松针大油边",
         "date": "2026-09-02",
-        "play": 2290298,
+        "play": 2291752,
         "bvid": "BV1xWtJ6iEGs"
       },
       {
         "meme": "【梗百科】闹吃VS古振兴是啥梗？真人HIM？",
         "name": "闹吃vs古振兴",
         "date": "2026-08-29",
-        "play": 1315499,
+        "play": 1316046,
         "bvid": "BV1ii4C6QEk8"
       }
     ],
@@ -92,35 +93,35 @@
         "meme": "雨中霸王龙是什么梗【梗指南】",
         "name": "雨中霸王龙",
         "date": "2026-09-24",
-        "play": 182838,
+        "play": 184315,
         "bvid": "BV1S5aA6GEfK"
       },
       {
         "meme": "琵琶曲是什么梗【梗指南】",
         "name": "琵琶曲",
         "date": "2026-09-15",
-        "play": 1471899,
+        "play": 1474366,
         "bvid": "BV1JyeJ6CEWh"
       },
       {
         "meme": "公路之王是什么梗【梗指南】",
         "name": "公路之王",
         "date": "2026-09-11",
-        "play": 1476581,
+        "play": 1478221,
         "bvid": "BV1RwYE68Eph"
       },
       {
         "meme": "耍起是什么梗【梗指南】",
         "name": "耍起",
         "date": "2026-09-02",
-        "play": 523357,
+        "play": 524177,
         "bvid": "BV1VotU6iEiZ"
       },
       {
         "meme": "我了叹是什么梗【梗指南】",
         "name": "我了叹",
         "date": "2026-08-31",
-        "play": 603311,
+        "play": 603682,
         "bvid": "BV1A1t86wExG"
       }
     ]
@@ -135,7 +136,7 @@
     "梗百科": {
       "fetched": 50,
       "pages_ok": 1,
-      "blocked": 1,
+      "blocked": 2,
       "in_window": 41,
       "named": 37
     },
@@ -147,97 +148,782 @@
       "named": 22
     }
   },
-  "certified": [
+  "pool": [
     {
-      "meme": "【梗百科】OMG你吓到我了是啥梗？",
-      "name": "【梗百科】OMG你吓到我了是啥梗？",
+      "name": "拳击猫",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
       "encyclopedia": {
-        "bvid": "BV1usN46zEq8",
-        "title": "【梗百科】OMG你吓到我了是啥梗？",
-        "pubdate": "2026-07-11T13:25",
-        "mid": 1544008396,
-        "author": "梗百科",
-        "play": 2055086
+        "bvid": "BV15vhR6dEEG",
+        "title": "【梗百科】拳击猫是啥梗？国际爆火出处在国内？！",
+        "pubdate": "2026-09-26T17:34",
+        "play": 345932
+      },
+      "guide": null
+    },
+    {
+      "name": "尴尬狗",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV1ubh26ZEsb",
+        "title": "【梗百科】尴尬狗是啥梗？",
+        "pubdate": "2026-09-25T18:55",
+        "play": 673832
+      },
+      "guide": null
+    },
+    {
+      "name": "闪身步",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV1tihq6wENf",
+        "title": "【梗百科】闪身步是啥梗？",
+        "pubdate": "2026-09-21T22:30",
+        "play": 646133
+      },
+      "guide": null
+    },
+    {
+      "name": "xx在哪？最优骑士小碎步",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV12Aeq6vEpv",
+        "title": "【梗百科】XX在哪？最优骑士小碎步是啥梗？",
+        "pubdate": "2026-09-20T18:47",
+        "play": 632671
+      },
+      "guide": null
+    },
+    {
+      "name": "驾考宝典",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV1vTeS6nEht",
+        "title": "【梗百科】驾考宝典是啥梗？！",
+        "pubdate": "2026-09-19T11:53",
+        "play": 366589
+      },
+      "guide": null
+    },
+    {
+      "name": "大脚忍者",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV1mgen69Ewc",
+        "title": "【梗百科】大脚忍者是啥梗？原来是个外网梗？！",
+        "pubdate": "2026-09-15T17:56",
+        "play": 403611
+      },
+      "guide": null
+    },
+    {
+      "name": "琵琶曲",
+      "certified_by": [
+        "梗百科",
+        "梗指南"
+      ],
+      "cert_label": "双 UP 认证",
+      "encyclopedia": {
+        "bvid": "BV1mtY164EUu",
+        "title": "【梗百科】琵琶曲是啥梗？",
+        "pubdate": "2026-09-14T18:29",
+        "play": 1404941
       },
       "guide": {
-        "bvid": "BV1ehMg63EAF",
-        "title": "omg你吓到我了是什么梗【梗指南】",
-        "pubdate": "2026-07-08T19:56",
-        "mid": 94510621,
-        "author": "梗指南",
-        "play": 1122390
+        "bvid": "BV1JyeJ6CEWh",
+        "title": "琵琶曲是什么梗【梗指南】",
+        "pubdate": "2026-09-15T20:31",
+        "play": 1474366
       }
     },
     {
-      "meme": "【梗百科】中国人能飞是啥梗？",
-      "name": "【梗百科】中国人能飞是啥梗？",
+      "name": "学功夫 练武术",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
       "encyclopedia": {
-        "bvid": "BV1YV3E6iE8T",
-        "title": "【梗百科】中国人能飞是啥梗？",
-        "pubdate": "2026-07-26T18:29",
-        "mid": 1544008396,
-        "author": "梗百科",
-        "play": 2220196
+        "bvid": "BV1aaY96dERK",
+        "title": "【梗百科】学功夫 练武术是啥梗？",
+        "pubdate": "2026-09-12T15:34",
+        "play": 574217
+      },
+      "guide": null
+    },
+    {
+      "name": "verity",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV1p2Y766Em8",
+        "title": "【梗百科】Verity是啥梗？国内外都爆火的笑脸小球？",
+        "pubdate": "2026-09-11T17:59",
+        "play": 398560
+      },
+      "guide": null
+    },
+    {
+      "name": "狼王撕衣",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV1G6tm6bEBT",
+        "title": "【梗百科】狼王撕衣是啥梗？",
+        "pubdate": "2026-09-05T15:58",
+        "play": 1188905
+      },
+      "guide": null
+    },
+    {
+      "name": "松针大油边",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV1xWtJ6iEGs",
+        "title": "【梗百科】松针大油边是啥梗？",
+        "pubdate": "2026-09-02T17:08",
+        "play": 2291752
+      },
+      "guide": null
+    },
+    {
+      "name": "闹吃vs古振兴",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV1ii4C6QEk8",
+        "title": "【梗百科】闹吃VS古振兴是啥梗？真人HIM？",
+        "pubdate": "2026-08-29T18:42",
+        "play": 1316046
+      },
+      "guide": null
+    },
+    {
+      "name": "我是爷们",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV11whN6NE6T",
+        "title": "【梗百科】我是爷们是啥梗？！",
+        "pubdate": "2026-08-24T17:25",
+        "play": 552358
+      },
+      "guide": null
+    },
+    {
+      "name": "胆子真是肥嘟嘟的",
+      "certified_by": [
+        "梗百科",
+        "梗指南"
+      ],
+      "cert_label": "双 UP 认证",
+      "encyclopedia": {
+        "bvid": "BV1a9816ZER9",
+        "title": "【梗百科】胆子真是肥嘟嘟的是啥梗？",
+        "pubdate": "2026-08-22T14:49",
+        "play": 1134307
       },
       "guide": {
-        "bvid": "BV14x3u6iEvc",
-        "title": "中国人能飞是什么梗【梗指南】",
-        "pubdate": "2026-07-25T17:10",
-        "mid": 94510621,
-        "author": "梗指南",
-        "play": 5591743
+        "bvid": "BV1n48E6aEcr",
+        "title": "胆子真是肥嘟嘟的是什么梗【梗指南】",
+        "pubdate": "2026-08-19T17:45",
+        "play": 3842879
       }
     },
     {
-      "meme": "【梗百科】宗主第二招是啥？",
-      "name": "【梗百科】宗主第二招是啥？",
+      "name": "老叟戏顽童",
+      "certified_by": [
+        "梗百科",
+        "梗指南"
+      ],
+      "cert_label": "双 UP 认证",
       "encyclopedia": {
-        "bvid": "BV1ScKn69Enz",
-        "title": "【梗百科】宗主第二招是啥？",
-        "pubdate": "2026-07-17T18:00",
-        "mid": 1544008396,
-        "author": "梗百科",
-        "play": 1606384
+        "bvid": "BV1vQ8i6uEYf",
+        "title": "【梗百科】老叟戏顽童是啥梗？泥肘！！？",
+        "pubdate": "2026-08-21T18:15",
+        "play": 6721392
       },
       "guide": {
-        "bvid": "BV19oKc6yEpR",
-        "title": "宗主第二招是什么梗【梗指南】",
-        "pubdate": "2026-07-18T17:20",
-        "mid": 94510621,
-        "author": "梗指南",
-        "play": 1095855
+        "bvid": "BV1gE8s6AEjn",
+        "title": "老叟戏顽童是什么梗【梗指南】",
+        "pubdate": "2026-08-23T12:37",
+        "play": 1155790
       }
     },
     {
-      "meme": "【梗百科】牛来是啥梗？",
-      "name": "【梗百科】牛来是啥梗？",
+      "name": "突然出现的章鱼哥的美妙音乐啥",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV16Sbo6TEBX",
+        "title": "【梗百科】突然出现的章鱼哥的美妙音乐啥梗？",
+        "pubdate": "2026-08-20T18:00",
+        "play": 1482693
+      },
+      "guide": null
+    },
+    {
+      "name": "隔壁班转来了个xx",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV1g4be69Edh",
+        "title": "【梗百科】隔壁班转来了个XX是啥梗？正太扭腰？",
+        "pubdate": "2026-08-17T18:36",
+        "play": 406713
+      },
+      "guide": null
+    },
+    {
+      "name": "牛来",
+      "certified_by": [
+        "梗百科",
+        "梗指南"
+      ],
+      "cert_label": "双 UP 认证",
       "encyclopedia": {
         "bvid": "BV1Lqby6oE7i",
         "title": "【梗百科】牛来是啥梗？",
         "pubdate": "2026-08-15T19:47",
-        "mid": 1544008396,
-        "author": "梗百科",
-        "play": 1630296
+        "play": 1630343
       },
       "guide": {
         "bvid": "BV1XabQ6VEWS",
         "title": "牛来是什么梗【梗指南】",
         "pubdate": "2026-08-16T17:45",
-        "mid": 94510621,
-        "author": "梗指南",
-        "play": 2169693
+        "play": 2169846
       }
     },
     {
+      "name": "野生狗奶",
+      "certified_by": [
+        "梗百科",
+        "梗指南"
+      ],
+      "cert_label": "双 UP 认证",
+      "encyclopedia": {
+        "bvid": "BV1i5gN6eEMW",
+        "title": "【梗百科】野生狗奶是啥梗？",
+        "pubdate": "2026-08-14T16:14",
+        "play": 6982626
+      },
+      "guide": {
+        "bvid": "BV1tjum6gExd",
+        "title": "野生狗奶是什么梗【梗指南】",
+        "pubdate": "2026-08-09T18:31",
+        "play": 1841370
+      }
+    },
+    {
+      "name": "熊大回眸",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV1PkgE69EoL",
+        "title": "【梗百科】熊大回眸是啥梗？轻松绷住！？",
+        "pubdate": "2026-08-13T11:55",
+        "play": 950107
+      },
+      "guide": null
+    },
+    {
+      "name": "x姆？长月老贼",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV1cVuq6aEeK",
+        "title": "【梗百科】X姆？长月老贼是啥梗？【B萌应援】",
+        "pubdate": "2026-08-11T17:47",
+        "play": 261241
+      },
+      "guide": null
+    },
+    {
+      "name": "直到xx变成xx",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV1yxum6AEfC",
+        "title": "【梗百科】直到XX变成XX是啥梗？",
+        "pubdate": "2026-08-09T18:56",
+        "play": 654728
+      },
+      "guide": null
+    },
+    {
+      "name": "霸之意志",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV1h6My6AEvN",
+        "title": "【梗百科】霸之意志是啥梗？",
+        "pubdate": "2026-08-05T18:53",
+        "play": 786070
+      },
+      "guide": null
+    },
+    {
+      "name": "你会xxx吗",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV1Xsuc67E8r",
+        "title": "【梗百科】你会XXX吗是啥梗？瓦哩师徒杯名场面！？",
+        "pubdate": "2026-08-04T18:35",
+        "play": 1164740
+      },
+      "guide": null
+    },
+    {
+      "name": "xx人吃到美食",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV1vwG369EkM",
+        "title": "【梗百科】XX人吃到美食是啥梗？",
+        "pubdate": "2026-08-01T16:27",
+        "play": 474830
+      },
+      "guide": null
+    },
+    {
+      "name": "许愿柳",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV1P8Gw6yEjS",
+        "title": "【梗百科】许愿柳是啥梗？",
+        "pubdate": "2026-07-31T19:00",
+        "play": 1622481
+      },
+      "guide": null
+    },
+    {
+      "name": "六人定律",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV1Ut3F6VE5x",
+        "title": "【梗百科】六人定律是啥梗？光头强认识川普？",
+        "pubdate": "2026-07-27T17:47",
+        "play": 753120
+      },
+      "guide": null
+    },
+    {
+      "name": "中国人能飞",
+      "certified_by": [
+        "梗百科",
+        "梗指南"
+      ],
+      "cert_label": "双 UP 认证",
+      "encyclopedia": {
+        "bvid": "BV1YV3E6iE8T",
+        "title": "【梗百科】中国人能飞是啥梗？",
+        "pubdate": "2026-07-26T18:29",
+        "play": 2220270
+      },
+      "guide": {
+        "bvid": "BV14x3u6iEvc",
+        "title": "中国人能飞是什么梗【梗指南】",
+        "pubdate": "2026-07-25T17:10",
+        "play": 5591989
+      }
+    },
+    {
+      "name": "大阪和摄政王",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV1dogD6aEpG",
+        "title": "【梗百科】大阪和摄政王是啥梗？",
+        "pubdate": "2026-07-23T18:01",
+        "play": 1359121
+      },
+      "guide": null
+    },
+    {
+      "name": "成吉思鸡",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV18egC6NEfr",
+        "title": "【梗百科】成吉思鸡是啥？你说的一点都对？！",
+        "pubdate": "2026-07-22T18:29",
+        "play": 1686003
+      },
+      "guide": null
+    },
+    {
+      "name": "宗主第二招",
+      "certified_by": [
+        "梗百科",
+        "梗指南"
+      ],
+      "cert_label": "双 UP 认证",
+      "encyclopedia": {
+        "bvid": "BV1ScKn69Enz",
+        "title": "【梗百科】宗主第二招是啥？",
+        "pubdate": "2026-07-17T18:00",
+        "play": 1606603
+      },
+      "guide": {
+        "bvid": "BV19oKc6yEpR",
+        "title": "宗主第二招是什么梗【梗指南】",
+        "pubdate": "2026-07-18T17:20",
+        "play": 1096030
+      }
+    },
+    {
+      "name": "干瘪瘪的芝士球",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV1DsKG6KE6q",
+        "title": "【梗百科】干瘪瘪的芝士球是啥梗？",
+        "pubdate": "2026-07-16T17:54",
+        "play": 1589675
+      },
+      "guide": null
+    },
+    {
+      "name": "omg你吓到我了",
+      "certified_by": [
+        "梗百科",
+        "梗指南"
+      ],
+      "cert_label": "双 UP 认证",
+      "encyclopedia": {
+        "bvid": "BV1usN46zEq8",
+        "title": "【梗百科】OMG你吓到我了是啥梗？",
+        "pubdate": "2026-07-11T13:25",
+        "play": 2055137
+      },
+      "guide": {
+        "bvid": "BV1ehMg63EAF",
+        "title": "omg你吓到我了是什么梗【梗指南】",
+        "pubdate": "2026-07-08T19:56",
+        "play": 1122493
+      }
+    },
+    {
+      "name": "大狗叫",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV1ysME67Em9",
+        "title": "【梗百科】大狗叫是啥梗？这只狗哪里来的？！",
+        "pubdate": "2026-07-09T18:02",
+        "play": 4375085
+      },
+      "guide": null
+    },
+    {
+      "name": "佛得角门神",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV1cyMi6tEKw",
+        "title": "【梗百科】佛得角门神是啥梗？",
+        "pubdate": "2026-07-08T13:25",
+        "play": 942678
+      },
+      "guide": null
+    },
+    {
+      "name": "睾酮打到xx上了",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV11UTL6gECb",
+        "title": "【梗百科】睾酮打到XX上了是啥梗？",
+        "pubdate": "2026-07-02T17:51",
+        "play": 1064543
+      },
+      "guide": null
+    },
+    {
+      "name": "被生活磨平了妙脆角",
+      "certified_by": [
+        "梗百科"
+      ],
+      "cert_label": "梗百科认证",
+      "encyclopedia": {
+        "bvid": "BV17LTF6mErp",
+        "title": "【梗百科】被生活磨平了妙脆角是啥梗？",
+        "pubdate": "2026-06-30T18:05",
+        "play": 3552550
+      },
+      "guide": null
+    },
+    {
+      "name": "雨中霸王龙",
+      "certified_by": [
+        "梗指南"
+      ],
+      "cert_label": "梗指南认证",
+      "encyclopedia": null,
+      "guide": {
+        "bvid": "BV1S5aA6GEfK",
+        "title": "雨中霸王龙是什么梗【梗指南】",
+        "pubdate": "2026-09-24T18:38",
+        "play": 184315
+      }
+    },
+    {
+      "name": "公路之王",
+      "certified_by": [
+        "梗指南"
+      ],
+      "cert_label": "梗指南认证",
+      "encyclopedia": null,
+      "guide": {
+        "bvid": "BV1RwYE68Eph",
+        "title": "公路之王是什么梗【梗指南】",
+        "pubdate": "2026-09-11T18:41",
+        "play": 1478221
+      }
+    },
+    {
+      "name": "耍起",
+      "certified_by": [
+        "梗指南"
+      ],
+      "cert_label": "梗指南认证",
+      "encyclopedia": null,
+      "guide": {
+        "bvid": "BV1VotU6iEiZ",
+        "title": "耍起是什么梗【梗指南】",
+        "pubdate": "2026-09-02T19:16",
+        "play": 524177
+      }
+    },
+    {
+      "name": "我了叹",
+      "certified_by": [
+        "梗指南"
+      ],
+      "cert_label": "梗指南认证",
+      "encyclopedia": null,
+      "guide": {
+        "bvid": "BV1A1t86wExG",
+        "title": "我了叹是什么梗【梗指南】",
+        "pubdate": "2026-08-31T18:56",
+        "play": 603682
+      }
+    },
+    {
+      "name": "舍命陪君子",
+      "certified_by": [
+        "梗指南"
+      ],
+      "cert_label": "梗指南认证",
+      "encyclopedia": null,
+      "guide": {
+        "bvid": "BV1U1h36FEVL",
+        "title": "舍命陪君子是什么梗【梗指南】",
+        "pubdate": "2026-08-25T12:05",
+        "play": 552079
+      }
+    },
+    {
+      "name": "胡迪渲染大赛",
+      "certified_by": [
+        "梗指南"
+      ],
+      "cert_label": "梗指南认证",
+      "encyclopedia": null,
+      "guide": {
+        "bvid": "BV1Qtuv6VEPU",
+        "title": "胡迪渲染大赛是什么梗【梗指南】",
+        "pubdate": "2026-08-11T12:09",
+        "play": 1084067
+      }
+    },
+    {
+      "name": "你那双眼睛究竟看到多远",
+      "certified_by": [
+        "梗指南"
+      ],
+      "cert_label": "梗指南认证",
+      "encyclopedia": null,
+      "guide": {
+        "bvid": "BV1YouJ6MEVh",
+        "title": "你那双眼睛究竟看到多远是什么梗【梗指南】",
+        "pubdate": "2026-08-06T19:01",
+        "play": 1138253
+      }
+    },
+    {
+      "name": "正太扭腰",
+      "certified_by": [
+        "梗指南"
+      ],
+      "cert_label": "梗指南认证",
+      "encyclopedia": null,
+      "guide": {
+        "bvid": "BV1tCMy6cEsk",
+        "title": "正太扭腰是什么梗【梗指南】",
+        "pubdate": "2026-08-05T19:00",
+        "play": 1946404
+      }
+    },
+    {
+      "name": "东北单兵口粮",
+      "certified_by": [
+        "梗指南"
+      ],
+      "cert_label": "梗指南认证",
+      "encyclopedia": null,
+      "guide": {
+        "bvid": "BV11n3t6QEQY",
+        "title": "东北单兵口粮是什么梗【梗指南】",
+        "pubdate": "2026-07-30T17:30",
+        "play": 876245
+      }
+    },
+    {
+      "name": "枪如人人如枪",
+      "certified_by": [
+        "梗指南"
+      ],
+      "cert_label": "梗指南认证",
+      "encyclopedia": null,
+      "guide": {
+        "bvid": "BV1RogD6aEvN",
+        "title": "枪如人人如枪是什么梗【梗指南】",
+        "pubdate": "2026-07-23T18:08",
+        "play": 1051097
+      }
+    },
+    {
+      "name": "初音未来监护权杯",
+      "certified_by": [
+        "梗指南"
+      ],
+      "cert_label": "梗指南认证",
+      "encyclopedia": null,
+      "guide": {
+        "bvid": "BV1DiKr6nEcS",
+        "title": "初音未来监护权杯是什么梗【梗指南】",
+        "pubdate": "2026-07-19T22:14",
+        "play": 384820
+      }
+    },
+    {
+      "name": "旱厕蜗牛",
+      "certified_by": [
+        "梗指南"
+      ],
+      "cert_label": "梗指南认证",
+      "encyclopedia": null,
+      "guide": {
+        "bvid": "BV1tHNi6aEsv",
+        "title": "旱厕蜗牛是什么梗【梗指南】",
+        "pubdate": "2026-07-15T19:43",
+        "play": 1366929
+      }
+    },
+    {
+      "name": "我简直就是佐助本人",
+      "certified_by": [
+        "梗指南"
+      ],
+      "cert_label": "梗指南认证",
+      "encyclopedia": null,
+      "guide": {
+        "bvid": "BV1XsNg6eEZL",
+        "title": "我简直就是佐助本人是什么梗【梗指南】",
+        "pubdate": "2026-07-12T17:30",
+        "play": 734198
+      }
+    },
+    {
+      "name": "走个面儿",
+      "certified_by": [
+        "梗指南"
+      ],
+      "cert_label": "梗指南认证",
+      "encyclopedia": null,
+      "guide": {
+        "bvid": "BV1rMTe6nEBh",
+        "title": "走个面儿是什么梗【梗指南】",
+        "pubdate": "2026-07-01T12:11",
+        "play": 913437
+      }
+    }
+  ],
+  "merged_writings": [],
+  "certified": [
+    {
       "meme": "【梗百科】琵琶曲是啥梗？",
-      "name": "【梗百科】琵琶曲是啥梗？",
+      "name": "琵琶曲",
       "encyclopedia": {
         "bvid": "BV1mtY164EUu",
         "title": "【梗百科】琵琶曲是啥梗？",
         "pubdate": "2026-09-14T18:29",
         "mid": 1544008396,
         "author": "梗百科",
-        "play": 1401663
+        "play": 1404941
       },
       "guide": {
         "bvid": "BV1JyeJ6CEWh",
@@ -245,39 +931,19 @@
         "pubdate": "2026-09-15T20:31",
         "mid": 94510621,
         "author": "梗指南",
-        "play": 1471899
-      }
-    },
-    {
-      "meme": "【梗百科】老叟戏顽童是啥梗？泥肘！！？",
-      "name": "【梗百科】老叟戏顽童是啥梗？泥肘！！？",
-      "encyclopedia": {
-        "bvid": "BV1vQ8i6uEYf",
-        "title": "【梗百科】老叟戏顽童是啥梗？泥肘！！？",
-        "pubdate": "2026-08-21T18:15",
-        "mid": 1544008396,
-        "author": "梗百科",
-        "play": 6720896
-      },
-      "guide": {
-        "bvid": "BV1gE8s6AEjn",
-        "title": "老叟戏顽童是什么梗【梗指南】",
-        "pubdate": "2026-08-23T12:37",
-        "mid": 94510621,
-        "author": "梗指南",
-        "play": 1155616
+        "play": 1474366
       }
     },
     {
       "meme": "【梗百科】胆子真是肥嘟嘟的是啥梗？",
-      "name": "【梗百科】胆子真是肥嘟嘟的是啥梗？",
+      "name": "胆子真是肥嘟嘟的",
       "encyclopedia": {
         "bvid": "BV1a9816ZER9",
         "title": "【梗百科】胆子真是肥嘟嘟的是啥梗？",
         "pubdate": "2026-08-22T14:49",
         "mid": 1544008396,
         "author": "梗百科",
-        "play": 1134170
+        "play": 1134307
       },
       "guide": {
         "bvid": "BV1n48E6aEcr",
@@ -285,19 +951,59 @@
         "pubdate": "2026-08-19T17:45",
         "mid": 94510621,
         "author": "梗指南",
-        "play": 3842330
+        "play": 3842879
+      }
+    },
+    {
+      "meme": "【梗百科】老叟戏顽童是啥梗？泥肘！！？",
+      "name": "老叟戏顽童",
+      "encyclopedia": {
+        "bvid": "BV1vQ8i6uEYf",
+        "title": "【梗百科】老叟戏顽童是啥梗？泥肘！！？",
+        "pubdate": "2026-08-21T18:15",
+        "mid": 1544008396,
+        "author": "梗百科",
+        "play": 6721392
+      },
+      "guide": {
+        "bvid": "BV1gE8s6AEjn",
+        "title": "老叟戏顽童是什么梗【梗指南】",
+        "pubdate": "2026-08-23T12:37",
+        "mid": 94510621,
+        "author": "梗指南",
+        "play": 1155790
+      }
+    },
+    {
+      "meme": "【梗百科】牛来是啥梗？",
+      "name": "牛来",
+      "encyclopedia": {
+        "bvid": "BV1Lqby6oE7i",
+        "title": "【梗百科】牛来是啥梗？",
+        "pubdate": "2026-08-15T19:47",
+        "mid": 1544008396,
+        "author": "梗百科",
+        "play": 1630343
+      },
+      "guide": {
+        "bvid": "BV1XabQ6VEWS",
+        "title": "牛来是什么梗【梗指南】",
+        "pubdate": "2026-08-16T17:45",
+        "mid": 94510621,
+        "author": "梗指南",
+        "play": 2169846
       }
     },
     {
       "meme": "【梗百科】野生狗奶是啥梗？",
-      "name": "【梗百科】野生狗奶是啥梗？",
+      "name": "野生狗奶",
       "encyclopedia": {
         "bvid": "BV1i5gN6eEMW",
         "title": "【梗百科】野生狗奶是啥梗？",
         "pubdate": "2026-08-14T16:14",
         "mid": 1544008396,
         "author": "梗百科",
-        "play": 6982370
+        "play": 6982626
       },
       "guide": {
         "bvid": "BV1tjum6gExd",
@@ -305,56 +1011,115 @@
         "pubdate": "2026-08-09T18:31",
         "mid": 94510621,
         "author": "梗指南",
-        "play": 1841161
+        "play": 1841370
+      }
+    },
+    {
+      "meme": "【梗百科】中国人能飞是啥梗？",
+      "name": "中国人能飞",
+      "encyclopedia": {
+        "bvid": "BV1YV3E6iE8T",
+        "title": "【梗百科】中国人能飞是啥梗？",
+        "pubdate": "2026-07-26T18:29",
+        "mid": 1544008396,
+        "author": "梗百科",
+        "play": 2220270
+      },
+      "guide": {
+        "bvid": "BV14x3u6iEvc",
+        "title": "中国人能飞是什么梗【梗指南】",
+        "pubdate": "2026-07-25T17:10",
+        "mid": 94510621,
+        "author": "梗指南",
+        "play": 5591989
+      }
+    },
+    {
+      "meme": "【梗百科】宗主第二招是啥？",
+      "name": "宗主第二招",
+      "encyclopedia": {
+        "bvid": "BV1ScKn69Enz",
+        "title": "【梗百科】宗主第二招是啥？",
+        "pubdate": "2026-07-17T18:00",
+        "mid": 1544008396,
+        "author": "梗百科",
+        "play": 1606603
+      },
+      "guide": {
+        "bvid": "BV19oKc6yEpR",
+        "title": "宗主第二招是什么梗【梗指南】",
+        "pubdate": "2026-07-18T17:20",
+        "mid": 94510621,
+        "author": "梗指南",
+        "play": 1096030
+      }
+    },
+    {
+      "meme": "【梗百科】OMG你吓到我了是啥梗？",
+      "name": "omg你吓到我了",
+      "encyclopedia": {
+        "bvid": "BV1usN46zEq8",
+        "title": "【梗百科】OMG你吓到我了是啥梗？",
+        "pubdate": "2026-07-11T13:25",
+        "mid": 1544008396,
+        "author": "梗百科",
+        "play": 2055137
+      },
+      "guide": {
+        "bvid": "BV1ehMg63EAF",
+        "title": "omg你吓到我了是什么梗【梗指南】",
+        "pubdate": "2026-07-08T19:56",
+        "mid": 94510621,
+        "author": "梗指南",
+        "play": 1122493
       }
     }
   ],
-  "suspected": [],
   "only_encyclopedia": [
-    "verity",
-    "xx人吃到美食",
-    "xx在哪？最优骑士小碎步",
-    "x姆？长月老贼",
-    "佛得角门神",
-    "你会xxx吗",
-    "六人定律",
-    "大狗叫",
-    "大脚忍者",
-    "大阪和摄政王",
-    "学功夫 练武术",
-    "尴尬狗",
-    "干瘪瘪的芝士球",
-    "成吉思鸡",
-    "我是爷们",
     "拳击猫",
-    "松针大油边",
-    "熊大回眸",
-    "狼王撕衣",
-    "直到xx变成xx",
-    "睾酮打到xx上了",
-    "突然出现的章鱼哥的美妙音乐啥",
-    "被生活磨平了妙脆角",
-    "许愿柳",
+    "尴尬狗",
     "闪身步",
+    "xx在哪？最优骑士小碎步",
+    "驾考宝典",
+    "大脚忍者",
+    "学功夫 练武术",
+    "verity",
+    "狼王撕衣",
+    "松针大油边",
     "闹吃vs古振兴",
+    "我是爷们",
+    "突然出现的章鱼哥的美妙音乐啥",
     "隔壁班转来了个xx",
+    "熊大回眸",
+    "x姆？长月老贼",
+    "直到xx变成xx",
     "霸之意志",
-    "驾考宝典"
+    "你会xxx吗",
+    "xx人吃到美食",
+    "许愿柳",
+    "六人定律",
+    "大阪和摄政王",
+    "成吉思鸡",
+    "干瘪瘪的芝士球",
+    "大狗叫",
+    "佛得角门神",
+    "睾酮打到xx上了",
+    "被生活磨平了妙脆角"
   ],
   "only_guide": [
-    "东北单兵口粮",
-    "你那双眼睛究竟看到多远",
+    "雨中霸王龙",
     "公路之王",
-    "初音未来监护权杯",
-    "我了叹",
-    "我简直就是佐助本人",
-    "旱厕蜗牛",
-    "枪如人人如枪",
-    "正太扭腰",
     "耍起",
-    "胡迪渲染大赛",
+    "我了叹",
     "舍命陪君子",
-    "走个面儿",
-    "雨中霸王龙"
+    "胡迪渲染大赛",
+    "你那双眼睛究竟看到多远",
+    "正太扭腰",
+    "东北单兵口粮",
+    "枪如人人如枪",
+    "初音未来监护权杯",
+    "旱厕蜗牛",
+    "我简直就是佐助本人",
+    "走个面儿"
   ]
 }

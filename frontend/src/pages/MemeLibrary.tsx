@@ -33,7 +33,7 @@ export default function MemeLibrary() {
   return (
     <div className="px-5 pb-12 pt-8 lg:px-[33px]">
       <SectionHeader emoji="📚" title="梗库" />
-      <p className="-mt-2 mb-5 text-[14px] text-ink-mute">
+      <p className="-mt-2 mb-6 text-[15px] text-ink-mute">
         只收录通过 梗百科 + 梗指南 双 UP 认证的梗，共 {data?.total ?? 0} 个。
       </p>
 

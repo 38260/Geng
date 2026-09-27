@@ -36,6 +36,8 @@ export function StickerThumb({
           src={image}
           alt=""
           loading="lazy"
+          // B站图床会因 Referer 直接 403，外链封面必须不带来源请求
+          referrerPolicy="no-referrer"
           onError={() => setBroken(true)}
           className="absolute inset-0 h-full w-full object-cover"
         />

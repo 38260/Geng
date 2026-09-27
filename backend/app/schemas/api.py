@@ -26,6 +26,17 @@ class CatchUpAdviceRequest(TrendExplanationRequest):
     pass
 
 
+class MemeMetaUpdate(BaseModel):
+    """梗元数据人工维护。不传的字段保持原样；只影响展示与检索，不影响任何算法指标。"""
+
+    cover_url: str | None = Field(
+        default=None, max_length=500, description="封面图片地址；空串表示恢复自动封面"
+    )
+    description: str | None = Field(default=None, description="梗介绍，最长 600 字")
+    aliases: list[str] | None = Field(default=None, description="别名，用于搜索与相关性判定")
+    keywords: list[str] | None = Field(default=None, description="关键词，同上")
+
+
 class LLMSettingsUpdate(BaseModel):
     provider: str = "longcat"
     base_url: str = "https://api.longcat.chat/openai/v1"

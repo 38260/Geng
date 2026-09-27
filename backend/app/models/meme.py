@@ -59,6 +59,10 @@ class Meme(Base):
     keywords: Mapped[list[str]] = mapped_column(JSON, default=list)
     description: Mapped[str] = mapped_column(Text, default="")
 
+    # 人工维护的封面；留空则自动取"该梗播放量最高那条视频"的 B站封面。
+    # 只影响展示，不参与任何指标计算。
+    cover_url: Mapped[str] = mapped_column(String(500), default="")
+
     status: Mapped[str] = mapped_column(String(20), default=MemeStatus.CANDIDATE, index=True)
 
     # 双 UP 认证结果（冗余存储，便于直接查询；由服务层根据认证记录重算）

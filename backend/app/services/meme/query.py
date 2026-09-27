@@ -84,19 +84,32 @@ def cover_for_meme(session: Session, meme_id: int) -> str:
     return link
 
 
-def thumbnail_for(meme: Meme, real_cover: str = "") -> dict[str, str]:
-    """封面优先级：B站真实封面 > 演示素材图 > 主题色 + 表情贴纸。
+def manual_cover_for(meme: Meme) -> str:
+    """人工维护的封面地址（站内素材保留相对路径，站外统一补 https）。
+
+    注意顺序：`//host/x.jpg` 是协议相对外链，不是站内路径。
+    """
+    raw = (meme.cover_url or "").strip()
+    if not raw or raw.startswith("//") or raw.startswith("http"):
+        return _https(raw)
+    return raw if raw.startswith("/") else ""
+
+
+def thumbnail_for(meme: Meme, real_cover: str = "") -> dict[str, Any]:
+    """封面优先级：人工维护 > B站真实封面 > 演示素材图 > 主题色 + 表情贴纸。
 
     真实采集的梗必须用真实视频封面，不能拿设计稿里的素材图冒充抓取结果；
-    只有演示数据才允许用那批素材图。
+    只有演示数据才允许用那批素材图。人工挑的封面带 manual 标记，
+    免得看的人以为它是某条真实视频的封面。
     """
     spec = spec_for(meme.name)
     emoji = spec.emoji if spec else DEFAULT_THUMBNAIL["emoji"]
     color = spec.color if spec else DEFAULT_THUMBNAIL["color"]
+    manual = manual_cover_for(meme)
     demo_image = getattr(spec, "image", "") if spec else ""
     is_real = (meme.data_source or "mock") == "bilibili"
-    image = real_cover or ("" if is_real else demo_image)
-    return {"emoji": emoji, "color": color, "image": image}
+    image = manual or real_cover or ("" if is_real else demo_image)
+    return {"emoji": emoji, "color": color, "image": image, "manual": bool(manual)}
 
 
 def _growth_percent(value: Any) -> float | None:

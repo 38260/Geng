@@ -10,6 +10,8 @@ from .algorithms import (
     HOME_FILTER_LABELS,
     HOTNESS_REFERENCE,
     HOTNESS_WEIGHTS,
+    GROWTH_SCORE_FULL,
+    GROWTH_SCORE_ZERO,
     LIFECYCLE_EMOJI,
     LIFECYCLE_LABELS,
     LIFECYCLE_STAGES,
@@ -20,12 +22,15 @@ from .algorithms import (
     RELEVANCE_WEIGHTS,
 )
 from .logging import configure_logging, get_logger
-from .settings import Settings, get_settings, settings
+from .settings import BACKEND_DIR, ENV_FILE, PROJECT_DIR, Settings, get_settings, settings
 
 __all__ = [
     "Settings",
     "get_settings",
     "settings",
+    "BACKEND_DIR",
+    "PROJECT_DIR",
+    "ENV_FILE",
     "configure_logging",
     "get_logger",
     "ANALYTICS_CONFIG",
@@ -34,6 +39,8 @@ __all__ = [
     "RELEVANCE_THRESHOLD",
     "HOTNESS_WEIGHTS",
     "HOTNESS_REFERENCE",
+    "GROWTH_SCORE_FULL",
+    "GROWTH_SCORE_ZERO",
     "MIN_SAMPLE_VIDEOS",
     "LOW_SAMPLE_DAMPING",
     "LIFECYCLE_STAGES",

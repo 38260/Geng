@@ -29,25 +29,28 @@ RELEVANCE_THRESHOLD = 0.5
 # --------------------------------------------------------------------------- #
 @dataclass(frozen=True)
 class HotnessWeights:
-    """Weights of the five sub-scores that build the 赶梗潮 heat index."""
+    """热度指数五个子分数的权重（合计 1.0）。
 
-    view: float = 0.28          # 播放表现
-    interaction: float = 0.24   # 互动表现（评论/弹幕/点赞/投币/收藏）
-    content: float = 0.18       # 内容规模（相关视频数）
-    creator: float = 0.15       # 参与 UP 主数量
-    growth: float = 0.15        # 近期增长速度
+    增长权重给到 0.25 是刻意的：产品要回答的是"最近是不是正在变热"，
+    一个历史累计 1 亿播放、但近 7 天没人做的梗不应该排在前面。
+    """
+
+    view: float = 0.25          # 播放表现
+    interaction: float = 0.20   # 互动表现（评论/弹幕/点赞/投币/收藏）
+    content: float = 0.16       # 内容规模（相关视频数）
+    creator: float = 0.14       # 参与 UP 主数量
+    growth: float = 0.25        # 近期增长速度
 
 
 HOTNESS_WEIGHTS = HotnessWeights()
 
-# Sub-scores are log-scaled against these reference values so that a single
-# viral mega-video cannot dominate the ranking, and so that the index stays
-# comparable across memes of very different sizes.
+# 子分数采用「对数区间归一化」：(floor, ceiling) 分别是 7 天窗口内的起步量与封顶量。
+# 绝对量再大也不会让一个梗吃掉整个榜，绝对量极小的梗也不会因为噪声上榜。
 HOTNESS_REFERENCE = {
-    "view": 2_000_000,        # 7 天播放量参考上限
-    "interaction": 150_000,   # 7 天互动总量参考上限
-    "content": 600,           # 7 天相关视频数参考上限
-    "creator": 250,           # 7 天参与 UP 主参考上限
+    "view": (3_000, 8_000_000),          # 7 天播放量
+    "interaction": (300, 900_000),       # 7 天互动总量（赞+币+藏+评+弹）
+    "content": (1, 900),                 # 7 天相关视频数
+    "creator": (1, 500),                 # 7 天参与 UP 主（日累计）
 }
 
 # Growth sub-score maps a 7d-vs-prev-7d growth rate onto 0..100.
@@ -93,32 +96,44 @@ LIFECYCLE_EMOJI = {
 
 @dataclass(frozen=True)
 class LifecycleThresholds:
-    """Rules are evaluated top-down; the first match wins.
+    """规则自上而下匹配，第一条命中即判定。
 
-    ``growth``   : heat growth of the last 7 days vs. the previous 7 days
-    ``level``    : current heat index (0-100)
-    ``peak_gap`` : how far today's heat sits below the 30-day peak
-    ``activity`` : relevant videos published in the last 7 days
+    ``heat``         : 当前热度指数（0-100）
+    ``growth``       : 最近 7 天 vs 前 7 天的综合增长率
+    ``peak_gap``     : 距 30 天内热度峰值的回落幅度（0 = 正在峰值上）
+    ``activity``     : 最近 7 天新增相关视频数
+    ``view_7d``      : 最近 7 天播放量
+    ``stale_days``   : 距今多少天没有新内容
     """
 
+    # 🪦 过气：长期没有新内容，或量级与热度同时塌到地板
+    obsolete_stale_days: int = 14
     obsolete_max_activity: int = 2
     obsolete_max_heat: float = 18.0
-    obsolete_stale_days: int = 14
 
-    sprouting_max_activity: int = 6
-    sprouting_max_heat: float = 25.0
+    # 🌱 萌芽：有动静但绝对量还很小（热度会因为高增长率被抬高，所以看量级）
+    sprouting_max_activity: int = 10
+    sprouting_max_view_7d: int = 80_000
+    sprouting_max_heat: float = 45.0
 
+    # 🔥 爆发：短时间陡增且已经冲到高位、正贴着峰值
+    #   增长门槛刻意高于普通上升期（+130%），否则涨得快的上升期会被误判成爆发
     explosive_min_heat: float = 70.0
-    explosive_min_growth: float = 0.45
-    explosive_near_peak_gap: float = 0.12
+    explosive_min_growth: float = 1.30
+    explosive_max_peak_gap: float = 0.15
 
+    # 📈 上升：稳定增长，量级已经起来
     rising_min_growth: float = 0.15
     rising_min_heat: float = 30.0
 
+    # 📉 退潮：增速转负，或已明显离开峰值且连续下滑
     receding_max_growth: float = -0.12
-    receding_from_peak_gap: float = 0.20
+    receding_min_peak_gap: float = 0.20
+    # 只有"连续若干天热度在掉"才算退潮，避免平稳期的正常抖动被误判
+    receding_min_declining_days: int = 3
 
-    plateau_band: float = 0.12  # |growth| below this is "flat"
+    # 🌊 平稳：以上都不命中（|增长| 很小）
+    plateau_band: float = 0.12
 
 
 LIFECYCLE_THRESHOLDS = LifecycleThresholds()

@@ -56,6 +56,12 @@ class LifecycleSnapshot(Base):
     indicators: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     reasons: Mapped[list[str]] = mapped_column(JSON, default=list)
 
+    # 赶梗判断（同样由算法给出；LLM 只能复述/润色这个结论，不能改状态）
+    catch_status: Mapped[str] = mapped_column(String(16), default="", index=True)
+    catch_label: Mapped[str] = mapped_column(String(16), default="")
+    catch_reason: Mapped[str] = mapped_column(String(200), default="")
+    catch_confidence: Mapped[float] = mapped_column(Float, default=0.0)
+
     computed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     data_version: Mapped[str] = mapped_column(String(64), default="")
 
@@ -66,5 +72,12 @@ class LifecycleSnapshot(Base):
             "emoji": self.emoji,
             "indicators": self.indicators or {},
             "reasons": self.reasons or [],
+            "catch_up": {
+                "status": self.catch_status,
+                "label": self.catch_label,
+                "reason": self.catch_reason,
+                "confidence": round(self.catch_confidence, 2),
+                "decided_by": "algorithm",
+            },
             "computed_at": self.computed_at.isoformat() if self.computed_at else None,
         }

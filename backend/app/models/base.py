@@ -76,10 +76,49 @@ def get_session() -> Iterator[Session]:
 
 
 def init_db() -> None:
-    """Create tables for models that have been imported."""
+    """建表 + 补齐新增列。"""
     from app import models  # noqa: F401  (ensures registration)
 
     Base.metadata.create_all(bind=engine)
+
+
+def ensure_schema() -> list[str]:
+    """给已有库补上新增列（轻量迁移，避免"改模型就得删库"）。
+
+    只处理"新增带默认值的列"这一种情况——本项目到目前为止的演进都是这种。
+    需要改类型/删列时请重新跑 seed。
+    """
+    from sqlalchemy import inspect, text
+
+    from app import models  # noqa: F401
+
+    Base.metadata.create_all(bind=engine)
+    inspector = inspect(engine)
+    added: list[str] = []
+
+    for table in Base.metadata.sorted_tables:
+        if not inspector.has_table(table.name):
+            continue
+        existing = {column["name"] for column in inspector.get_columns(table.name)}
+        for column in table.columns:
+            if column.name in existing:
+                continue
+            column_type = column.type.compile(engine.dialect)
+            default = "NULL"
+            if column.default is not None and column.default.is_scalar:
+                value = column.default.arg
+                default = f"'{value}'" if isinstance(value, str) else str(value)
+            elif not column.nullable:
+                default = "0" if "INT" in column_type.upper() else "''"
+            with engine.begin() as conn:
+                conn.execute(text(f"ALTER TABLE {table.name} ADD COLUMN {column.name} {column_type} DEFAULT {default}"))
+            added.append(f"{table.name}.{column.name}")
+
+    if added:
+        from app.config import get_logger
+
+        get_logger(__name__).info("已补齐数据库列：%s", ", ".join(added))
+    return added
 
 
 def reset_db() -> None:

@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from app.analytics import (
     MemeTerms,
     Series,
+    aggregate_videos,
     build_input,
     classify,
     compute_hotness,
@@ -171,6 +172,100 @@ def recompute_meme(session: Session, meme: Meme, *, window_days: int | None = No
     return MemeMetrics(
         hotness=current, lifecycle=lifecycle, catch_up=catch_up, series=series, data_version=data_version
     )
+
+
+def collect_all(
+    source: str | None = None,
+    *,
+    meme_ids: list[int] | None = None,
+    limit: int | None = None,
+    window_days: int | None = None,
+    commit: bool = True,
+) -> dict[str, object]:
+    """跑一遍采集 → 清洗 → 匹配 → 聚合 → 指标计算。
+
+    一个梗只保留一份数据来源：采集某个梗时会先清掉它原来的行，
+    避免演示数据和真实数据混在同一个时间序列里被重复计数。
+    """
+    from app.collectors import make_collector
+    from app.collectors.bilibili import BilibiliBlocked
+
+    collector = make_collector(source)
+    window = window_days or settings.analysis_window_days
+    available, reason = collector.is_available()
+    summary: dict[str, object] = {
+        "ok": bool(available),
+        "source": collector.source,
+        "reason": reason,
+        "collected": 0,
+        "empty": 0,
+        "failed": 0,
+        "videos": 0,
+        "skipped": 0,
+        "dropped": 0,
+    }
+    if not available:
+        log.warning("数据源 %s 不可用：%s", collector.source, reason)
+        return summary
+
+    session = SessionLocal()
+    try:
+        stmt = select(Meme).where(Meme.certified.is_(True))
+        if meme_ids:
+            stmt = stmt.where(Meme.id.in_(meme_ids))
+        memes = list(session.scalars(stmt.order_by(Meme.id)))
+        if limit:
+            memes = memes[:limit]
+
+        for meme in memes:
+            try:
+                bundle = collector.collect(meme, window_days=window)
+            except BilibiliBlocked as exc:
+                summary["failed"] = int(summary["failed"]) + 1
+                log.warning("梗「%s」采集中断：%s", meme.name, exc)
+                continue
+
+            # 清洗 → 梗匹配：搜索结果里混着无关内容，先按相关性打分过滤，
+            # 再用剩下的视频做每日聚合，否则统计会被无关样本灌水。
+            terms = MemeTerms.from_meme(meme)
+            kept, dropped = match_videos(terms, bundle.videos)
+            if dropped:
+                bundle.videos = kept
+                bundle.daily_stats = aggregate_videos(meme.id, kept, data_source=collector.source)
+                summary["dropped"] = int(summary["dropped"]) + len(dropped)
+                log.info("梗「%s」相关性过滤：保留 %s 条，剔除 %s 条", meme.name, len(kept), len(dropped))
+
+            if not bundle.videos:
+                summary["empty"] = int(summary["empty"]) + 1
+                log.info("梗「%s」窗口内没有可用视频，保留原数据", meme.name)
+                continue
+
+            session.query(MemeDailyStats).filter(MemeDailyStats.meme_id == meme.id).delete()
+            session.query(Video).filter(Video.meme_id == meme.id).delete()
+            session.flush()
+
+            for stat in bundle.daily_stats:
+                stat.meme_id = meme.id
+                session.add(stat)
+            for video in bundle.videos:
+                video.meme_id = meme.id
+                session.add(video)
+
+            # autoflush=False：不 flush 的话下面 recompute 读不到刚插入的行
+            session.flush()
+
+            meme.data_source = collector.source
+            summary["collected"] = int(summary["collected"]) + 1
+            summary["videos"] = int(summary["videos"]) + len(bundle.videos)
+
+            if recompute_meme(session, meme) is None:
+                summary["skipped"] = int(summary["skipped"]) + 1
+            session.commit()
+
+        session.commit()
+    finally:
+        session.close()
+    return summary
 
 
 def recompute_all(*, window_days: int | None = None, commit: bool = True) -> dict[str, int]:

@@ -44,6 +44,7 @@ def upsert_meme(session, spec: MemeSpec, index: int) -> Meme:
     meme.aliases = list(spec.aliases)
     meme.keywords = list(spec.keywords)
     meme.description = spec.description
+    meme.data_source = "mock"
     meme.status = MemeStatus.CANDIDATE
     recompute_certification(meme)
     session.flush()

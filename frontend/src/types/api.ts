@@ -33,6 +33,7 @@ export interface Meta {
   data_updated_at: string | null;
   certified_count: number;
   candidate_count: number;
+  source_breakdown: Partial<Record<DataSource, number>>;
   window_days: number;
   filters: { key: HomeFilter; label: string }[];
   lifecycle_stages: { key: LifecycleStage; label: string; emoji: string }[];
@@ -65,6 +66,8 @@ export interface MemeCard {
   catch_reason: string;
   catch_confidence: number;
   thumbnail: Thumbnail;
+  /** 这个梗自己的数据来源（真实采集和演示数据可能混在同一个库里） */
+  meme_data_source: DataSource;
   certified_at: string | null;
   data_updated_at: string | null;
 }

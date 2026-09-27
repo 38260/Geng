@@ -106,6 +106,7 @@ def card_payload(meme: Meme, hotness: HotnessSnapshot, lifecycle: LifecycleSnaps
         "catch_reason": lifecycle.catch_reason,
         "catch_confidence": round(lifecycle.catch_confidence, 2),
         "thumbnail": thumbnail_for(meme),
+        "meme_data_source": meme.data_source or settings.data_source,
         "certified_at": meme.certified_at.isoformat() if meme.certified_at else None,
         "data_updated_at": meme.data_updated_at.isoformat() if meme.data_updated_at else None,
     })
@@ -369,6 +370,8 @@ def detail_payload(session: Session, meme: Meme) -> dict[str, Any] | None:
 def meta_payload(session: Session) -> dict[str, Any]:
     latest = session.scalar(select(Meme.data_updated_at).order_by(Meme.data_updated_at.desc()))
     total_certified = len(_load_rows(session))
+    sources = [meme.data_source or settings.data_source for meme, _, _ in _load_rows(session)]
+    source_breakdown = {key: sources.count(key) for key in sorted(set(sources))}
     candidate_count = len(
         list(session.scalars(select(Meme.id).where(Meme.certified.is_(False))))
     )
@@ -382,6 +385,7 @@ def meta_payload(session: Session) -> dict[str, Any]:
         "certified_count": total_certified,
         "candidate_count": candidate_count,
         "window_days": settings.analysis_window_days,
+        "source_breakdown": source_breakdown,
         "filters": [
             {"key": key, "label": HOME_FILTER_LABELS[key]}
             for key in ("all", "hot", "taking_off", "receding")

@@ -1,6 +1,15 @@
 """ORM models for 赶梗潮."""
 
-from .base import Base, DATABASE_URL, SessionLocal, engine, get_session, init_db, reset_db
+from .base import (
+    Base,
+    DATABASE_URL,
+    SessionLocal,
+    engine,
+    ensure_schema,
+    get_session,
+    init_db,
+    reset_db,
+)
 from .insight import AIInsight, InsightKind, InsightSource, InsightStatus
 from .meme import CertRole, Meme, MemeCertification, MemeStatus
 from .metrics import HotnessSnapshot, LifecycleSnapshot
@@ -14,6 +23,7 @@ __all__ = [
     "get_session",
     "init_db",
     "reset_db",
+    "ensure_schema",
     "DATABASE_URL",
     "Meme",
     "MemeCertification",

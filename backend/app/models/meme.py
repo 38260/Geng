@@ -67,6 +67,9 @@ class Meme(Base):
     certified: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     certified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
+    # 这个梗的数据来自演示生成还是真实 B 站抓取（混跑时要能区分）
+    data_source: Mapped[str] = mapped_column(String(16), default="mock", index=True)
+
     # 最近一次数据/指标重算的时间，前端"数据更新于"直接取它
     data_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     data_version: Mapped[str] = mapped_column(String(64), default="")
@@ -125,6 +128,7 @@ class Meme(Base):
             "description": self.description,
             "status": self.status,
             "certified": self.certified,
+            "data_source": self.data_source,
             "encyclopedia_confirmed": self.encyclopedia_confirmed,
             "guide_confirmed": self.guide_confirmed,
             "certified_at": self.certified_at.isoformat() if self.certified_at else None,

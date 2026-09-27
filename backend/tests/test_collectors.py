@@ -1,0 +1,224 @@
+"""采集层测试：全部离线，不碰真实 B 站接口。"""
+
+from __future__ import annotations
+
+from datetime import date, datetime, timedelta
+
+import pytest
+
+from app.collectors import BilibiliCollector, MockCollector, make_collector
+from app.collectors.bilibili import parse_search_row, sign_params
+from app.models import Meme, MemeDailyStats, Video
+from app.services.pipeline import collect_all
+
+# 真实的 img_key/sub_key 是 64 位文件名，签名表要索引到第 63 位
+IMG_KEY = "7cd0849413384173a0436703415832c9"
+SUB_KEY = "4932caff0ff746eab6f01bf08b70ac45"
+
+_counter = {"n": 0}
+
+
+def test_factory_picks_collector():
+    assert isinstance(make_collector("mock"), MockCollector)
+    assert isinstance(make_collector("bilibili"), BilibiliCollector)
+    assert isinstance(make_collector("BILIBILI"), BilibiliCollector)
+
+
+def test_mock_collector_output_is_labelled_mock(meme_factory, session):
+    # 演示梗库里已有同名梗时复用，避免用例之间互相撞唯一键
+    meme = session.query(Meme).filter(Meme.name == "电子木鱼").one_or_none()
+    if meme is None:
+        meme = meme_factory(name="电子木鱼", aliases=["赛博木鱼"], keywords=["木鱼", "功德"])
+    bundle = MockCollector().collect(meme, window_days=30)
+    assert bundle.daily_stats and bundle.videos
+    assert all(row.data_source == "mock" for row in bundle.daily_stats)
+    assert all(video.data_source == "mock" for video in bundle.videos)
+    assert {cert.role for cert in bundle.certifications} == {"encyclopedia", "guide"}
+
+
+def test_wbi_signature_is_stable_and_ordered(monkeypatch):
+    monkeypatch.setattr("app.collectors.bilibili.time.time", lambda: 1_700_000_000)
+    signed = sign_params({"search_type": "video", "keyword": "电子木鱼", "page": 1}, IMG_KEY, SUB_KEY)
+
+    assert signed["wts"] == "1700000000"
+    assert len(signed["w_rid"]) == 32
+    assert list(signed)[:3] == ["keyword", "page", "search_type"]
+    reordered = sign_params({"page": 1, "keyword": "电子木鱼", "search_type": "video"}, IMG_KEY, SUB_KEY)
+    assert signed["w_rid"] == reordered["w_rid"]
+    assert sign_params({"keyword": "a'b(c)*"}, IMG_KEY, SUB_KEY)["keyword"] == "abc"
+
+
+def test_parse_search_row_strips_highlight_tags():
+    row = {
+        "bvid": "BV1xx",
+        "title": '<em class="keyword">电子木鱼</em>是什么梗',
+        "description": "赛博功德",
+        "author": "<em>某UP</em>",
+        "play": 1234,
+        "danmaku": 5,
+        "review": 7,
+        "pubdate": datetime(2026, 9, 20).timestamp(),
+        "duration": "3:12",
+    }
+    parsed = parse_search_row(row)
+    assert parsed["title"] == "电子木鱼是什么梗"
+    assert parsed["author"] == "某UP"
+    assert parsed["view"] == 1234
+    assert parsed["reply"] == 7
+    assert parsed["duration_seconds"] == 192
+    assert parsed["publish_time"].date() == datetime(2026, 9, 20).date()
+
+
+class FakeClient:
+    """替代 BiliClient：让我们能在不联网的情况下验证采集逻辑。"""
+
+    def __init__(self, *, blocked=False, rows=None):
+        self.blocked = blocked
+        self.rows = rows or []
+        self.requested: list[str] = []
+
+    def probe(self):
+        if self.blocked:
+            return False, "B 站风控拦截（HTTP 412）"
+        return True, "WBI 签名可用"
+
+    def search_videos(self, keyword, *, pages=1, order="pubdate"):
+        self.requested.append(keyword)
+        if self.blocked:
+            from app.collectors.bilibili import BilibiliBlocked
+
+            raise BilibiliBlocked("HTTP 412")
+        return self.rows
+
+    def _get_payload(self, url, params):
+        return {
+            "data": {
+                "stat": {
+                    "view": 5000, "like": 200, "coin": 60,
+                    "favorite": 80, "reply": 30, "danmaku": 45,
+                },
+                "duration": 100,
+                "desc": "详情描述",
+                "mid": 900,
+                "tags": [],
+            }
+        }
+
+
+def _row(index: int, *, days_ago: int, title: str):
+    return {
+        "bvid": f"BV1fake{index}_{_counter['n']}",
+        "aid": 1000 + index,
+        "title": title,
+        "description": "",
+        "author": f"UP{index}",
+        "mid": 900 + index,
+        "pic": "",
+        "play": 1000 * (index + 1),
+        "danmaku": 10,
+        "review": 3,
+        "pubdate": (datetime.now() - timedelta(days=days_ago)).timestamp(),
+        "duration": "1:30",
+    }
+
+
+@pytest.fixture()
+def certified_meme(session, meme_factory):
+    from app.services.meme.certification import record_certification
+
+    _counter["n"] += 1
+    name = f"采集测试梗{_counter['n']}"
+    meme = meme_factory(name=name, aliases=[f"别名{_counter['n']}"], keywords=["拟声", "装傻"])
+    record_certification(session, meme, "encyclopedia", bvid="BV1enc")
+    record_certification(session, meme, "guide", bvid="BV1gui")
+    session.commit()
+    return meme
+
+
+def _patch_client(monkeypatch, client):
+    from app.collectors import bilibili_collector
+
+    monkeypatch.setattr(bilibili_collector, "get_client", lambda: client)
+
+
+def test_bilibili_collector_builds_consistent_daily_stats(certified_meme):
+    name = certified_meme.name
+    rows = [
+        _row(0, days_ago=2, title=f"{name}名场面"),
+        _row(1, days_ago=2, title=f"{name}reaction"),
+        _row(2, days_ago=9, title=f"第一次看{name}"),
+        _row(3, days_ago=120, title=f"窗口外的老视频 {name}"),
+    ]
+    collector = BilibiliCollector(client=FakeClient(rows=rows), request_gap=0)
+    bundle = collector.collect(certified_meme, window_days=30)
+
+    assert len(bundle.videos) == 3, "窗口外的视频不应进入统计"
+    assert all(video.data_source == "bilibili" for video in bundle.videos)
+    assert bundle.videos[0].like == 200 and bundle.videos[0].coin == 60, "详情接口应补齐点赞/投币"
+
+    by_day = {stat.stat_date: stat for stat in bundle.daily_stats}
+    assert len(by_day) == 2
+    recent = max(by_day)
+    assert by_day[recent].video_count == 2
+    assert by_day[recent].view == 10_000          # 5000 + 5000
+    assert by_day[recent].creator_count == 2      # 两个不同 UP 主
+    assert by_day[min(by_day)].video_count == 1
+
+
+def test_collect_all_drops_irrelevant_search_results(certified_meme, session, monkeypatch):
+    """搜索结果里混着的无关视频，必须在聚合前被相关性过滤剔掉。"""
+    name = certified_meme.name
+    rows = [
+        _row(0, days_ago=1, title=f"{name}是什么梗"),
+        _row(1, days_ago=1, title="周末去了趟郊外 vlog"),
+        _row(2, days_ago=1, title="本周热门视频合集"),
+    ]
+    _patch_client(monkeypatch, FakeClient(rows=rows))
+
+    result = collect_all("bilibili", meme_ids=[certified_meme.id], window_days=30)
+
+    assert result["ok"] is True and result["collected"] == 1
+    assert result["dropped"] == 2
+    session.expire_all()
+    kept = session.query(Video).filter(Video.meme_id == certified_meme.id).all()
+    assert [video.title for video in kept] == [f"{name}是什么梗"]
+    assert all(video.relevance_score >= 0.5 for video in kept)
+
+
+def test_collect_all_refuses_when_blocked_and_keeps_data(certified_meme, session, monkeypatch):
+    before = session.query(Video).filter(Video.meme_id == certified_meme.id).count()
+    _patch_client(monkeypatch, FakeClient(blocked=True))
+
+    result = collect_all("bilibili", meme_ids=[certified_meme.id], window_days=30)
+
+    assert result["ok"] is False
+    assert "412" in str(result["reason"])
+    assert result["collected"] == 0
+    session.expire_all()
+    assert session.query(Video).filter(Video.meme_id == certified_meme.id).count() == before
+
+
+def test_collect_all_replaces_previous_source_for_a_meme(certified_meme, session, monkeypatch):
+    """一个梗只能有一个数据来源，否则时间序列会把演示数据和真实数据加起来。"""
+    session.add(
+        MemeDailyStats(
+            meme_id=certified_meme.id,
+            stat_date=date.today(),
+            video_count=99,
+            view=999_999,
+            data_source="mock",
+        )
+    )
+    session.commit()
+
+    name = certified_meme.name
+    _patch_client(monkeypatch, FakeClient(rows=[_row(0, days_ago=1, title=f"{name}名场面")]))
+
+    result = collect_all("bilibili", meme_ids=[certified_meme.id], window_days=30)
+
+    assert result["ok"] is True and result["collected"] == 1
+    session.expire_all()
+    stats = session.query(MemeDailyStats).filter(MemeDailyStats.meme_id == certified_meme.id).all()
+    assert stats and all(row.data_source == "bilibili" for row in stats)
+    assert sum(row.video_count for row in stats) < 99, "旧的演示数据不应残留"
+    assert session.get(Meme, certified_meme.id).data_source == "bilibili"

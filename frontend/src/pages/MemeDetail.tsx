@@ -73,6 +73,18 @@ function HeadCard({
             <span className={`h-1.5 w-1.5 rounded-full ${catchStyle.dot}`} />
             {bundle.catch_up.label}
           </span>
+          <span
+            className={`chip px-2.5 py-1 text-[11px] ${
+              meme.meme_data_source === "bilibili" ? "bg-flare/10 text-flare" : "bg-gold/20 text-[#B2750A]"
+            }`}
+            title={
+              meme.meme_data_source === "bilibili"
+                ? "这个梗的数据来自 B 站真实采集"
+                : "这个梗的数据是演示数据，不是真实抓取结果"
+            }
+          >
+            {meme.meme_data_source === "bilibili" ? "B站真实数据" : "演示数据"}
+          </span>
         </div>
 
         <p className="mt-3 text-[13px] leading-relaxed text-ink-mute">

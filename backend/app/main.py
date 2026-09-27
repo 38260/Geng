@@ -15,7 +15,7 @@ from sqlalchemy import select
 
 from app.api import api_router
 from app.config import configure_logging, get_logger, settings
-from app.models import Meme, SessionLocal, init_db
+from app.models import Meme, SessionLocal, ensure_schema
 
 log = get_logger(__name__)
 
@@ -44,7 +44,7 @@ def ensure_seed() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     configure_logging()
-    init_db()
+    ensure_schema()
     try:
         ensure_seed()
     except Exception:  # noqa: BLE001 - 初始化失败不应该让服务起不来

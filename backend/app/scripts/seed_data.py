@@ -13,6 +13,7 @@ import argparse
 import sys
 from datetime import datetime
 
+from app.analytics import MemeTerms, match_videos
 from app.collectors.base import CollectedBundle
 from app.collectors.mock_collector import MockCollector
 from app.config import get_logger, settings
@@ -92,6 +93,9 @@ def seed(days: int | None = None, do_reset: bool = True) -> dict[str, int]:
 
             if meme.certified:
                 summary["certified"] += 1
+                # 演示数据也走一遍相关性打分：抽查列表里显示的分数得是真算出来的，
+                # 全留 0 会让人以为这些样本根本没通过过滤。
+                match_videos(MemeTerms.from_meme(meme), bundle.videos)
                 for stat in bundle.daily_stats:
                     stat.meme_id = meme.id
                     session.add(stat)

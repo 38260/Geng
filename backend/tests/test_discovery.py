@@ -75,6 +75,19 @@ def test_extract_meme_name_gives_up_instead_of_guessing():
     assert extract_meme_name("为什么最近大家都在玩梗") is None
 
 
+@pytest.mark.parametrize(
+    "title",
+    [
+        "【梗百科】xx在哪？最优骑士小碎步是啥梗？",
+        "你会xxx吗是什么梗【梗指南】",
+        "【梗百科】隔壁班转来了个xx是什么梗",
+    ],
+)
+def test_placeholder_names_are_rejected(title):
+    """UP 主用 xx 代替敏感词，这种名字没法拿去搜索，抽取阶段就丢掉。"""
+    assert extract_meme_name(title) is None
+
+
 # --------------------------------------------------------------------------- #
 # 索引与并集
 # --------------------------------------------------------------------------- #

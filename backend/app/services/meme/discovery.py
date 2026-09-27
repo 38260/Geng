@@ -36,6 +36,9 @@ _TITLE_PATTERNS = [
 ]
 _BRACKET = re.compile(r"【[^】]*】|\[[^\]]*\]|（[^）]*）")
 _STOP_WORDS = {"这个", "那个", "一个", "一种", "到底", "原来", "居然", "竟然", "什么", "为啥", "为什么"}
+# UP 主为了避敏感词会把梗名写成占位（"xx在哪"、"你会xxx吗"）。这种名字不能拿去搜索，
+# 采回来的全是噪声，所以抽取阶段就丢掉——跟"宁可漏不可造"是同一条底线。
+PLACEHOLDER = re.compile(r"[xXｘＸ×]{2,}")
 # 短于此长度不做写法合并：两三个字的梗名互相包含纯属巧合（"牛来" ⊂ "牛来也"）
 MIN_MERGE_LEN = 4
 
@@ -124,8 +127,13 @@ def extract_meme_name(title: str) -> str | None:
 
     for candidate in [*heads, *candidates]:
         cleaned = re.sub(r"^[\s「『\"'']+", "", candidate).strip(" \t\"'』」？?！!。.，,、")
-        if 2 <= len(cleaned) <= 16 and not any(word in cleaned for word in _STOP_WORDS):
-            return cleaned
+        if not (2 <= len(cleaned) <= 16):
+            continue
+        if any(word in cleaned for word in _STOP_WORDS):
+            continue
+        if PLACEHOLDER.search(cleaned):
+            continue        # 避敏感词写成的 "xx/xxx" 占位名，搜不动也不该入库
+        return cleaned
     return None
 
 

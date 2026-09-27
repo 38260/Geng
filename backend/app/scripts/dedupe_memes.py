@@ -132,8 +132,45 @@ def drop_memes(session: Session, ids: list[int]) -> list[str]:
     return removed
 
 
+def placeholder_rows(session: Session) -> list[Meme]:
+    """名字里带 xx 占位、且一次数据都没采到的条目。
+
+    UP 主为了避敏感词把梗名写成"xx在哪""你会xxx吗"，这种名字搜不出内容，
+    留在库里只是一个永远没有数字的空壳。抽取阶段已经把它们挡掉了
+    （``discovery.PLACEHOLDER``），这里负责清理历史遗留。
+    """
+    from app.services.meme.discovery import PLACEHOLDER
+
+    out: list[Meme] = []
+    for meme in session.scalars(select(Meme).order_by(Meme.id)):
+        if not PLACEHOLDER.search(meme.name or ""):
+            continue
+        if stats_of(session, meme)["days"]:
+            continue          # 真采到过数据的不动，哪怕名字难看
+        out.append(meme)
+    return out
+
+
+def drop_placeholder_memes(session: Session) -> list[str]:
+    """清掉"名字是 xx 占位 + 一天数据都没采到"的空壳（见 :func:`placeholder_rows`）。"""
+    removed: list[str] = []
+    for meme in placeholder_rows(session):
+        removed.append(meme.name)
+        session.delete(meme)
+        log.info("删除占位名空壳「%s」(id %s)：0 天序列，名字没法搜索", meme.name, meme.id)
+    session.commit()
+    return removed
+
+
 def report(session: Session) -> int:
     memes = list(session.scalars(select(Meme).order_by(Meme.id)))
+    shells = placeholder_rows(session)
+    if shells:
+        print(
+            f"占位名空壳：{len(shells)} 条（名字里是 xx 且一天数据都没采到）："
+            + "、".join(meme.name for meme in shells)
+        )
+        print("  清理：python -m app.scripts.dedupe_memes --apply --drop-placeholders\n")
     pairs = duplicate_pairs(memes)
     if not pairs:
         print("没有互相包含的梗名对，梗库不存在这类重复。")
@@ -155,8 +192,9 @@ def report(session: Session) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="赶梗潮 · 梗库去重（默认只报告）")
-    parser.add_argument("--apply", action="store_true", help="真的删除（必须配合 --drop）")
+    parser.add_argument("--apply", action="store_true", help="真的删除（必须配合 --drop / --drop-placeholders）")
     parser.add_argument("--drop", default="", help="要删除的 meme id，逗号分隔")
+    parser.add_argument("--drop-placeholders", action="store_true", help="清掉 xx 占位名且一天数据都没采到的空壳")
     args = parser.parse_args(argv)
 
     from app.models import SessionLocal
@@ -167,12 +205,16 @@ def main(argv: list[str] | None = None) -> int:
         if not args.apply:
             return 0
         ids = [int(x) for x in args.drop.split(",") if x.strip()]
-        if not ids:
-            raise SystemExit("--apply 必须配合 --drop 点名要删的 id")
+        if not ids and not args.drop_placeholders:
+            raise SystemExit("--apply 必须配合 --drop（点名 id）或 --drop-placeholders")
         snap = backup_database()
         print(f"\n已备份到 {snap}" if snap else "\n（非 SQLite 数据源，未做本地快照）")
-        removed = drop_memes(session, ids)
-        print(f"删除 {len(removed)} 条：{'、'.join(removed)}")
+        if args.drop_placeholders:
+            shells = drop_placeholder_memes(session)
+            print(f"清理占位名空壳 {len(shells)} 条：{'、'.join(shells) or '（无）'}")
+        removed = drop_memes(session, ids) if ids else []
+        if removed:
+            print(f"删除 {len(removed)} 条：{'、'.join(removed)}")
         print("接着跑一次重算，让榜单不再引用已删除的条目：python -m app.scripts.rebuild_from_bilibili --recompute-only")
     finally:
         session.close()

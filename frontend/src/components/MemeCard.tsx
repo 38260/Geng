@@ -25,7 +25,7 @@ function RankBadge({ rank }: { rank: number }) {
 /** 今日热榜卡片：只回答"现在该不该赶"，不堆指标。 */
 export function MemeCard({ item, rank }: { item: Card; rank: number }) {
   return (
-    <article className="card animate-rise flex flex-col rounded-2xl border-line p-3 shadow-none">
+    <article className="card animate-rise flex min-w-0 flex-col rounded-2xl border-line p-3 shadow-none">
       <div className="relative">
         <RankBadge rank={rank} />
         <StickerThumb thumbnail={item.thumbnail} ratio="6/5" emojiSize={48} rounded="rounded-xl" />
@@ -77,7 +77,7 @@ export function RecommendationCard({ item }: { item: Card }) {
           ratio="5/7"
           emojiSize={30}
           rounded="rounded-xl"
-          className="w-[96px] shrink-0"
+          className="w-[104px] shrink-0"
         />
         <div className="min-w-0 flex-1 pt-0.5">
           <h3 className="truncate text-[18px] font-bold leading-none">{item.name}</h3>

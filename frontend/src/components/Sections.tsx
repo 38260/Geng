@@ -32,10 +32,10 @@ export function Hero({ subtitle }: { subtitle: string }) {
       }}
     >
       <div className="relative z-10 max-w-[860px] px-10 pb-[64px] pt-[58px] lg:px-[70px]">
-        <h1 className="brush-title brush-heavy text-[54px] leading-[1.08] text-ink sm:text-[68px] lg:text-[82px]">
+        <h1 className="brush-title brush-heavy text-[40px] leading-[1.1] text-ink sm:text-[62px] lg:text-[82px]">
           今天，赶什么梗？
         </h1>
-        <BrushUnderline className="-mt-1 h-[22px] w-[430px]" />
+        <BrushUnderline className="-mt-1 h-[22px] w-[430px] max-w-full" />
         <p className="mt-[26px] text-[20px] font-semibold text-[#2D4A84] lg:text-[23px]">{subtitle}</p>
       </div>
 

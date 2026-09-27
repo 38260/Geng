@@ -40,7 +40,7 @@ from .certification import certification_progress
 
 log = get_logger(__name__)
 
-DEFAULT_THUMBNAIL = {"emoji": "🎬", "color": "#FFE9E4"}
+DEFAULT_THUMBNAIL = {"emoji": "🎬", "color": "#FFE9E4", "image": ""}
 
 
 def _clean(value: Any) -> Any:
@@ -54,11 +54,49 @@ def _clean_dict(payload: dict[str, Any]) -> dict[str, Any]:
     return {key: _clean(value) for key, value in payload.items()}
 
 
-def thumbnail_for(meme: Meme) -> dict[str, str]:
+def _https(url: str) -> str:
+    """B站返回的是协议相对地址（//i0.hdslb.com/...），浏览器 img src 需要补上协议。"""
+    url = (url or "").strip()
+    if url.startswith("//"):
+        return "https:" + url
+    return url if url.startswith("http") else ""
+
+
+def covers_by_meme(session: Session) -> dict[int, str]:
+    """梗的代表封面 = 该梗播放量最高的那条真实视频的 B站封面。
+
+    一次查询拿全表再分组，避免列表页 N+1；演示数据没有真实封面，
+    拿不到就退回"主题色 + 表情"贴纸，绝不编造图片地址。
+    """
+    rows = session.execute(
+        select(Video.meme_id, Video.cover, Video.view).order_by(Video.view.desc())
+    )
+    out: dict[int, str] = {}
+    for meme_id, cover, _view in rows:
+        link = _https(cover)
+        if link and meme_id not in out:
+            out[meme_id] = link
+    return out
+
+
+def cover_for_meme(session: Session, meme_id: int) -> str:
+    link = covers_by_meme(session).get(meme_id, "")
+    return link
+
+
+def thumbnail_for(meme: Meme, real_cover: str = "") -> dict[str, str]:
+    """封面优先级：B站真实封面 > 演示素材图 > 主题色 + 表情贴纸。
+
+    真实采集的梗必须用真实视频封面，不能拿设计稿里的素材图冒充抓取结果；
+    只有演示数据才允许用那批素材图。
+    """
     spec = spec_for(meme.name)
-    if spec is None:
-        return dict(DEFAULT_THUMBNAIL)
-    return {"emoji": spec.emoji, "color": spec.color}
+    emoji = spec.emoji if spec else DEFAULT_THUMBNAIL["emoji"]
+    color = spec.color if spec else DEFAULT_THUMBNAIL["color"]
+    demo_image = getattr(spec, "image", "") if spec else ""
+    is_real = (meme.data_source or "mock") == "bilibili"
+    image = real_cover or ("" if is_real else demo_image)
+    return {"emoji": emoji, "color": color, "image": image}
 
 
 def _growth_percent(value: Any) -> float | None:
@@ -98,7 +136,13 @@ def _load_rows(session: Session) -> list[tuple[Meme, HotnessSnapshot, LifecycleS
     return list(session.execute(stmt))
 
 
-def card_payload(meme: Meme, hotness: HotnessSnapshot, lifecycle: LifecycleSnapshot) -> dict[str, Any]:
+def card_payload(
+    meme: Meme,
+    hotness: HotnessSnapshot,
+    lifecycle: LifecycleSnapshot,
+    *,
+    real_cover: str = "",
+) -> dict[str, Any]:
     metrics = hotness.metrics or {}
     growth = metrics.get("growth")
     return _clean_dict({
@@ -121,7 +165,7 @@ def card_payload(meme: Meme, hotness: HotnessSnapshot, lifecycle: LifecycleSnaps
         "catch_label": lifecycle.catch_label or CATCHUP_LABELS.get(lifecycle.catch_status, ""),
         "catch_reason": lifecycle.catch_reason,
         "catch_confidence": round(lifecycle.catch_confidence, 2),
-        "thumbnail": thumbnail_for(meme),
+        "thumbnail": thumbnail_for(meme, real_cover),
         "meme_data_source": meme.data_source or settings.data_source,
         "verification_state": meme.verification_state or "unverified",
         "certified_at": meme.certified_at.isoformat() if meme.certified_at else None,
@@ -164,11 +208,15 @@ def list_memes(
 
     total = len(rows)
     page = rows[offset:] if limit is None else rows[offset : offset + limit]
+    covers = covers_by_meme(session)
     return {
         "filter": filter_key,
         "filter_label": HOME_FILTER_LABELS.get(filter_key, "全部"),
         "total": total,
-        "items": [card_payload(meme, hotness, lifecycle) for meme, hotness, lifecycle in page],
+        "items": [
+            card_payload(meme, hotness, lifecycle, real_cover=covers.get(meme.id, ""))
+            for meme, hotness, lifecycle in page
+        ],
     }
 
 
@@ -233,6 +281,7 @@ def video_payloads(session: Session, meme: Meme, limit: int | None = 4) -> list[
     return [
         {
             **video.to_dict(include_meme=False),
+            "cover": _https(video.cover),
             "duration_text": _duration_text(video.duration_seconds),
             "view_text": _compact(video.view),
             "danmaku_text": _compact(video.danmaku),
@@ -340,7 +389,9 @@ def detail_payload(session: Session, meme: Meme) -> dict[str, Any] | None:
         return None
 
     payload = {
-        "meme": card_payload(meme, hotness, lifecycle),
+        "meme": card_payload(
+            meme, hotness, lifecycle, real_cover=cover_for_meme(session, meme.id)
+        ),
         "hotness": {
             "score": round(hotness.score, 1),
             "window_days": hotness.window_days,

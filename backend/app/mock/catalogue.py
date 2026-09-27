@@ -27,15 +27,17 @@ class MemeSpec:
     certification: str = "both"    # both / enc / guide / none
     emoji: str = "🎬"
     color: str = "#FFE9E4"
+    # 参考图里裁出的真实封面（frontend/public/thumbs/…）；没有的走表情贴纸
+    image: str = ""
 
 
 # 目标：首页热榜前五与参考图一致（电子木鱼 / 狗都不谈恋爱 / 我是大学生 / 阿巴阿巴 / 啊对对对）
 MEME_CATALOGUE: tuple[MemeSpec, ...] = (
     # ---------------------------- 🔥 爆发期 ---------------------------- #
     MemeSpec("电子木鱼", "explosive", 260_000, "敲电子木鱼、赛博积功德的解压玩法，衍生出大量整活视频与小游戏。",
-             ("赛博木鱼", "电子功德"), ("木鱼", "功德", "赛博"), emoji="🥁", color="#FFE9D6"),
+             ("赛博木鱼", "电子功德"), ("木鱼", "功德", "赛博"), emoji="🥁", color="#FFE9D6", image="/thumbs/muyu.png"),
     MemeSpec("我不是黄豆", "explosive", 190_000, "用变黄表情包自嘲「我不是黄豆」的二次创作潮，常配魔性 BGM。",
-             ("黄豆", "变黄了"), ("黄豆", "表情包"), emoji="🫘", color="#FFF3C4"),
+             ("黄豆", "变黄了"), ("黄豆", "表情包"), emoji="🫘", color="#FFF3C4", image="/thumbs/shiba-serious.png"),
     MemeSpec("哈基米", "rising", 175_000, "源自猫咪视频的洗脑旋律，被大量剪辑成萌宠与整活混剪。",
              ("哈基米你呀", "hajimi"), ("哈基米", "猫", "洗脑"), emoji="🐱", color="#FFE4EF"),
     MemeSpec("泼天的富贵", "rising", 150_000, "形容突然降临的流量与好运，常用于品牌与素人爆火叙事。",
@@ -47,13 +49,13 @@ MEME_CATALOGUE: tuple[MemeSpec, ...] = (
 
     # ---------------------------- 📈 上升期 ---------------------------- #
     MemeSpec("狗都不谈恋爱", "rising", 96_000, "单身向自嘲句式，「狗都不谈恋爱，我要谈」的反转结构正在扩散。",
-             ("狗都不谈",), ("单身", "自嘲"), emoji="🐶", color="#FFE2D1"),
+             ("狗都不谈",), ("单身", "自嘲"), emoji="🐶", color="#FFE2D1", image="/thumbs/shiba.png"),
     MemeSpec("我是大学生", "rising", 82_000, "以「我是大学生」开头的身份反转叙事，用于解释各种离谱行为。",
-             ("大学生", "学姐好"), ("大学生", "校园"), emoji="🎓", color="#E6F0FF"),
+             ("大学生", "学姐好"), ("大学生", "校园"), emoji="🎓", color="#E6F0FF", image="/thumbs/college-girl.png"),
     MemeSpec("军训好热", "rising", 70_000, "开学季军训吐槽合集，配合晒伤与拉歌场景的二创。",
-             ("军训", "教官", "拉歌"), ("军训", "开学"), emoji="☀️", color="#FFF1CC"),
+             ("军训", "教官", "拉歌"), ("军训", "开学"), emoji="☀️", color="#FFF1CC", image="/thumbs/anime-summer.png"),
     MemeSpec("这也太刑了", "rising", 61_000, "「太行了」的谐音变形，用来形容擦边到违法边缘的离谱操作。",
-             ("太刑了", "刑不刑"), ("刑", "谐音"), emoji="⚖️", color="#EDE7FF"),
+             ("太刑了", "刑不刑"), ("刑", "谐音"), emoji="⚖️", color="#EDE7FF", image="/thumbs/penguin.png"),
     MemeSpec("班味", "rising", 55_000, "打工人身上洗不掉疲惫气质的统称，衍生出「去班味」穿搭与生活方式内容。",
              ("去班味", "一身班味"), ("打工人", "职场"), emoji="💼", color="#E8F1EC"),
     MemeSpec("质疑理解成为", "rising", 48_000, "「质疑他、理解他、成为他」三段式句式，用于描述成长的回旋镖。",
@@ -75,9 +77,9 @@ MEME_CATALOGUE: tuple[MemeSpec, ...] = (
 
     # ---------------------------- 🌊 平稳期 ---------------------------- #
     MemeSpec("阿巴阿巴", "plateau", 39_000, "装傻失语的拟声表达，长期稳定出现在鬼畜与萌宠区。",
-             ("阿巴",), ("拟声", "装傻"), emoji="🗿", color="#EDEDED"),
+             ("阿巴",), ("拟声", "装傻"), emoji="🗿", color="#EDEDED", image="/thumbs/tom.png"),
     MemeSpec("夏天的风", "plateau", 33_000, "老歌翻唱与夏日氛围混剪的固定 BGM，热度稳定。",
-             ("夏天的风 翻唱",), ("夏日", "音乐"), emoji="🍃", color="#E3F5EA"),
+             ("夏天的风 翻唱",), ("夏日", "音乐"), emoji="🍃", color="#E3F5EA", image="/thumbs/lake.png"),
     MemeSpec("发疯文学", "plateau", 30_000, "以夸张崩溃语气表达诉求的文体，已成语境通用工具。",
              ("发疯",), ("文学", "情绪"), emoji="🌀", color="#F3E8FF"),
     MemeSpec("松弛感", "plateau", 27_000, "形容不费力却好看的状态，穿搭与生活方式区常驻标签。",
@@ -89,7 +91,7 @@ MEME_CATALOGUE: tuple[MemeSpec, ...] = (
 
     # ---------------------------- 📉 退潮期 ---------------------------- #
     MemeSpec("啊对对对", "receding", 18_000, "敷衍式认同的万能回复，热度已从峰值明显回落。",
-             ("对对对",), ("敷衍", "口头禅"), emoji="🙄", color="#E9E9E9"),
+             ("对对对",), ("敷衍", "口头禅"), emoji="🙄", color="#E9E9E9", image="/thumbs/blob.png"),
     MemeSpec("你个老6", "receding", 16_000, "游戏区衍生出的「老六」骂梗，二创量持续下滑。",
              ("老六",), ("游戏", "阴人"), emoji="🎮", color="#EAEAEA"),
     MemeSpec("遥遥领先", "receding", 15_000, "发布会口头禅出圈后进入长尾，新增内容增速转负。",

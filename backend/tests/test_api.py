@@ -12,6 +12,8 @@ from app.config import HOME_FILTERS, settings
 from app.main import app
 from app.models import Meme, reset_db
 
+from .conftest import make_video
+
 UNVERIFIED_NAMES = {"新梗观察A", "新梗观察B", "网友投稿梗"}
 
 
@@ -114,6 +116,36 @@ def test_pagination(client):
     assert len(page1["items"]) == 3 == len(page2["items"])
     assert {i["id"] for i in page1["items"]}.isdisjoint({i["id"] for i in page2["items"]})
     assert page1["total"] == page2["total"]
+
+
+def test_cover_follows_the_actual_data_source(client, session, meme_factory):
+    """封面不许造假：真实采集的梗用 B站真实封面，演示梗才用设计稿素材图。"""
+    from app.services.meme.query import covers_by_meme, thumbnail_for
+
+    real = session.query(Meme).filter_by(name="阿巴阿巴").one()
+    real.data_source = "bilibili"
+    demo = session.query(Meme).filter_by(name="狗都不谈恋爱").one()
+    plain = meme_factory(name="查无此梗XYZ", data_source="bilibili")
+    session.add(
+        make_video("BV1coverhi", "阿巴阿巴", meme_id=real.id, view=900,
+                   cover="//i0.hdslb.com/bfs/archive/hi.jpg")
+    )
+    session.add(
+        make_video("BV1coverlo", "阿巴阿巴", meme_id=real.id, view=10,
+                   cover="//i0.hdslb.com/bfs/archive/lo.jpg")
+    )
+    session.flush()
+
+    covers = covers_by_meme(session)
+    assert covers[real.id] == "https://i0.hdslb.com/bfs/archive/hi.jpg", "取播放量最高那条的封面"
+
+    assert thumbnail_for(real, covers[real.id])["image"].startswith("https://i0.hdslb.com")
+    assert thumbnail_for(demo, "")["image"] == "/thumbs/shiba.png"
+
+    # 既没有真实封面也没有素材图：退回表情贴纸，而不是编一个图片地址
+    empty = thumbnail_for(plain, "")
+    assert empty["image"] == "" and empty["emoji"] and empty["color"]
+    session.rollback()
 
 
 # --------------------------------------------------------------------------- #

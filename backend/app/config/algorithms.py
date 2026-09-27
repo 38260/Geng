@@ -62,6 +62,11 @@ GROWTH_SCORE_FULL = 1.20    # +120% growth -> 100
 MIN_SAMPLE_VIDEOS = 3
 LOW_SAMPLE_DAMPING = 0.6
 
+# Growth percentages shown in the UI need a base thick enough to mean anything:
+# "prev 7 days had 4 replies, this week 300" is +7400% but it is pure noise.
+# Below this previous-window discussion volume we show "—" instead of a percent.
+MIN_GROWTH_DISCUSSION = 30
+
 
 # --------------------------------------------------------------------------- #
 # Lifecycle classification

@@ -72,3 +72,17 @@ def test_rolling_hotness_covers_every_day():
     assert not any(math.isnan(value) for _, value in daily)
     # 持续上涨的梗，末期热度应高于初期
     assert daily[-1][1] > daily[3][1]
+
+
+def test_thin_base_does_not_produce_a_showy_percentage():
+    """前 7 天只有几条讨论时，"+几千%"是噪声不是增长，卡片上该显示"—"。"""
+    thin_base = series_from_views([0] * 16 + [60] * 7 + [20_000] * 7)
+    result = compute_hotness(thin_base)
+
+    assert 0 < result.metrics["prev_discussion"] < 30
+    assert result.metrics["discussion_growth"] is None, "基数太薄不报讨论量增幅"
+    assert result.metrics["video_growth"] is not None, "视频数两边都有样本，正常给"
+    assert result.metrics["growth"] is not None, "样本量够，增长率照旧计入热度"
+
+    thick = series_from_views([0] * 16 + [20_000] * 7 + [60_000] * 7)
+    assert compute_hotness(thick).metrics["discussion_growth"] is not None

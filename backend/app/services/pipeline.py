@@ -103,7 +103,13 @@ def recompute_meme(session: Session, meme: Meme, *, window_days: int | None = No
         )
     )
     if not stats:
-        log.info("梗「%s」暂无时间序列数据，跳过", meme.name)
+        # 没有时间序列就没有算分的依据：把旧快照一起撤掉。
+        # 否则这个梗会带着上一版的分数继续留在榜单上，等于用已经不存在的数据说话。
+        removed = _drop_snapshots(session, meme.id)
+        log.info(
+            "梗「%s」暂无时间序列数据，%s",
+            meme.name, "已撤下旧的热度/生命周期快照" if removed else "跳过",
+        )
         return None
 
     series = Series.from_stats(meme.id, stats, window_days=window)
@@ -171,6 +177,16 @@ def recompute_meme(session: Session, meme: Meme, *, window_days: int | None = No
     return MemeMetrics(
         hotness=current, lifecycle=lifecycle, catch_up=catch_up, series=series, data_version=data_version
     )
+
+
+def _drop_snapshots(session, meme_id: int) -> int:
+    """撤下某个梗的热度与生命周期快照，返回删除行数。"""
+    from app.models import LifecycleSnapshot
+
+    # 不关会话同步：后面还会 session.get 这两张表，留着脏对象会"删不掉"
+    removed = session.query(HotnessSnapshot).filter(HotnessSnapshot.meme_id == meme_id).delete()
+    removed += session.query(LifecycleSnapshot).filter(LifecycleSnapshot.meme_id == meme_id).delete()
+    return removed
 
 
 def _delete_other_source(session, model, meme_id: int, source: str) -> int:

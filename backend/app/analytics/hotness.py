@@ -25,6 +25,7 @@ from app.config import (
     HOTNESS_REFERENCE,
     HOTNESS_WEIGHTS,
     LOW_SAMPLE_DAMPING,
+    MIN_GROWTH_DISCUSSION,
     MIN_SAMPLE_VIDEOS,
 )
 
@@ -161,6 +162,15 @@ def compute_hotness(series: Series, *, end_index: int | None = None) -> HotnessR
         # 样本太小时不把"+100%"这种外推结果当成真实增长
         metrics["growth"] = None
         metrics["growth_note"] = "近两周样本过小，增长率不计入热度"
+
+    # 卡片上那几个百分比要能回答"相对多少涨的"：前 7 天基数太薄时，
+    # +585% 只是噪声，宁缺显示"—"，也不要让人以为真的涨了。
+    if prev.discussion < MIN_GROWTH_DISCUSSION:
+        metrics["discussion_growth"] = None
+    if prev.video_count < MIN_SAMPLE_VIDEOS:
+        metrics["video_growth"] = None
+    if prev.creator_count < MIN_SAMPLE_VIDEOS:
+        metrics["creator_growth"] = None
     if sample_note:
         metrics["sample_note"] = sample_note
 

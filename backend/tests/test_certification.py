@@ -71,3 +71,28 @@ def test_unknown_role_rejected(meme_factory, session):
     meme = meme_factory()
     with pytest.raises(ValueError):
         record_certification(session, meme, "抖音", bvid="BV1x")
+
+
+def test_recompute_withdraws_snapshot_when_series_is_gone(meme_factory, session):
+    """序列被清空之后，不能继续挂着上一版的分数留在榜单上。"""
+    from app.models import HotnessSnapshot, LifecycleSnapshot, MemeDailyStats
+
+    meme = meme_factory(
+        certified=True,
+        status=MemeStatus.CERTIFIED,
+        encyclopedia_confirmed=True,
+        guide_confirmed=True,
+    )
+    for row in make_stats(meme.id, [50_000] * 30, end=date.today()):
+        session.add(row)
+    session.flush()
+    assert recompute_meme(session, meme) is not None
+    session.flush()
+    assert session.query(HotnessSnapshot).filter_by(meme_id=meme.id).count() == 1
+
+    session.query(MemeDailyStats).filter(MemeDailyStats.meme_id == meme.id).delete()
+    session.flush()
+
+    assert recompute_meme(session, meme) is None
+    assert session.query(HotnessSnapshot).filter_by(meme_id=meme.id).count() == 0
+    assert session.query(LifecycleSnapshot).filter_by(meme_id=meme.id).count() == 0

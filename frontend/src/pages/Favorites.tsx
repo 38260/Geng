@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 
 import { api } from "@/api/client";
-import { Header } from "@/components/Header";
 import { MemeCard } from "@/components/MemeCard";
 import { SectionHeader, TransparencyFooter } from "@/components/Sections";
 import { EmptyState, ErrorState, LoadingCards } from "@/components/States";
@@ -23,8 +22,7 @@ export default function Favorites() {
 
   return (
     <>
-      <Header />
-      <div className="mx-auto w-full max-w-[1180px] px-4 pb-10 pt-5 lg:px-7">
+      <div className="px-5 pb-12 pt-8 lg:px-[33px]">
         <div className="flex items-end justify-between">
           <SectionHeader emoji="🔖" title="我的收藏" />
           {items.length ? (

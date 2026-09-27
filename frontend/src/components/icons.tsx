@@ -159,3 +159,90 @@ export const LinkIcon = (p: IconProps) => (
     <path d="M14 10.5a3.5 3.5 0 0 0-5 0L6.5 13a3.5 3.5 0 0 0 5 5l1.5-1.5" />
   </svg>
 );
+
+/* ------------------------------- 实心导航图标 ------------------------------- *
+ * 参考图的侧栏图标是实心色块（不是描边），门洞/缺口用 evenodd 挖空，
+ * 这样在选中态的浅蓝底上也能透出背景色。
+ */
+function solid({ size = 20, ...props }: IconProps) {
+  return {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "currentColor",
+    fillRule: "evenodd" as const,
+    ...props,
+  };
+}
+
+export const HomeSolidIcon = (p: IconProps) => (
+  <svg {...solid(p)}>
+    <path d="M12 3.2 3.6 9.1v11.3a.9.9 0 0 0 .9.9h4.9v-5.5a1 1 0 0 1 1-1h3.2a1 1 0 0 1 1 1v5.5h4.9a.9.9 0 0 0 .9-.9V9.1z" />
+  </svg>
+);
+
+export const LibrarySolidIcon = (p: IconProps) => (
+  <svg {...solid(p)}>
+    <rect x="8.6" y="2.6" width="11.4" height="13" rx="3" opacity="0.45" />
+    <rect x="4" y="7.4" width="11.4" height="14" rx="3" />
+    <rect x="6.8" y="10.4" width="5.8" height="1.7" rx="0.85" fill="#fff" opacity="0.9" />
+  </svg>
+);
+
+export const TrendSolidIcon = (p: IconProps) => (
+  <svg {...solid(p)}>
+    <path d="M3.4 13.6h4v6.9h-4zM9.9 10.2h4v10.3h-4zM16.4 12.4h4v8.1h-4z" />
+    <path
+      d="M3.6 9.4 9 4.3l3.1 2.7L20.2 2.6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.1"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <circle cx="20.2" cy="2.9" r="1.9" />
+  </svg>
+);
+
+export const BookmarkSolidIcon = (p: IconProps) => (
+  <svg {...solid(p)}>
+    <path d="M6.2 2.4h11.6A1.8 1.8 0 0 1 19.6 4.2v18l-7.6-5.1-7.6 5.1v-18A1.8 1.8 0 0 1 6.2 2.4z" />
+    <circle cx="12" cy="9.2" r="2.1" fill="#fff" opacity="0.9" />
+  </svg>
+);
+
+export const GearSolidIcon = (p: IconProps) => (
+  <svg {...solid(p)}>
+    <path d="M10.6 2.3h2.8l.5 2.5a7.4 7.4 0 0 1 1.9.8l2.2-1.3 2 2-1.3 2.2c.4.6.6 1.2.8 1.9l2.5.5v2.8l-2.5.5c-.2.7-.4 1.3-.8 1.9l1.3 2.2-2 2-2.2-1.3c-.6.4-1.2.6-1.9.8l-.5 2.5h-2.8l-.5-2.5a7.4 7.4 0 0 1-1.9-.8l-2.2 1.3-2-2 1.3-2.2c-.4-.6-.6-1.2-.8-1.9l-2.5-.5v-2.8l2.5-.5c.2-.7.4-1.3.8-1.9L3.1 6.3l2-2 2.2 1.3c.6-.4 1.2-.6 1.9-.8z" />
+    <circle cx="12" cy="12" r="3.4" fill="#fff" opacity="0.92" />
+  </svg>
+);
+
+export const ChartSolidIcon = (p: IconProps) => (
+  <svg {...solid(p)}>
+    <rect x="2.8" y="3" width="18.4" height="15.4" rx="3.4" />
+    <path
+      d="M6.6 14.2 10 10.4l2.5 2.2 4.3-4.9"
+      fill="none"
+      stroke="#fff"
+      strokeWidth="2.1"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path d="M3 19.6h18v1.9H3z" opacity="0.5" />
+  </svg>
+);
+
+export const PlaySolidIcon = (p: IconProps) => (
+  <svg {...solid(p)}>
+    <rect x="2.6" y="4.2" width="18.8" height="15.6" rx="4.4" />
+    <path d="M9.9 8.9 15.4 12l-5.5 3.1z" fill="#fff" />
+  </svg>
+);
+
+export const UserSolidIcon = (p: IconProps) => (
+  <svg {...solid(p)}>
+    <circle cx="12" cy="7.6" r="4.2" />
+    <path d="M4.2 21c.6-4.1 3.8-6.4 7.8-6.4s7.2 2.3 7.8 6.4z" />
+  </svg>
+);

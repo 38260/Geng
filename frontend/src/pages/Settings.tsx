@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 
 import { api } from "@/api/client";
-import { Header } from "@/components/Header";
 import { EyeIcon, GearIcon, RefreshIcon } from "@/components/icons";
 import { TransparencyFooter } from "@/components/Sections";
 import { ErrorState } from "@/components/States";
@@ -96,8 +95,7 @@ export default function Settings() {
   if (loading) {
     return (
       <>
-        <Header />
-        <div className="mx-auto w-full max-w-[1180px] px-4 py-8 lg:px-7">
+        <div className="px-5 py-8 lg:px-[33px]">
           <div className="skeleton h-[320px]" />
         </div>
       </>
@@ -107,8 +105,7 @@ export default function Settings() {
   if (error || !data || !form) {
     return (
       <>
-        <Header />
-        <div className="mx-auto w-full max-w-[1180px] px-4 py-8 lg:px-7">
+        <div className="px-5 py-8 lg:px-[33px]">
           <ErrorState message={error} onRetry={reload} hint="设置页需要后端在线" />
         </div>
       </>
@@ -117,18 +114,17 @@ export default function Settings() {
 
   return (
     <>
-      <Header />
-      <div className="mx-auto w-full max-w-[1180px] px-4 pb-10 pt-5 lg:px-7">
+      <div className="px-5 pb-12 pt-8 lg:px-[33px]">
         <div className="mb-1 flex items-center gap-2">
           <GearIcon size={20} className="text-flare" />
-          <h1 className="text-[22px] font-black">系统设置</h1>
+          <h1 className="text-[28px] font-black">系统设置</h1>
         </div>
-        <p className="mb-6 text-[13px] text-ink-mute">配置 LLM 服务与相关参数</p>
+        <p className="mb-6 text-[15px] text-ink-mute">配置 LLM 服务与相关参数</p>
 
         <section className="card p-6">
           <div className="mb-5 flex items-center gap-2">
             <span className="text-[16px]">🔌</span>
-            <h2 className="text-[15px] font-bold">LLM 配置</h2>
+            <h2 className="text-[18px] font-bold">LLM 配置</h2>
             <span
               className={`chip ml-2 ${data.config.api_key_set ? "bg-go/10 text-go" : "bg-gold/20 text-[#B2750A]"}`}
             >
@@ -137,10 +133,10 @@ export default function Settings() {
           </div>
 
           <div className="grid gap-x-8 gap-y-4 md:grid-cols-2">
-            <label className="block">
-              <span className="field-label">LLM 提供商</span>
+            <label className="flex items-center gap-3">
+              <span className="w-[92px] shrink-0 text-[14px] font-medium text-ink-soft">LLM 提供商</span>
               <select
-                className="field"
+                className="field flex-1"
                 value={PROVIDERS.some((p) => p.value === form.provider) ? form.provider : PROVIDERS[0].value}
                 onChange={(event) => patch({ provider: event.target.value })}
               >
@@ -152,11 +148,11 @@ export default function Settings() {
               </select>
             </label>
 
-            <label className="block">
-              <span className="field-label">API Key</span>
-              <div className="relative">
+            <label className="flex items-start gap-3">
+              <span className="w-[92px] shrink-0 pt-2.5 text-[14px] font-medium text-ink-soft">API Key</span>
+              <div className="relative flex-1">
                 <input
-                  className="field pr-10"
+                  className="field flex-1 pr-10"
                   type={showKey ? "text" : "password"}
                   value={form.api_key}
                   placeholder={data.config.api_key_masked || "请输入 API Key"}
@@ -179,19 +175,19 @@ export default function Settings() {
               </span>
             </label>
 
-            <label className="block">
-              <span className="field-label">Base URL</span>
+            <label className="flex items-center gap-3">
+              <span className="w-[92px] shrink-0 text-[14px] font-medium text-ink-soft">Base URL</span>
               <input
-                className="field"
+                className="field flex-1"
                 value={form.base_url}
                 onChange={(event) => patch({ base_url: event.target.value })}
               />
             </label>
 
-            <label className="block">
-              <span className="field-label">Temperature</span>
+            <label className="flex items-center gap-3">
+              <span className="w-[92px] shrink-0 text-[14px] font-medium text-ink-soft">Temperature</span>
               <input
-                className="field"
+                className="field flex-1"
                 type="number"
                 step="0.1"
                 min="0"
@@ -201,19 +197,19 @@ export default function Settings() {
               />
             </label>
 
-            <label className="block">
-              <span className="field-label">Model</span>
+            <label className="flex items-center gap-3">
+              <span className="w-[92px] shrink-0 text-[14px] font-medium text-ink-soft">Model</span>
               <input
-                className="field"
+                className="field flex-1"
                 value={form.model}
                 onChange={(event) => patch({ model: event.target.value })}
               />
             </label>
 
-            <label className="block">
-              <span className="field-label">Max Tokens</span>
+            <label className="flex items-center gap-3">
+              <span className="w-[92px] shrink-0 text-[14px] font-medium text-ink-soft">Max Tokens</span>
               <input
-                className="field"
+                className="field flex-1"
                 type="number"
                 min="16"
                 max="4096"
@@ -223,7 +219,7 @@ export default function Settings() {
             </label>
           </div>
 
-          <div className="mt-6 flex flex-wrap items-center gap-3">
+          <div className="mt-6 flex flex-wrap items-center gap-3 md:justify-end">
             <button type="button" className="btn-primary" onClick={save} disabled={busy !== null}>
               {busy === "save" ? "保存中…" : "保存配置"}
             </button>
@@ -252,7 +248,7 @@ export default function Settings() {
         <section className="card mt-5 p-6">
           <div className="mb-4 flex items-center gap-2">
             <span className="text-[16px]">⚙️</span>
-            <h2 className="text-[15px] font-bold">系统信息</h2>
+            <h2 className="text-[18px] font-bold">系统信息</h2>
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             {[
@@ -269,8 +265,8 @@ export default function Settings() {
               },
             ].map((item) => (
               <div key={item.label} className="rounded-xl bg-rail px-4 py-3">
-                <div className="text-[12px] text-ink-mute">{item.label}</div>
-                <div className="mt-0.5 text-[14px] font-semibold">{item.value}</div>
+                <div className="text-[13px] text-ink-mute">{item.label}</div>
+                <div className="mt-1 text-[16px] font-bold">{item.value}</div>
               </div>
             ))}
           </div>

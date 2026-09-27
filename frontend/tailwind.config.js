@@ -5,37 +5,24 @@ export default {
     extend: {
       colors: {
         // 取自参考图：冷白画布 + 纯白卡片 + 珊瑚红主强调
-        canvas: "#F5F7FB",
+        // 以下色值全部从 docs/design/reference-ui.png 逐元素采样得到
+        canvas: "#F7FAFD",
         surface: "#FFFFFF",
-        rail: "#F9FBFE",
+        rail: "#F7FAFD",
         ink: {
-          DEFAULT: "#181818",
-          soft: "#4A5568",
-          mute: "#8A94A6",
-          faint: "#B4BCCB",
+          DEFAULT: "#000214",
+          soft: "#3C5989",
+          mute: "#5E739F",
+          faint: "#B0BAD0",
         },
         line: "#ECF0F6",
-        brand: {
-          DEFAULT: "#FF6B5F",
-          soft: "#FFEEE9",
-          deep: "#F0483C",
-        },
-        flare: {
-          DEFAULT: "#4C7EED",
-          soft: "#EDF3FF",
-        },
-        go: {
-          DEFAULT: "#15AE6F",
-          soft: "#E6F8EF",
-        },
-        gold: {
-          DEFAULT: "#F5A623",
-          soft: "#FFF3DC",
-        },
-        dusk: {
-          DEFAULT: "#7C8698",
-          soft: "#F1F3F7",
-        },
+        brand: { DEFAULT: "#FB3A5E", soft: "#FDE9EE", deep: "#E2224A" },
+        flare: { DEFAULT: "#0D8AFE", soft: "#ECF6FE" },
+        go: { DEFAULT: "#019646", soft: "#E5FCF2" },
+        gold: { DEFAULT: "#FDC069", soft: "#FFF3DC" },
+        dusk: { DEFAULT: "#546F98", soft: "#EFF4FB" },
+        // 侧栏选中态：浅蓝底 + 亮蓝字（参考图「首页」那一格）
+        nav: { DEFAULT: "#1152F3", soft: "#E5EEFD" },
       },
       fontFamily: {
         sans: [

@@ -1,7 +1,6 @@
 import { Link } from "react-router-dom";
 
 import { api } from "@/api/client";
-import { Header } from "@/components/Header";
 import { SectionHeader, TransparencyFooter } from "@/components/Sections";
 import { ErrorState, LoadingCards } from "@/components/States";
 import { useAsync } from "@/hooks/useAsync";
@@ -17,8 +16,7 @@ export default function Trends() {
 
   return (
     <>
-      <Header />
-      <div className="mx-auto w-full max-w-[1180px] px-4 pb-10 pt-5 lg:px-7">
+      <div className="px-5 pb-12 pt-8 lg:px-[33px]">
         <SectionHeader emoji="📊" title="热度趋势" />
         <p className="-mt-2 mb-5 text-[13px] text-ink-mute">
           热度为赶梗潮自定义指数（0-100，滚动 7 天窗口），增幅口径是最近 7 天相对前 7 天。

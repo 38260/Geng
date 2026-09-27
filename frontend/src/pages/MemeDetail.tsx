@@ -10,18 +10,10 @@ import { StickerThumb } from "@/components/StickerThumb";
 import { TrendChart } from "@/components/TrendChart";
 import { ErrorState, LoadingCards } from "@/components/States";
 import { TransparencyFooter } from "@/components/Sections";
-import { DetailTopBar } from "@/components/Header";
 import { useAsync } from "@/hooks/useAsync";
 import { useFavorites, useMeta } from "@/hooks/useAppData";
 import type { Certification, InsightBundle, MemeCard, Trend as TrendData, VideoItem } from "@/types/api";
 import { CATCH_STYLE, STAGE_STYLE } from "@/utils/format";
-
-const SECTIONS = [
-  { id: "overview", label: "概览", emoji: "🏠" },
-  { id: "trend", label: "趋势图", emoji: "📊" },
-  { id: "videos", label: "相关视频", emoji: "▶" },
-  { id: "creators", label: "参与UP主", emoji: "👥" },
-];
 
 const EMPTY_BUNDLE: InsightBundle = {
   trend_explanation: null,
@@ -53,7 +45,7 @@ function HeadCard({
       />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-[26px] font-black leading-tight">{meme.name}</h1>
+          <h1 className="text-[30px] font-black leading-tight">{meme.name}</h1>
           <button
             type="button"
             onClick={() => toggle(meme.id, meme.name)}
@@ -65,8 +57,8 @@ function HeadCard({
 
         <div className="mt-2 flex flex-wrap items-center gap-2.5">
           <span className="flex items-center gap-1 text-brand">
-            <span className="text-[19px] leading-none">🔥</span>
-            <span className="tabular text-[30px] font-black leading-none">{Math.round(meme.hotness)}</span>
+            <span className="text-[24px] leading-none">🔥</span>
+            <span className="tabular text-[34px] font-black leading-none">{Math.round(meme.hotness)}</span>
           </span>
           <span className={`chip ${stage.chip} px-3 py-1.5 text-[13px]`}>{meme.nickname}</span>
           <span className={`chip ${catchStyle.chip} px-3 py-1.5 text-[13px]`}>
@@ -87,8 +79,8 @@ function HeadCard({
           </span>
         </div>
 
-        <p className="mt-3 text-[13px] leading-relaxed text-ink-mute">
-          <span className="mr-1">👋</span>
+        <p className="mt-4 text-[15px] leading-relaxed text-ink-mute">
+          <span className="mr-1">🌟</span>
           {explanation || meme.catch_reason || "最近这个梗的数据还在积累中。"}
         </p>
         <p className="mt-2 line-clamp-2 text-[12px] leading-relaxed text-ink-faint">{meme.description}</p>
@@ -111,8 +103,8 @@ function CertificationStrip({
   return (
     <section className="card p-5">
       <div className="mb-3 flex items-center gap-2">
-        <span className="text-[16px]">✅</span>
-        <h3 className="text-[15px] font-bold">双 UP 梗认证</h3>
+        <span className="text-[19px]">✅</span>
+        <h3 className="text-[18px] font-bold">双 UP 梗认证</h3>
         <span
           className={`chip ml-auto ${
             verification === "verified_both" ? "bg-go/10 text-go" : "bg-gold/20 text-[#B2750A]"
@@ -176,11 +168,11 @@ function CreatorsStrip({
   return (
     <section id="creators" className="card p-5">
       <div className="mb-3 flex items-center gap-2">
-        <span className="text-[16px]">👥</span>
-        <h3 className="text-[15px] font-bold">参与 UP 主</h3>
+        <span className="text-[19px]">👥</span>
+        <h3 className="text-[18px] font-bold">参与 UP 主</h3>
       </div>
       <div className="flex flex-wrap items-baseline gap-2">
-        <span className="tabular text-[26px] font-black">{creators.value.toLocaleString("en-US")}</span>
+        <span className="tabular text-[30px] font-black">{creators.value.toLocaleString("en-US")}</span>
         <span className={`tabular text-[13px] font-bold ${tone}`}>
           {creators.growth === null
             ? "样本不足"
@@ -275,8 +267,7 @@ export default function MemeDetail() {
   if (!valid) {
     return (
       <>
-        <DetailTopBar />
-        <div className="mx-auto w-full max-w-[1180px] px-4 py-8">
+        <div className="px-5 py-8 lg:px-[33px]">
           <ErrorState message="这个梗的地址不太对" />
         </div>
       </>
@@ -284,24 +275,8 @@ export default function MemeDetail() {
   }
 
   return (
-    <>
-      <DetailTopBar updatedAt={detail.data?.meme.data_updated_at ?? meta?.data_updated_at} />
-
-      <div className="mx-auto flex w-full max-w-[1180px] gap-6 px-4 pb-10 pt-5 lg:px-7">
-        <nav className="sticky top-[86px] hidden h-fit w-[124px] shrink-0 flex-col gap-1 xl:flex">
-          {SECTIONS.map((section) => (
-            <a
-              key={section.id}
-              href={`#${section.id}`}
-              className="flex items-center gap-2 rounded-xl px-3 py-2 text-[13px] font-medium text-ink-soft transition hover:bg-white hover:text-flare"
-            >
-              <span>{section.emoji}</span>
-              {section.label}
-            </a>
-          ))}
-        </nav>
-
-        <div className="min-w-0 flex-1 space-y-5">
+    <div className="px-5 pb-12 pt-7 lg:px-[33px]">
+      <div className="min-w-0 space-y-5">
           {detail.loading ? <LoadingCards count={3} /> : null}
 
           {detail.error ? <ErrorState message={detail.error} onRetry={detail.reload} /> : null}
@@ -320,8 +295,8 @@ export default function MemeDetail() {
               <div className="grid gap-5 xl:grid-cols-[1.55fr_1fr]">
                 <section id="trend" className="card p-5">
                   <div className="mb-3 flex items-center gap-3">
-                    <span className="text-[17px]">🔥</span>
-                    <h3 className="text-[15px] font-bold">热度趋势</h3>
+                    <span className="text-[20px]">🔥</span>
+                    <h3 className="text-[18px] font-bold">热度趋势</h3>
                     <div className="ml-auto flex rounded-full bg-rail p-1">
                       {([7, 30] as const).map((size) => (
                         <button
@@ -390,9 +365,8 @@ export default function MemeDetail() {
             </>
           ) : null}
 
-          <TransparencyFooter meta={meta} />
-        </div>
+        <TransparencyFooter meta={meta} />
       </div>
-    </>
+    </div>
   );
 }

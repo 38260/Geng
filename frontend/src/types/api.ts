@@ -45,6 +45,8 @@ export interface Meta {
 export interface Thumbnail {
   emoji: string;
   color: string;
+  /** 参考图裁出的真实封面；为空则退回表情贴纸 */
+  image?: string;
 }
 
 export interface MemeCard {

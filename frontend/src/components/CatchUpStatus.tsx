@@ -4,9 +4,9 @@ import { CheckIcon, RefreshIcon, StarIcon } from "@/components/icons";
 import type { CatchUpStatus as Status, InsightBundle } from "@/types/api";
 
 const CHIP: Record<Status, string> = {
-  can_catch: "bg-go text-white",
-  caution: "bg-gold text-white",
-  too_late: "bg-brand text-white",
+  can_catch: "bg-go-soft text-go",
+  caution: "bg-gold/20 text-[#B2750A]",
+  too_late: "bg-brand-soft text-brand",
 };
 
 /**
@@ -53,7 +53,7 @@ export function CatchUpCards({
       <section className="rounded-card border border-go/20 bg-go/5 p-5">
         <div className="flex flex-wrap items-center gap-2">
           <span className="grid h-8 w-8 place-items-center rounded-full bg-white text-[16px] shadow-sm">🐧</span>
-          <h3 className="text-[15px] font-bold">现在赶这个梗？</h3>
+          <h3 className="text-[18px] font-bold">现在赶这个梗？</h3>
           <span className={`chip ${CHIP[bundle.catch_up.status]}`}>
             <CheckIcon size={13} />
             {bundle.catch_up.label}
@@ -63,7 +63,7 @@ export function CatchUpCards({
           </span>
         </div>
 
-        <p className="mt-3 text-[13px] leading-relaxed text-ink-soft">{reason}</p>
+        <p className="mt-4 text-[15px] leading-relaxed text-ink-soft">{reason}</p>
 
         <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] text-ink-faint">
           {adviceOk ? (
@@ -91,12 +91,12 @@ export function CatchUpCards({
       <section className="rounded-card border border-flare/20 bg-flare/5 p-5">
         <div className="flex items-center gap-2">
           <StarIcon size={17} className="text-flare" />
-          <h3 className="text-[15px] font-bold">趋势解释</h3>
+          <h3 className="text-[18px] font-bold">趋势解释</h3>
           {explanation?.source === "cache" ? (
             <span className="chip bg-dusk/10 text-ink-mute">缓存</span>
           ) : null}
         </div>
-        <p className="mt-3 text-[13px] leading-relaxed text-ink-soft">
+        <p className="mt-4 text-[15px] leading-relaxed text-ink-soft">
           {explanationOk ? explanation!.result.text : bundle.algorithm_reason}
         </p>
         {!explanationOk ? (

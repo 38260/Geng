@@ -46,15 +46,15 @@
   }
 
   .chip {
-    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-[3px] text-[12px] font-medium leading-none;
+    @apply inline-flex items-center gap-1 rounded-full px-3 py-[7px] text-[14px] font-bold leading-none;
   }
 
   .link-quiet {
-    @apply inline-flex items-center gap-1 text-[13px] font-medium text-ink-mute transition hover:text-flare;
+    @apply inline-flex items-center gap-1 text-[14px] font-medium text-ink-mute transition hover:text-flare;
   }
 
   .section-title {
-    @apply flex items-center gap-2 text-[19px] font-bold tracking-tight;
+    @apply flex items-center gap-2 text-[26px] font-black tracking-tight;
   }
 
   .btn-primary {
@@ -85,14 +85,17 @@
   }
 }
 
-/* 参考图里的 Hero 是毛笔字 + 珊瑚红下划线，这里用本机中文字体还原 */
+/* 参考图里的 Hero 是重墨毛笔字 + 珊瑚红下划线，这里用本机中文字体还原 */
 .brush-title {
   font-family: "FZShuTi", "方正舒体", "STHupo", "华文琥珀", "KaiTi", "楷体", cursive;
   letter-spacing: 0.02em;
 }
 
-.hero-swoosh {
-  background-image: linear-gradient(90deg, rgba(255, 107, 95, 0) 0%, #ff6b5f 18%, #ff8f7a 82%, rgba(255, 143, 122, 0) 100%);
+/* 参考图的标题比任何本机毛笔字都粗，用描边补上笔画重量 */
+.brush-heavy {
+  font-weight: 900;
+  -webkit-text-stroke: 2.2px currentColor;
+  paint-order: stroke fill;
 }
 
 /* 吉祥物是白底素材，用 multiply 融进浅色 Hero，避免出现"贴纸白边" */

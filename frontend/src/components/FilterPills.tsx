@@ -8,11 +8,12 @@ const ICONS: Record<HomeFilter, typeof FireIcon> = {
   receding: WaveIcon,
 };
 
+/** 未选中胶囊里，图标各自带一个浅色圆底（参考图口径）。 */
 const TONES: Record<HomeFilter, string> = {
-  all: "text-brand",
-  hot: "text-brand",
-  taking_off: "text-go",
-  receding: "text-flare",
+  all: "bg-white/25 text-white",
+  hot: "bg-brand-soft text-brand",
+  taking_off: "bg-go-soft text-go",
+  receding: "bg-flare-soft text-flare",
 };
 
 export function FilterPills({
@@ -25,7 +26,7 @@ export function FilterPills({
   onChange: (next: HomeFilter) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-3">
+    <div className="flex flex-wrap gap-4">
       {filters.map((filter) => {
         const active = filter.key === value;
         const Icon = ICONS[filter.key];
@@ -35,13 +36,20 @@ export function FilterPills({
             type="button"
             onClick={() => onChange(filter.key)}
             className={[
-              "flex items-center gap-2 rounded-full px-5 py-2.5 text-[14px] font-semibold transition",
+              "flex h-[54px] items-center gap-3 rounded-full pl-2.5 pr-7 text-[19px] font-bold transition",
               active
-                ? "bg-gradient-to-r from-brand to-[#FF8A62] text-white shadow-pill"
-                : "border border-line bg-surface text-ink-soft hover:border-brand/30 hover:text-ink",
+                ? "bg-gradient-to-r from-brand to-[#FF7A8C] text-white shadow-pill"
+                : "bg-[#F6FAFE] text-ink hover:bg-nav-soft",
             ].join(" ")}
           >
-            <Icon size={16} className={active ? "text-white" : TONES[filter.key]} />
+            <span
+              className={[
+                "grid h-[40px] w-[40px] shrink-0 place-items-center rounded-full",
+                active ? "bg-white/22 text-white" : TONES[filter.key],
+              ].join(" ")}
+            >
+              <Icon size={21} />
+            </span>
             {filter.label}
           </button>
         );

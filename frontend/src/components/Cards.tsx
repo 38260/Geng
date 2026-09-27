@@ -10,13 +10,6 @@ const ICONS = {
   danmaku: DanmakuIcon,
 } as const;
 
-const TONES: Record<keyof typeof ICONS, string> = {
-  videos: "bg-flare/10 text-flare",
-  creators: "bg-flare/10 text-flare",
-  comments: "bg-go/10 text-go",
-  danmaku: "bg-flare/10 text-flare",
-};
-
 export function MetricCard({
   metric,
   label,
@@ -28,25 +21,24 @@ export function MetricCard({
 }) {
   const Icon = ICONS[kind];
   return (
-    <div className="card flex items-center gap-3 px-4 py-3.5">
-      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${TONES[kind]}`}>
-        <Icon size={18} />
-      </span>
-      <div className="min-w-0">
-        <div className="text-[12px] text-ink-mute">{label}</div>
-        <div className="flex items-baseline gap-1.5">
-          <span className="tabular text-[19px] font-black leading-tight">{compact(metric.value)}</span>
-          <span className={`tabular text-[12px] font-bold ${growthClass(metric.growth)}`}>
-            {percent(metric.growth)}
-          </span>
-        </div>
+    <div className="flex flex-col gap-2.5 rounded-2xl bg-dusk-soft px-4 py-3.5">
+      <div className="flex items-center gap-2 text-[14px] font-semibold text-ink-soft">
+        <Icon size={17} className="text-flare" />
+        {label}
+      </div>
+      <div className="flex items-baseline gap-2">
+        <span className="tabular text-[24px] font-black leading-none">{compact(metric.value)}</span>
+        <span className={`tabular text-[14px] font-bold ${growthClass(metric.growth)}`}>
+          {percent(metric.growth)}
+        </span>
       </div>
     </div>
   );
 }
 
-/** B 站视频卡：缩略图 + 标题 + UP主 + 播放/弹幕，文字保持很少。 */
+/** B 站视频卡：真实封面优先，没有才退回梗的贴纸占位。 */
 export function VideoCard({ video, thumbnail }: { video: VideoItem; thumbnail: Thumbnail }) {
+  const cover = video.cover ? { ...thumbnail, image: video.cover } : thumbnail;
   return (
     <a
       href={video.url}
@@ -55,7 +47,7 @@ export function VideoCard({ video, thumbnail }: { video: VideoItem; thumbnail: T
       className="card card-hover flex flex-col overflow-hidden p-0"
     >
       <div className="relative p-2.5 pb-0">
-        <StickerThumb thumbnail={thumbnail} ratio="16/9" emojiSize={34} />
+        <StickerThumb thumbnail={cover} ratio="16/9" emojiSize={34} />
         <span className="absolute left-1/2 top-1/2 grid h-9 w-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white/80 text-[13px] shadow-sm">
           ▶
         </span>

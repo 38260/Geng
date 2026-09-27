@@ -52,25 +52,35 @@ export function shortDate(iso: string): string {
   return `${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-/** 状态色：涨=绿，跌=珊瑚红，持平=蓝灰（参考图口径） */
-export function growthClass(value: number | null | undefined): string {
-  const tone = growthTone(value);
-  if (tone === "up") return "text-go";
-  if (tone === "down") return "text-brand";
-  return "text-flare";
+/**
+ * 增幅文字颜色 —— 参考图口径不是"涨绿跌红"，而是**跟随所处阶段的颜色**，
+ * 只有负增长才统一转红：
+ *   正在爆 +142% 红 / 快起飞 +68% 绿 / 上升期 +51% 蓝 / 平稳期 +12% 灰蓝 / 退潮期 -37% 红
+ */
+export function growthClass(value: number | null | undefined, stage?: LifecycleStage): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return "text-ink-faint";
+  if (value < 0) return "text-brand";
+  return stage ? STAGE_STYLE[stage].text : "text-go";
 }
 
+/** chip 底色/字色取自参考图对应徽章的采样值 */
 export const STAGE_STYLE: Record<LifecycleStage, { chip: string; dot: string; text: string }> = {
-  explosive: { chip: "bg-brand text-white", dot: "bg-brand", text: "text-brand" },
-  rising: { chip: "bg-go/10 text-go", dot: "bg-go", text: "text-go" },
-  sprouting: { chip: "bg-gold/20 text-[#B2750A]", dot: "bg-gold", text: "text-gold" },
-  plateau: { chip: "bg-flare/10 text-flare", dot: "bg-flare", text: "text-flare" },
-  receding: { chip: "bg-dusk/20 text-dusk", dot: "bg-dusk", text: "text-dusk" },
-  obsolete: { chip: "bg-ink-faint/25 text-ink-mute", dot: "bg-ink-faint", text: "text-ink-mute" },
+  explosive: { chip: "bg-brand-soft text-brand", dot: "bg-brand", text: "text-brand" },
+  rising: { chip: "bg-flare-soft text-flare", dot: "bg-flare", text: "text-flare" },
+  sprouting: { chip: "bg-gold/15 text-[#B2750A]", dot: "bg-gold", text: "text-gold" },
+  plateau: { chip: "bg-dusk-soft text-dusk", dot: "bg-dusk", text: "text-dusk" },
+  receding: { chip: "bg-dusk-soft text-dusk", dot: "bg-dusk", text: "text-dusk" },
+  obsolete: { chip: "bg-dusk-soft text-ink-mute", dot: "bg-ink-faint", text: "text-ink-mute" },
 };
 
+/** 「快起飞」这类上升中的梗用绿色徽章，与参考图一致 */
+export function stageChipClass(stage: LifecycleStage, nickname: string): string {
+  if (nickname === "快起飞") return "bg-go-soft text-go";
+  return STAGE_STYLE[stage].chip;
+}
+
 export const CATCH_STYLE: Record<CatchUpStatus, { chip: string; text: string; dot: string }> = {
-  can_catch: { chip: "bg-go/10 text-go", text: "text-go", dot: "bg-go" },
+  can_catch: { chip: "bg-go-soft text-go", text: "text-go", dot: "bg-go" },
   caution: { chip: "bg-gold/20 text-[#B2750A]", text: "text-[#B2750A]", dot: "bg-gold" },
   too_late: { chip: "bg-brand/10 text-brand", text: "text-brand", dot: "bg-brand" },
 };

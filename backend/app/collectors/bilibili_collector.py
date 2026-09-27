@@ -117,23 +117,25 @@ class BilibiliCollector:
         candidates = [meme.name] + [
             alias for alias in (meme.aliases or []) if alias and alias != meme.name
         ][:2]
-        best: tuple[list, dict, int] = ([], {}, 0)
+        best: tuple[list, dict, int] | None = None
 
         def days_of(rows: list) -> int:
             return sum(1 for row in rows if row.video_count)
 
         for term in candidates:
-            stats, seen, filtered_out = self._daily_pass(meme, term, window_days=window_days)
-            if days_of(stats) > days_of(best[0]):
-                best = (stats, seen, filtered_out)
+            result = self._daily_pass(meme, term, window_days=window_days)
+            # 第一版无条件收下：哪怕全是 0，也要保留"逐日跑满窗口"的骨架，
+            # 否则调用方看到的行数是 0 而不是 window_days，日志和空窗判断都会误导。
+            if best is None or days_of(result[0]) > days_of(best[0]):
+                best = result
             if days_of(best[0]) >= _ENOUGH_DAYS:
                 break
             if term == candidates[0]:
                 log.info(
                     "梗「%s」用梗名只查到 %s 天有内容，改用别名再查一轮（B站对口语梗名会模糊匹配到无关内容）",
-                    meme.name, days_of(stats),
+                    meme.name, days_of(result[0]),
                 )
-        return best
+        return best or ([], {}, 0)
 
     def _daily_pass(
         self, meme: Meme, term: str, *, window_days: int = 30

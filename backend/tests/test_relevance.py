@@ -69,3 +69,23 @@ def test_match_videos_partitions_and_backfills():
         assert video.relevance_score >= RELEVANCE_THRESHOLD
         assert video.matched_terms
     assert videos[1].relevance_score == 0.0
+
+
+SOYBEAN = MemeTerms(name="我不是黄豆", aliases=("黄豆",), keywords=("黄豆", "表情包"))
+
+
+def test_short_alias_hit_alone_is_not_enough():
+    """「琵琶曲黄豆版」撞的是别名"黄豆"这个常用词，不是这个梗本身。"""
+    result = score_text(SOYBEAN, "琵琶曲黄豆版", "一首曲子换个乐器弹", [])
+    assert result.title_score == 0.5, "短别名只能算弱证据"
+    assert result.accepted is False
+
+
+def test_short_alias_needs_a_second_signal():
+    """短别名 + 描述/关键词佐证，才算真的在讲这个梗。"""
+    result = score_text(SOYBEAN, "黄豆这个表情到底什么来头", "满屏都是黄豆流汗表情包", [])
+    assert result.accepted is True
+
+
+def test_meme_name_in_title_always_wins():
+    assert score_text(SOYBEAN, "我不是黄豆是什么梗", "", []).accepted is True

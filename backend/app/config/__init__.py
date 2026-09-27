@@ -21,6 +21,7 @@ from .algorithms import (
     MIN_SAMPLE_VIDEOS,
     RELEVANCE_THRESHOLD,
     RELEVANCE_WEIGHTS,
+    STRONG_ALIAS_LEN,
 )
 from .logging import configure_logging, get_logger
 from .settings import BACKEND_DIR, ENV_FILE, PROJECT_DIR, Settings, get_settings, settings
@@ -37,6 +38,7 @@ __all__ = [
     "ANALYTICS_CONFIG",
     "ANALYSIS_DEFAULTS",
     "RELEVANCE_WEIGHTS",
+    "STRONG_ALIAS_LEN",
     "RELEVANCE_THRESHOLD",
     "HOTNESS_WEIGHTS",
     "HOTNESS_REFERENCE",

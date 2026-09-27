@@ -5,6 +5,10 @@ B 站搜索结果不会全部真的与目标梗相关，因此进入统计前必
     relevance = 0.6 * TitleMatch + 0.2 * DescriptionMatch + 0.2 * KeywordMatch
     进入统计的条件： relevance >= 0.5
 
+标题命中主名算强证据；别名按长度分级——4 字以上（赛博木鱼）单独命中即可，
+2~3 字的别名（黄豆、老六、发疯）只是常用词，单独命中不足以判定相关，
+必须再有第二个词佐证，否则"琵琶曲黄豆版"这种字面撞车会把梗的数据灌满。
+
 阈值与权重都来自 :mod:`app.config.algorithms`，不写死在这里。
 LLM 不参与这一步（文档明确要求不要让 LLM 判断全部视频）。
 """
@@ -14,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Iterable, Sequence
 
-from app.config import RELEVANCE_THRESHOLD, RELEVANCE_WEIGHTS
+from app.config import RELEVANCE_THRESHOLD, RELEVANCE_WEIGHTS, STRONG_ALIAS_LEN
 from app.models import Meme, Video
 
 
@@ -63,6 +67,21 @@ def _norm(text: str | None) -> str:
     return (text or "").strip().lower()
 
 
+def _alias_title_score(aliases: Sequence[str], title_l: str) -> float:
+    """别名命中标题能给多少分，取决于这个别名有多"专属"。
+
+    中文里 2~3 字的别名基本就是常用词：「我不是黄豆」的别名"黄豆"会撞上
+    琵琶曲黄豆版、炒黄豆、树叶做豆腐——那些视频跟这个梗毫无关系，但它们
+    把梗的热度算上了榜。所以短别名只能算弱证据，必须再有别的词佐证才算相关；
+    4 字以上的别名（赛博木鱼）仍然是单独命中就够。
+    """
+    hits = [alias for alias in aliases if alias and _norm(alias) in title_l]
+    if not hits:
+        return 0.0
+    longest = max(len(alias) for alias in hits)
+    return 0.85 if longest >= STRONG_ALIAS_LEN else 0.5
+
+
 def score_text(terms: MemeTerms, title: str, description: str = "", tags: Iterable[str] = ()) -> RelevanceResult:
     title_l, desc_l = _norm(title), _norm(description)
     tags_l = _norm(" ".join(tags or []))
@@ -71,8 +90,8 @@ def score_text(terms: MemeTerms, title: str, description: str = "", tags: Iterab
     # 标题：主名 > 别名 > 关键词
     if _norm(terms.name) and _norm(terms.name) in title_l:
         title_score = 1.0
-    elif any(a and _norm(a) in title_l for a in terms.aliases):
-        title_score = 0.85
+    elif (alias_score := _alias_title_score(terms.aliases, title_l)) > 0.0:
+        title_score = alias_score
     elif any(k and _norm(k) in title_l for k in terms.keywords):
         title_score = 0.5
     else:

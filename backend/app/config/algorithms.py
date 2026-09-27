@@ -53,6 +53,11 @@ HOTNESS_REFERENCE = {
     "creator": (1, 500),                 # 7 天参与 UP 主（日累计）
 }
 
+# Alias hits shorter than this many CJK characters are treated as weak evidence:
+# a 2-char alias ("黄豆" of "我不是黄豆") collides with everyday vocabulary
+# (琵琶曲黄豆版 / 炒黄豆) and would otherwise flood a meme's series.
+STRONG_ALIAS_LEN = 4
+
 # Growth sub-score maps a 7d-vs-prev-7d growth rate onto 0..100.
 GROWTH_SCORE_ZERO = -0.30   # -30% growth  -> 0
 GROWTH_SCORE_FULL = 1.20    # +120% growth -> 100

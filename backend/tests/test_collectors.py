@@ -141,7 +141,8 @@ def certified_meme(session, meme_factory):
 
     _counter["n"] += 1
     name = f"采集测试梗{_counter['n']}"
-    meme = meme_factory(name=name, aliases=[f"别名{_counter['n']}"], keywords=["拟声", "装傻"])
+    # 别名保持 ≥4 字：短别名按相关性规则只能算弱证据，这里要测的是"退回别名再查一轮"的机制
+    meme = meme_factory(name=name, aliases=[f"测试别名梗{_counter['n']}"], keywords=["拟声", "装傻"])
     record_certification(session, meme, "encyclopedia", bvid="BV1enc")
     record_certification(session, meme, "guide", bvid="BV1gui")
     session.commit()

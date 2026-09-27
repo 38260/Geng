@@ -291,7 +291,7 @@ export default function MemeDetail() {
             <>
               <HeadCard meme={detail.data.meme} bundle={bundle} explanation={explanationText} />
 
-              <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <MetricCard kind="videos" label="视频数" metric={detail.data.metrics.videos} />
                 <MetricCard kind="creators" label="参与UP主" metric={detail.data.metrics.creators} />
                 <MetricCard kind="comments" label="评论" metric={detail.data.metrics.comments} />

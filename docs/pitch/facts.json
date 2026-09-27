@@ -1,0 +1,118 @@
+{
+  "generated_at": "2026-09-28",
+  "counts": {
+    "memes": 84,
+    "admitted": 83,
+    "double": 44,
+    "real_memes": 55,
+    "demo_memes": 15,
+    "stat_rows": 2010,
+    "stat_days_with_content": 447,
+    "videos": 1632,
+    "views_total": 208248393,
+    "through": "2026-09-27",
+    "on_board": 31,
+    "no_series": 16
+  },
+  "correlation": {
+    "pearson": 0.395,
+    "pearson_p": 0.028,
+    "r2": 0.156,
+    "spearman": 0.286,
+    "spearman_p": 0.119,
+    "n": 31
+  },
+  "coverage": {
+    "encyclopedia_named": 37,
+    "guide_named": 22,
+    "intersection": 8,
+    "union": 51,
+    "cert_days": 90,
+    "collected": 30,
+    "empty": 21
+  },
+  "top": [
+    {
+      "name": "闪身步",
+      "score": 81.0,
+      "stage": "爆发期",
+      "catch": "还来得及",
+      "cert": "梗百科认证"
+    },
+    {
+      "name": "耍起",
+      "score": 69.5,
+      "stage": "上升期",
+      "catch": "还来得及",
+      "cert": "梗指南认证"
+    },
+    {
+      "name": "野生狗奶",
+      "score": 69.0,
+      "stage": "上升期",
+      "catch": "还来得及",
+      "cert": "双 UP 认证"
+    },
+    {
+      "name": "牛来",
+      "score": 56.7,
+      "stage": "上升期",
+      "catch": "慎赶",
+      "cert": "双 UP 认证"
+    },
+    {
+      "name": "雨中霸王龙",
+      "score": 53.6,
+      "stage": "上升期",
+      "catch": "还来得及",
+      "cert": "梗指南认证"
+    },
+    {
+      "name": "老叟戏顽童",
+      "score": 52.5,
+      "stage": "退潮期",
+      "catch": "你来晚了",
+      "cert": "双 UP 认证"
+    },
+    {
+      "name": "大狗叫",
+      "score": 47.0,
+      "stage": "上升期",
+      "catch": "还来得及",
+      "cert": "梗百科认证"
+    },
+    {
+      "name": "琵琶曲",
+      "score": 44.2,
+      "stage": "退潮期",
+      "catch": "你来晚了",
+      "cert": "双 UP 认证"
+    },
+    {
+      "name": "中国人能飞",
+      "score": 40.3,
+      "stage": "退潮期",
+      "catch": "你来晚了",
+      "cert": "双 UP 认证"
+    },
+    {
+      "name": "尴尬狗",
+      "score": 35.6,
+      "stage": "平稳期",
+      "catch": "还来得及",
+      "cert": "梗百科认证"
+    }
+  ],
+  "stages": {
+    "爆发期": 1,
+    "上升期": 5,
+    "退潮期": 5,
+    "平稳期": 1,
+    "萌芽期": 2,
+    "过气": 17
+  },
+  "curve_days": {
+    "from": "08-28",
+    "to": "09-26"
+  }
+}

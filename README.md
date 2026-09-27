@@ -79,9 +79,11 @@ $env:VITE_API_TARGET="http://127.0.0.1:8010"; npm run dev
 
 | 命令 | 作用 |
 | --- | --- |
-| `python -m pytest`（backend 目录） | 100 个后端测试 |
+| `python -m pytest`（backend 目录） | 102 个后端测试 |
 | `python scripts/smoke_api.py` | 对运行中的后端逐个打接口 |
 | `bash scripts/screenshot.sh` | Chrome 无头截图，做视觉比对 |
+| `bash scripts/ui_shot.sh home "/"` | 截图 + 缩到参考图画板宽度，输出并排图与 50% 叠图（`.shots/cmp-*.png` / `blend-*.png`） |
+| `python scripts/extract_ref_assets.py` | 从 `docs/design/reference-ui.png` 重切前端素材（封面、Logo、Hero 装饰带） |
 | `bash scripts/restart-backend.sh` | 重启本地后端 |
 | `python -m app.scripts.collect_data --source bilibili --limit 3` | 真实 B 站采集 |
 

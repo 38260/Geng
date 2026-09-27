@@ -333,11 +333,19 @@ export default function Manage() {
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[14px] font-bold">{item.name}</span>
                       <span className="block truncate text-[12px] text-ink-faint">
-                        {item.hotness == null ? "未进榜（候选或暂无数据）" : `热度 ${item.hotness}`}
+                        {item.hotness == null ? "不在榜单（未入池或还没采到数据）" : `热度 ${item.hotness}`}
                       </span>
                     </span>
                     {item.has_manual_cover ? (
                       <span className="chip shrink-0 bg-brand-soft px-1.5 py-0.5 text-[10px] text-brand">人工</span>
+                    ) : null}
+                    {item.admitted && item.verification_state === "unverified" ? (
+                      <span
+                        className="chip shrink-0 bg-gold/20 px-1.5 py-0.5 text-[10px] text-[#B2750A]"
+                        title="认证位来自人工整理或演示数据，没有在 UP 主真实投稿里命中；真实模式下不进榜单"
+                      >
+                        未核验
+                      </span>
                     ) : null}
                     <span
                       className={`chip shrink-0 px-1.5 py-0.5 text-[10px] ${certChipClass(item)}`}
@@ -396,6 +404,14 @@ export default function Manage() {
                   >
                     {view.cert_label}
                   </span>
+                  {view.admitted && view.verification_state === "unverified" ? (
+                    <span
+                      className="chip bg-gold/20 text-[#B2750A]"
+                      title="认证位来自人工整理或演示数据，没有在 UP 主真实投稿里命中；真实模式下不进榜单"
+                    >
+                      未在线核验
+                    </span>
+                  ) : null}
                   {view.admitted ? null : (
                     <span className="chip bg-gold/20 text-[#B2750A]">未入池，不进榜单</span>
                   )}

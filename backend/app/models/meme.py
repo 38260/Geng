@@ -1,0 +1,171 @@
+"""梗 / 双 UP 认证 数据模型。
+
+「双 UP 梗认证」是本项目最重要的数据规则，因此它不是一段 README 说明，而是
+真实落在数据模型上的约束：
+
+    certified = 梗百科 confirmed AND 梗指南 confirmed
+
+只有 ``certified == True`` 的梗才会进入正式梗库参与热度与生命周期分析，
+这一点由 :mod:`app.services.meme.certification` 在写入时强制，并由
+``Meme.is_official`` 在读侧把关。
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any
+
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from .base import Base
+
+
+class CertRole:
+    """两个梗解释 UP 主的角色标识。"""
+
+    ENCYCLOPEDIA = "encyclopedia"  # 梗百科
+    GUIDE = "guide"                # 梗指南
+
+
+class MemeStatus:
+    CANDIDATE = "candidate"   # 只有单 UP 介绍过，等待另一个 UP 认证
+    CERTIFIED = "certified"   # 双 UP 认证，进入正式梗库
+    ARCHIVED = "archived"     # 过气归档，不再出现在榜单
+
+
+class Meme(Base):
+    __tablename__ = "memes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    slug: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+
+    aliases: Mapped[list[str]] = mapped_column(JSON, default=list)
+    keywords: Mapped[list[str]] = mapped_column(JSON, default=list)
+    description: Mapped[str] = mapped_column(Text, default="")
+
+    status: Mapped[str] = mapped_column(String(20), default=MemeStatus.CANDIDATE, index=True)
+
+    # 双 UP 认证结果（冗余存储，便于直接查询；由服务层根据认证记录重算）
+    encyclopedia_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
+    guide_confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
+    certified: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    certified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # 最近一次数据/指标重算的时间，前端"数据更新于"直接取它
+    data_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    data_version: Mapped[str] = mapped_column(String(64), default="")
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    certifications: Mapped[list["MemeCertification"]] = relationship(
+        back_populates="meme",
+        cascade="all, delete-orphan",
+        order_by="MemeCertification.role",
+        lazy="selectin",
+    )
+    daily_stats: Mapped[list["MemeDailyStats"]] = relationship(
+        back_populates="meme", cascade="all, delete-orphan", lazy="noload"
+    )
+    videos: Mapped[list["Video"]] = relationship(
+        back_populates="meme", cascade="all, delete-orphan", lazy="noload"
+    )
+
+    # ------------------------------------------------------------------ #
+    @property
+    def is_official(self) -> bool:
+        """是否属于「赶梗潮」正式梗库。"""
+        return bool(self.certified) and self.status == MemeStatus.CERTIFIED
+
+    @property
+    def encyclopedia(self) -> "MemeCertification | None":
+        return next((c for c in self.certifications if c.role == CertRole.ENCYCLOPEDIA), None)
+
+    @property
+    def guide(self) -> "MemeCertification | None":
+        return next((c for c in self.certifications if c.role == CertRole.GUIDE), None)
+
+    def match_terms(self) -> list[str]:
+        """用于 B 站搜索与相关性打分的词表：名称 + 别名 + 关键词。"""
+        terms = [self.name, *(self.aliases or []), *(self.keywords or [])]
+        seen: set[str] = set()
+        out: list[str] = []
+        for term in terms:
+            term = (term or "").strip()
+            if term and term.lower() not in seen:
+                seen.add(term.lower())
+                out.append(term)
+        return out
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "name": self.name,
+            "slug": self.slug,
+            "aliases": self.aliases or [],
+            "keywords": self.keywords or [],
+            "description": self.description,
+            "status": self.status,
+            "certified": self.certified,
+            "encyclopedia_confirmed": self.encyclopedia_confirmed,
+            "guide_confirmed": self.guide_confirmed,
+            "certified_at": self.certified_at.isoformat() if self.certified_at else None,
+            "data_updated_at": self.data_updated_at.isoformat() if self.data_updated_at else None,
+        }
+
+    def __repr__(self) -> str:  # pragma: no cover - debug helper
+        return f"<Meme {self.id} {self.name} certified={self.certified}>"
+
+
+class MemeCertification(Base):
+    """单个 UP 主对某个梗的一次「介绍过」证据。"""
+
+    __tablename__ = "meme_certifications"
+    __table_args__ = (UniqueConstraint("meme_id", "role", name="uq_certification_role"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    meme_id: Mapped[int] = mapped_column(ForeignKey("memes.id", ondelete="CASCADE"), index=True)
+
+    role: Mapped[str] = mapped_column(String(20))
+    up_name: Mapped[str] = mapped_column(String(80))
+    up_mid: Mapped[int] = mapped_column(Integer, index=True)
+
+    bvid: Mapped[str] = mapped_column(String(32), default="")
+    video_title: Mapped[str] = mapped_column(String(200), default="")
+    video_url: Mapped[str] = mapped_column(String(200), default="")
+    published_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    confirmed: Mapped[bool] = mapped_column(Boolean, default=False)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # mock = 演示证据；bilibili = 真实抓取到的 UP 主投稿
+    data_source: Mapped[str] = mapped_column(String(16), default="mock")
+
+    meme: Mapped[Meme] = relationship(back_populates="certifications")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "role": self.role,
+            "up_name": self.up_name,
+            "up_mid": self.up_mid,
+            "bvid": self.bvid,
+            "video_title": self.video_title,
+            "video_url": self.video_url or (f"https://www.bilibili.com/video/{self.bvid}" if self.bvid else ""),
+            "published_at": self.published_at.isoformat() if self.published_at else None,
+            "confirmed": self.confirmed,
+            "data_source": self.data_source,
+        }

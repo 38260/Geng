@@ -71,6 +71,22 @@ def _pair(value: Any, growth: Any) -> dict[str, Any]:
     return {"value": int(value or 0), "growth": _growth_percent(growth)}
 
 
+def effective_source(sources: list[str]) -> tuple[str, bool]:
+    """站点级数据源标签由库里真实存在的数据决定，而不是由配置决定。
+
+    配置写的是 bilibili、但库里还是演示数据（例如刚建库还没采集）时，
+    绝不能对外显示"B站真实数据"。混合情况一律按"含演示数据"标注。
+    """
+    present = {item or "mock" for item in sources}
+    if not present:
+        return settings.data_source, settings.data_source == "mock"
+    if present == {"bilibili"}:
+        return "bilibili", False
+    if present == {"mock"}:
+        return "mock", True
+    return "mixed", True
+
+
 def _load_rows(session: Session) -> list[tuple[Meme, HotnessSnapshot, LifecycleSnapshot]]:
     """正式梗库 = 双 UP 认证通过 且 已有指标快照。"""
     stmt = (
@@ -370,9 +386,11 @@ def detail_payload(session: Session, meme: Meme) -> dict[str, Any] | None:
 
 def meta_payload(session: Session) -> dict[str, Any]:
     latest = session.scalar(select(Meme.data_updated_at).order_by(Meme.data_updated_at.desc()))
-    total_certified = len(_load_rows(session))
-    sources = [meme.data_source or settings.data_source for meme, _, _ in _load_rows(session)]
+    rows = _load_rows(session)
+    total_certified = len(rows)
+    sources = [meme.data_source or settings.data_source for meme, _, _ in rows]
     source_breakdown = {key: sources.count(key) for key in sorted(set(sources))}
+    site_source, site_is_demo = effective_source(sources)
     candidate_count = len(
         list(session.scalars(select(Meme.id).where(Meme.certified.is_(False))))
     )
@@ -380,8 +398,9 @@ def meta_payload(session: Session) -> dict[str, Any]:
         "app_name": settings.app_name,
         "version": settings.app_version,
         "environment": settings.environment,
-        "data_source": settings.data_source,
-        "is_demo": settings.data_source == "mock",
+        "data_source": site_source,
+        "is_demo": site_is_demo,
+        "configured_source": settings.data_source,
         "data_updated_at": latest.isoformat() if isinstance(latest, datetime) else latest,
         "certified_count": total_certified,
         "candidate_count": candidate_count,
@@ -405,8 +424,13 @@ def meta_payload(session: Session) -> dict[str, Any]:
                 "真实采集口径：每日取 B 站该关键词下播放量最高的前 20 条相关视频作为样本，"
                 "所以「当日播放量」是该日头部内容的合计，不是全站绝对量；"
                 "跨日与跨梗比较用同一把尺子。"
-                if settings.data_source == "bilibili"
-                else "演示数据：数值由生命周期原型生成，不是真实抓取结果。"
+                if site_source == "bilibili"
+                else (
+                    "混合状态：配置的数据源是 " + settings.data_source +
+                    "，但库里仍有演示数据，请先跑 python -m app.scripts.rebuild_from_bilibili。"
+                    if site_source == "mixed"
+                    else "演示数据：数值由生命周期原型生成，不是真实抓取结果。"
+                )
             ),
         },
     }

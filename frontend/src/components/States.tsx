@@ -66,6 +66,17 @@ export function describeError(error: unknown): string {
 
 /** 演示数据标记：不允许把 Mock 伪装成实时抓取结果。 */
 export function DemoBadge({ isDemo, source }: { isDemo: boolean; source: string }) {
+  if (isDemo && source === "mixed") {
+    return (
+      <span
+        className="chip hidden bg-gold/20 text-[#B2750A] sm:inline-flex"
+        title="配置的是真实数据源，但库里仍有演示数据，请先执行一次真实采集"
+      >
+        <span className="h-1.5 w-1.5 rounded-full bg-gold" />
+        含演示数据
+      </span>
+    );
+  }
   if (!isDemo) {
     return (
       <span className="chip hidden bg-go/10 text-go sm:inline-flex">

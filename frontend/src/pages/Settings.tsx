@@ -258,7 +258,15 @@ export default function Settings() {
             {[
               { label: "当前版本", value: data.version },
               { label: "运行环境", value: data.environment },
-              { label: "数据来源", value: data.data_source === "mock" ? "Bilibili（演示数据）" : "Bilibili" },
+              {
+                label: "数据来源",
+                value:
+                  data.data_source === "bilibili"
+                    ? "Bilibili（真实采集）"
+                    : data.data_source === "mixed"
+                      ? "Bilibili + 演示数据混合"
+                      : "Bilibili（演示数据）",
+              },
             ].map((item) => (
               <div key={item.label} className="rounded-xl bg-rail px-4 py-3">
                 <div className="text-[12px] text-ink-mute">{item.label}</div>

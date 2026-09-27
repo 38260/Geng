@@ -5,7 +5,7 @@
  * 前端不自己算热度、不自己判生命周期，只做展示。
  */
 
-export type DataSource = "mock" | "bilibili";
+export type DataSource = "mock" | "bilibili" | "mixed";
 export type LifecycleStage =
   | "sprouting"
   | "rising"

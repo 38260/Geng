@@ -34,6 +34,16 @@ def _forbid_nan(response):
 # --------------------------------------------------------------------------- #
 # 元信息
 # --------------------------------------------------------------------------- #
+def test_site_label_follows_actual_data_not_configuration():
+    """配置写 bilibili 但库里还是演示数据时，不许对外声称"真实数据"。"""
+    from app.services.meme.query import effective_source
+
+    assert effective_source(["bilibili", "bilibili"]) == ("bilibili", False)
+    assert effective_source(["mock", "mock"]) == ("mock", True)
+    assert effective_source(["mock", "bilibili"]) == ("mixed", True)
+    assert effective_source([]) == (settings.data_source, settings.data_source == "mock")
+
+
 def test_health_and_meta(client):
     health = client.get("/api/health")
     assert health.status_code == 200

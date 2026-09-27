@@ -60,6 +60,25 @@ def duplicate_pairs(memes: list[Meme]) -> list[tuple[Meme, Meme]]:
     return out
 
 
+def similar_pairs(memes: list[Meme]) -> list[tuple[Meme, Meme]]:
+    """只差一两个字、又不构成包含的条目（"胆子真的肥嘟嘟的" / "胆子真是肥嘟嘟的"）。
+
+    这种**只报告、绝不自动合并**：像 "宗主第一招" 和 "宗主第二招" 相似度也一样高，
+    但它们确实是两个梗。要不要合，得人来看。
+    """
+    from difflib import SequenceMatcher
+
+    out: list[tuple[Meme, Meme]] = []
+    for i, a in enumerate(memes):
+        for b in memes[i + 1:]:
+            na, nb = _norm(a.name), _norm(b.name)
+            if not na or not nb or na == nb or (na in nb or nb in na):
+                continue
+            if SequenceMatcher(None, na, nb).ratio() >= 0.75:
+                out.append((a, b))
+    return out
+
+
 def keeper_of(pair: tuple[Meme, Meme]) -> tuple[Meme, Meme]:
     """正主 = 有真实 UP 证据的那条；都没有就取名字短的（更接近抽取口径）。"""
     a, b = pair
@@ -187,6 +206,16 @@ def report(session: Session) -> int:
             )
         print()
     print("确认无误后：python -m app.scripts.dedupe_memes --apply --drop <要删的id,逗号分隔>")
+
+    near = similar_pairs(memes)
+    if near:
+        print(f"\n近似但没互相包含（{len(near)} 组，只提示不自动合——可能是两个不同的梗）：")
+        for a, b in near:
+            info_a, info_b = stats_of(session, a), stats_of(session, b)
+            print(
+                f"  id {a.id} {a.name}（{info_a['days']}天/{info_a['cert_label']}）"
+                f" ↔ id {b.id} {b.name}（{info_b['days']}天/{info_b['cert_label']}）"
+            )
     return len(pairs)
 
 

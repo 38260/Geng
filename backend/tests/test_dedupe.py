@@ -8,7 +8,13 @@ from __future__ import annotations
 import pytest
 
 from app.models import Meme, MemeDailyStats, Video
-from app.scripts.dedupe_memes import duplicate_pairs, drop_memes, keeper_of, placeholder_rows
+from app.scripts.dedupe_memes import (
+    duplicate_pairs,
+    drop_memes,
+    keeper_of,
+    placeholder_rows,
+    similar_pairs,
+)
 from app.services.meme.certification import record_certification
 
 from .conftest import make_stats, make_video
@@ -40,6 +46,19 @@ def test_keeper_is_the_one_with_real_evidence(session, meme_factory):
     keep, gone = keeper_of((hand_made, evidenced))
 
     assert keep.id == evidenced.id and gone.id == hand_made.id
+
+
+def test_near_duplicates_are_reported_but_never_auto_merged(session, meme_factory):
+    """只差一个字的条目要报出来给人看，但不能自动合："宗主第一招/第二招" 就是两个梗。"""
+    a = meme_factory("胆子真的肥嘟嘟的")
+    b = meme_factory("胆子真是肥嘟嘟的")
+    meme_factory("宗主第一招")
+    meme_factory("宗主第二招")
+
+    pairs = similar_pairs(list(session.query(Meme).order_by(Meme.id)))
+    names = {(x.name, y.name) for x, y in pairs} | {(y.name, x.name) for x, y in pairs}
+
+    assert ("胆子真的肥嘟嘟的", "胆子真是肥嘟嘟的") in names
 
 
 def test_placeholder_shells_are_listed_only_when_they_have_no_data(session, meme_factory):

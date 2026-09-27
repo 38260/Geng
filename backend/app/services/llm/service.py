@@ -234,8 +234,11 @@ def generate(
     if not config.is_configured:
         reason = "未配置 LLM_API_KEY"
         if settings.llm_allow_rule_based_fallback:
-            text = rule_based_trend(data)
-            result = {"text": text} if kind == InsightKind.TREND_EXPLANATION else _catch_up_result(data, text)
+            if kind == InsightKind.TREND_EXPLANATION:
+                result = {"text": rule_based_trend(data)}
+            else:
+                # 赶梗建议优先复用算法已经写好的那句判断
+                result = _catch_up_result(data, str(data.get("algorithm_reason") or ""))
             row = _save(
                 session, meme_id=meme_id, kind=kind, data_version=data_version,
                 result=result, source=InsightSource.RULE, model="rule-based",

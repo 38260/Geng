@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --canvas: #f5f7fb;
+    --brand: #ff6b5f;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-canvas font-sans text-ink antialiased;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* 数字用等宽，避免榜单刷新时数字宽度跳动 */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-ink-faint/40;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-card border border-line bg-surface shadow-card;
+  }
+
+  .card-hover {
+    @apply transition duration-200 hover:-translate-y-0.5 hover:shadow-lift;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-[3px] text-[12px] font-medium leading-none;
+  }
+
+  .link-quiet {
+    @apply inline-flex items-center gap-1 text-[13px] font-medium text-ink-mute transition hover:text-flare;
+  }
+
+  .section-title {
+    @apply flex items-center gap-2 text-[19px] font-bold tracking-tight;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl bg-flare px-4 py-2.5 text-[14px]
+      font-semibold text-white transition hover:brightness-105 active:scale-[0.99] disabled:opacity-50;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-surface px-3.5 py-2
+      text-[13px] font-medium text-ink-soft transition hover:border-flare/40 hover:text-flare;
+  }
+
+  .field {
+    @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-ink outline-none
+      transition placeholder:text-ink-faint focus:border-flare/60 focus:ring-2 focus:ring-flare/15;
+  }
+
+  .field-label {
+    @apply mb-1.5 text-[13px] font-semibold text-ink-soft;
+  }
+
+  .skeleton {
+    @apply rounded-lg bg-ink-faint/15;
+    background-image: linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.05) 50%, rgba(0, 0, 0, 0) 100%);
+    background-size: 400px 100%;
+    background-repeat: no-repeat;
+    @apply animate-shimmer;
+  }
+}
+
+/* 参考图里的 Hero 是毛笔字 + 珊瑚红下划线，这里用本机中文字体还原 */
+.brush-title {
+  font-family: "FZShuTi", "方正舒体", "STHupo", "华文琥珀", "KaiTi", "楷体", cursive;
+  letter-spacing: 0.02em;
+}
+
+.hero-swoosh {
+  background-image: linear-gradient(90deg, rgba(255, 107, 95, 0) 0%, #ff6b5f 18%, #ff8f7a 82%, rgba(255, 143, 122, 0) 100%);
+}
+
+/* 吉祥物是白底素材，用 multiply 融进浅色 Hero，避免出现"贴纸白边" */
+.blend-mascot {
+  mix-blend-mode: multiply;
+}

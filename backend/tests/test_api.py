@@ -207,6 +207,19 @@ def test_insight_endpoint_degrades_without_key(client, top_meme_id):
     assert advice["result"]["reason"]
 
 
+def test_cached_insight_has_the_same_shape_as_a_fresh_one(client, top_meme_id):
+    """缓存记录与新生成记录必须同形状，否则前端会把命中缓存当成"没生成"。"""
+    fresh = client.post(f"/api/memes/{top_meme_id}/insight", json={"refresh": True}).json()
+    cached = client.get(f"/api/memes/{top_meme_id}").json()["insight"]
+
+    for key in ("trend_explanation", "catch_up_advice"):
+        assert cached[key] is not None, key
+        assert cached[key]["available"] is True
+        assert set(cached[key]) >= set(fresh[key]) - {"error"}
+    assert cached["trend_explanation"]["result"]["text"] == fresh["trend_explanation"]["result"]["text"]
+    assert cached["catch_up_advice"]["result"]["status"] == fresh["catch_up_advice"]["result"]["status"]
+
+
 def test_insight_is_cached_by_data_version(client, top_meme_id):
     first = client.post(f"/api/memes/{top_meme_id}/insight", json={"refresh": False}).json()
     second = client.post(f"/api/memes/{top_meme_id}/insight", json={"refresh": False}).json()

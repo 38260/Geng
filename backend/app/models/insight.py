@@ -61,6 +61,9 @@ class AIInsight(Base):
         return {
             "kind": self.kind,
             "status": self.status,
+            # 与 InsightOutput.to_dict 保持同一形状，否则前端命中缓存时
+            # 反而会因为缺字段把它当成"未生成"。
+            "available": self.status == InsightStatus.OK,
             "source": self.source,
             "model": self.model,
             "data_version": self.data_version,

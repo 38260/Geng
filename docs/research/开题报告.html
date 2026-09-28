@@ -1,0 +1,442 @@
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="utf-8"/><style>
+@page { size: A4; margin: 2.2cm 2cm; }
+body { font-family: "Microsoft YaHei", "SimSun", sans-serif; font-size: 10.8pt;
+       line-height: 1.75; color: #14161f; }
+h1 { font-size: 20pt; margin: 0 0 4pt; }
+h2 { font-size: 14.5pt; margin: 22pt 0 6pt; border-bottom: 1.4pt solid #FB3A5E;
+     padding-bottom: 3pt; }
+h3 { font-size: 12pt; margin: 14pt 0 4pt; color: #3C5989; }
+p { margin: 0 0 7pt; text-align: justify; }
+hr { border: none; border-top: 0.6pt solid #d8deea; margin: 12pt 0; }
+table { border-collapse: collapse; width: 100%; margin: 6pt 0 10pt; font-size: 10pt; }
+th, td { border: 0.6pt solid #b9c3d4; padding: 4pt 6pt; vertical-align: top; }
+th { background: #eef3fa; text-align: left; }
+code, pre { font-family: Consolas, monospace; font-size: 9.6pt; background: #f3f6fb; }
+pre { padding: 7pt 9pt; border: 0.6pt solid #d8deea; white-space: pre-wrap; }
+blockquote { margin: 6pt 0; padding: 5pt 9pt; border-left: 2.6pt solid #FB3A5E;
+             background: #fdf3f5; color: #3C5989; }
+ol { margin: 0 0 8pt 18pt; padding: 0; }
+ol > li { margin-bottom: 2pt; }
+strong { color: #0b1a33; }
+</style></head><body><h1>赶梗潮 —— B 站网络梗热度与生命周期分析系统</h1>
+<p><strong>课程：数据科学 · 开题答辩　|　汇报人：＿＿＿＿＿＿　|　学号：＿＿＿＿＿＿　|　指导教师：＿＿＿＿＿＿</strong>
+<strong>日期：2026 年 9 月 28 日　|　数据截至：2026-09-27（真实抓取，非样例数据）</strong></p>
+<hr />
+<h2>一、选题背景与研究意义</h2>
+<h3>1.1 一个具体的起点</h3>
+<p>2026 年 9 月 21 日，B 站账号「梗百科」发布了一期标题为「闪身步是啥梗？」的解说视频，
+播放量 64.6 万；到 9 月 26 日，这个梗在本系统的自定义热度指数上拿到 <strong>81.0 分，位居当日榜首</strong>，
+近 7 天相关头部内容播放合计 <strong>1,781 万</strong>。也就是说：从&rdquo;有人把它讲明白&rdquo;到&rdquo;它火到不能再拖&rdquo;，
+中间只有 5 天。</p>
+<p>这 5 天就是本课题要研究的对象。</p>
+<h3>1.2 问题陈述</h3>
+<p>现有的热点工具都能回答&rdquo;此刻什么在前面&rdquo;，但回答不了三个更值钱的问题：</p>
+<ol>
+<li>这个梗<strong>到底有多火</strong>（跨梗可比的量化值，而不是一个名次）；</li>
+<li>它<strong>走到了生命周期的哪一段</strong>（在冲、在顶、还是在崩）；</li>
+<li>现在<strong>赶这个梗还来不来得及</strong>（一个可执行的时间判断）。</li>
+</ol>
+<p>微博热搜与平台热榜是<strong>存量快照</strong>：一个梗崩盘当天照样能挂在榜上；百度指数一类工具度量的是
+<strong>搜索词</strong>而非梗本身，「松弛感」这类口语词会混入大量无关检索；创作者与运营则普遍凭手感判断，
+同一个梗每次判断都不一样。</p>
+<h3>1.3 研究意义</h3>
+<ul>
+<li><strong>理论层面</strong>：把&rdquo;网络梗&rdquo;从文化批评的对象，变成一个有明确观测口径、可复算、可证伪的时间序列对象。
+  Lorenz-Spreen 等人（2019）已经证明<strong>集体注意力的半衰期在系统性缩短</strong>[12]，
+  这意味着&rdquo;还剩多久&rdquo;正在成为比&rdquo;有多热&rdquo;更重要的信息。</li>
+<li><strong>应用层面</strong>：为内容创作者、品牌社媒运营与一般用户提供&rdquo;赶梗窗口&rdquo;判断，
+  减少&rdquo;跟风即过气&rdquo;的时间错配。</li>
+<li><strong>方法层面</strong>：在真实平台接口存在限流与抽样抖动的前提下，给出一套可审计的数据质量控制方案
+  （见 4.7），这部分是本课题最具数据科学含量的部分。</li>
+</ul>
+<hr />
+<h2>二、国内外研究现状</h2>
+<h3>2.1 模因与网络梗研究</h3>
+<p>&ldquo;meme（模因）&rdquo;由 Dawkins（1976）提出，指依靠<strong>模仿与复制</strong>在文化中扩散的信息单元[1]。
+Shifman（2012, 2013）把它落到互联网语境，给出&rdquo;同一梗 = 一组相互模仿的变体&rdquo;的可操作定义，
+并把研究问题指向生产、传播与接受三个环节[2][3]。中文世界方面，谢朝群与何自然（2007）
+系统介绍了语言模因说，区分了基因型与表现型复制[8]；薛一飞（2024）从青年社会心态角度
+分析了&rdquo;热梗&rdquo;的生成动因[9]。</p>
+<p>与本课题最接近的是 Bauckhage（2011）：该文用搜索与视频平台的时间序列刻画单个梗的流行曲线，
+指出流行度分布近似对数正态、且梗的寿命有限[4]；Ward（2025）则把梗放进营销学的
+<strong>fad cycle（风潮周期）</strong>框架，讨论品牌跟风的时机问题[5]——这与本课题的&rdquo;赶梗判断&rdquo;是同一个问题，
+但它没有给出可复算的量化口径。Razza 等（2020）用随机流行病模型描述模因扩散[6]，
+提供了&rdquo;为什么会自然归零&rdquo;的机理视角。</p>
+<h3>2.2 集体注意力与话题生命周期</h3>
+<p>Downs（1972）提出的<strong>议题—注意力周期</strong>把公共议题的公众关注分成若干阶段，
+是&rdquo;生命周期&rdquo;这一思路的源头[10]。计算社会科学一侧，Crane 与 Sornette（2008）用亚马逊图书销量证明
+在线注意力存在<strong>少数几种可复用的脉冲响应形状</strong>[11]；Kleinberg（2002）给出从事件流中检测
+&ldquo;突发（burst）&rdquo;的最优分割方法[13]；Yang 与 Leskovec（2011）把新闻与话题的时间曲线聚成
+若干响应类别[14]；Lorenz-Spreen 等（2019）用词典、书名、新闻与推特数据证明<strong>注意力半衰期在加速缩短</strong>[12]。
+国内情报学界对&rdquo;网络舆情生命周期&rdquo;已有较成熟的阶段划分：宋宁、刘婵君（2016）从过程与要素两个视角
+把突发事件舆情演化归纳为形成期、发展期、消弭期并讨论&rdquo;关键节点&rdquo;[15]；
+史伟等（2022）综述了情感视角下的舆情演化与预测研究[16]。</p>
+<h3>2.3 流行度量化与预测</h3>
+<p>Szabo 与 Huberman（2010）在 Digg/YouTube 上证明流行度服从幂律，且<strong>早期增速可预测最终热度</strong>[17]，
+这是本课题把&rdquo;增长&rdquo;作为一等因子的实证依据。视频方向上，Li 等（2013）预测社交网络中视频的流行度[18]，
+Tan 等（2014）直接研究视频热度的<strong>寿命（lifetime）</strong>[19]，Li 等（2016）大规模刻画并预测在线视频热度[20]；
+Zhou 等（2021）系统综述了信息级联分析的模型与方法[21]；Xu 等（2025）在话题标签热度预测中引入
+大模型推理，但<strong>数值预测仍由统计模型给出、大模型只做辅助</strong>[22]——这与本课题&rdquo;LLM 不参与计算&rdquo;的
+边界设计一致。</p>
+<h3>2.4 B 站与弹幕的既有研究</h3>
+<p>Zhang 与 Cassany（2020）以 B 站为对象研究了大规模匿名弹幕的连贯性机制[23]；
+Wang（2022）分析了弹幕对 B 站社区认同的作用[24]；闫方洁（2017）从媒介文化视角讨论了
+弹幕经 A 站、B 站引入国内后的&rdquo;戏仿、拼贴、挪用&rdquo;式造梗方式[25]；曾一果（2021）分析了
+弹幕背后青年群体的情感需要[26]。这些工作共同说明：<strong>弹幕/评论是梗的主要载体</strong>，
+因此本课题把评论与弹幕计入互动与讨论量因子。</p>
+<h3>2.5 述评：本课题的落点</h3>
+<table>
+<thead>
+<tr>
+<th>已有研究</th>
+<th>做到了什么</th>
+<th>留下的缺口</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>梗的文化研究[1-6, 8-9, 25-26]</td>
+<td>定义、分类、生成机制、社会心态</td>
+<td>几乎不给出可复算的时间度量</td>
+</tr>
+<tr>
+<td>注意力与生命周期[10-16]</td>
+<td>曲线形状可分类、半衰期在缩短、阶段可划分</td>
+<td>对象是新闻/议题/搜索词，不是&rdquo;梗&rdquo;</td>
+</tr>
+<tr>
+<td>流行度预测[17-22]</td>
+<td>早期增速可预测、热度寿命可建模</td>
+<td>落到单条内容，未做跨创作者的&rdquo;梗&rdquo;级聚合</td>
+</tr>
+<tr>
+<td>B 站平台研究[23-24]</td>
+<td>说明弹幕是梗的载体</td>
+<td>没有热度指数与赶梗时机的产品化输出</td>
+</tr>
+</tbody>
+</table>
+<p><strong>本课题的位置</strong>：把上述三条线接成一条可运行链路——用两位解说 UP 主的真实投稿证明&rdquo;这是个真梗&rdquo;，
+用逐日头部内容抽样把它变成时间序列，用五因子指数与规则引擎给出热度、阶段与赶梗判断，
+并把全部口径与数据新鲜度直接显示在产品上。</p>
+<hr />
+<h2>三、研究内容与关键问题</h2>
+<table>
+<thead>
+<tr>
+<th>编号</th>
+<th>研究问题</th>
+<th>本课题的作答方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RQ1</td>
+<td>一个梗现在有多火？</td>
+<td>0-100 自定义热度指数：五因子加权，绝对量先做对数区间归一（见 4.4）</td>
+</tr>
+<tr>
+<td>RQ2</td>
+<td>它处在生命周期哪一段？</td>
+<td>时间序列特征（增长率、距峰值差、连续下滑天数、活跃度）→ 规则引擎 → 六阶段</td>
+</tr>
+<tr>
+<td>RQ3</td>
+<td>现在赶还来得及吗？</td>
+<td>由 RQ1/RQ2 输出经判定规则给出三态（还来得及 / 慎赶 / 你来晚了）+ 置信度 + 理由</td>
+</tr>
+</tbody>
+</table>
+<p><strong>明确不做</strong>（边界即贡献的一部分）：① 不做未来数值预测，只描述已发生的数据；
+② 不让大模型修改任何事实或判定，LLM 只把算法结论翻译成人话，越界表述（&rdquo;预计&rdquo;&ldquo;一定会爆&rdquo;）直接丢弃；
+③ 不做多平台与用户体系，先把 B 站这一把尺子做准。</p>
+<hr />
+<h2>四、技术方案</h2>
+<h3>4.1 数据链路</h3>
+<p><code>B 站接口 → 逐日采集 → 清洗与梗匹配 → 日粒度聚合 → 热度指数 → 生命周期判定
+        → 赶梗判断 → （可选）大模型解释文案 → FastAPI → React 前端</code></p>
+<h3>4.2 发现层：梗从哪里来（本课题的准入设计）</h3>
+<p>一个梗值不值得被记录，先看有没有人把它讲明白过。选取两个解说账号作为<strong>存在性证明</strong>：
+梗百科（mid=1544008396，日更）与梗指南（mid=94510621，周更）。做法是翻页拉取二者真实投稿、
+从标题抽取梗名、以真实 BV 号 + 标题 + 发布时间作为证据入库。</p>
+<ul>
+<li><strong>准入取并集</strong>：任一账号在 <strong>90 天滚动窗口</strong>内介绍过即入池。实测同一批投稿中，
+  梗百科识别出 37 个梗名、梗指南 22 个，若取交集只剩 <strong>8 个</strong>——日更账号的选题被周更账号的
+  排期一票否决，热度实测最高的「闪身步」（81.0）当时就在库外。改为并集后入池 <strong>51 个</strong>，覆盖率提升 6.4 倍。</li>
+<li><strong>认证降级为标签</strong>：两位都做过的仍单独标「双 UP 认证」，只有一位做过的写明是哪一位，
+  可信度信息不损失，但不再作为闸门。</li>
+<li><strong>认证窗口 ≠ 报告窗口</strong>：解说视频通常比梗的爆发期早 1~2 周，两窗合一曾把 8 月 21 日解说的
+  「老叟戏顽童」整条排除（该梗 9 月仍居热榜）。</li>
+<li><strong>写法合并</strong>：同一梗在两个账号标题里写法不同时（&rdquo;胆子肥嘟嘟&rdquo; / &ldquo;胆子肥嘟嘟的&rdquo;）按
+  <strong>互相包含</strong>这一保守条件合并；仅&rdquo;长得像&rdquo;的名称（宗主第一招 / 宗主第二招）绝不自动合并。</li>
+<li><strong>占位名拒收</strong>：UP 主为规避敏感词把标题写成「XX在哪？最优骑士小碎步」「你会XXX吗」，
+  这类名字无法用于检索，在抽取阶段直接丢弃（实测 51 条里有 6 条）。</li>
+</ul>
+<h3>4.3 观测与清洗：把&rdquo;相关视频&rdquo;筛出来</h3>
+<p>对每个梗、每一天，用 <code>pubtime_begin_s/pubtime_end_s</code> 区间查询 + <code>order=click</code> 取当日
+<strong>播放量最高的 20 条</strong>相关视频作为样本。相关性由加权证据打分：
+<code>0.6×标题命中 + 0.2×简介命中 + 0.2×标签命中</code>，阈值 0.5。</p>
+<p>短别名只算弱证据（中文 2~3 字别名基本是常用词）：早期把「我不是黄豆」的别名写成&rdquo;黄豆&rdquo;，
+导致 418 条样本里 343 条其实只在讲黄豆（琵琶曲黄豆版、炒黄豆、树叶做豆腐），
+该梗还挂着榜首。现规则为：短于 4 字的别名必须再有第二个词佐证才能过阈值。
+本轮并集入库共剔除不相关样本 <strong>1,250 条</strong>。</p>
+<h3>4.4 热度指数（RQ1）</h3>
+<p><code>Hotness = 0.25·增长 + 0.25·播放 + 0.20·互动 + 0.16·内容 + 0.14·创作者</code></p>
+<ul>
+<li>每个因子先做<strong>对数区间归一化</strong>：播放量差三个量级的梗必须能同框比较，线性归一会让亿级老梗永远压住新梗。</li>
+<li><strong>增长权重给到 0.25</strong>，只看最近 7 天相对前 7 天，避免&rdquo;去年 1 亿播放、今天没人做&rdquo;的梗霸榜。</li>
+<li><strong>样本不足不外推</strong>：前一周讨论量 &lt; 30 或样本视频 &lt; 3 条时，增长率置空并对整体打折，
+  卡片上显示&rdquo;—&ldquo;而不是 +585% 这种噪声。</li>
+</ul>
+<h3>4.5 生命周期与赶梗判断（RQ2、RQ3）</h3>
+<p>六阶段：萌芽 → 上升 → 爆发 → 平稳 → 退潮 → 过气，规则自上而下匹配，
+判定依据（增长率、距峰值差、连续下滑天数、活跃度）随结果一起输出到详情页。
+赶梗判断输出三态 + 置信度 + 一句算法自己的理由；大模型只能复述该结论，
+与其不一致时以算法为准。</p>
+<h3>4.6 热榜门槛：准入 ≠ 上榜</h3>
+<p>首页要回答&rdquo;今天玩什么&rdquo;，所以梗还得<strong>活着</strong>：</p>
+<p><code>热榜 = 通过发现层准入 ∧ 有指标快照 ∧ 阶段非"过气" ∧ 近 7 天头部播放 ≥ 1 万</code></p>
+<p>刻意<strong>不</strong>用&rdquo;有内容天数&rdquo;当门槛：「琵琶曲」30 天只有 4 天有内容，但那几天播了 3,976 万，
+按天数卡会误杀脉冲型梗。实测该门槛把热榜从 31 个条目收敛到 <strong>12 个</strong>，
+被挡掉的 19 个中 17 个为过气、2 个近 7 天播放不足 1 万（如「omg你吓到我了」
+30 天里 26 天有内容但近 7 天仅 3,770 次播放，属历史残值）。梗库接口
+（<code>scope=all</code>）不受影响，被挡掉的梗仍可查。</p>
+<h3>4.7 数据质量控制（本课题最难的部分）</h3>
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>现象（实测）</th>
+<th>处理</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>假增长</td>
+<td>一次抓完再摊到每天，算出 <strong>+23,616%</strong> 的增长</td>
+<td>逐日带时间区间查询，只统计当天发布内容</td>
+</tr>
+<tr>
+<td>抽样抖动刷薄数据</td>
+<td>同一个词同一天两次返回的头部 20 条差异极大：琵琶曲 4 天/3,976 万 → 1 天/18 条，热度 44.2 → 0.0</td>
+<td><strong>同一天只保留更好的一次观测</strong>（比较样本数与播放量，绝不相加），并提供从快照按同一规则回填的工具（本轮回填 53 天）</td>
+</tr>
+<tr>
+<td>空窗误删</td>
+<td>一次采空就把历史真实数据清掉</td>
+<td>空窗只清非本源（演示）数据，同源旧快照保留并计数</td>
+</tr>
+<tr>
+<td>新鲜度不可见</td>
+<td>用户以为数据是&rdquo;现在的&rdquo;</td>
+<td>接口给出 <code>data_through</code> 与滞后天数，界面写明&rdquo;统计窗口不含今天&rdquo;</td>
+</tr>
+<tr>
+<td>演示数据冒充真实</td>
+<td>手写梗库与真梗同榜</td>
+<td>演示数据强制标注，且真实模式下无在线核验证据者不进榜</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>五、数据来源与规模（全部真实抓取）</h2>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>数值</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>梗库条目</td>
+<td>84</td>
+<td>其中 83 个通过发现层准入，44 个为双 UP 认证</td>
+</tr>
+<tr>
+<td>真实 B 站来源的梗</td>
+<td>55</td>
+<td>其余为演示梗库（用于跑通流程，界面明确标注）</td>
+</tr>
+<tr>
+<td>认证证据记录</td>
+<td>127 条</td>
+<td>其中 53 条为真实投稿证据（含可点开的 BV 号）</td>
+</tr>
+<tr>
+<td>日粒度统计</td>
+<td>2,010 行</td>
+<td>其中 447 行&rdquo;当日有内容&rdquo;</td>
+</tr>
+<tr>
+<td>采信视频样本</td>
+<td>1,632 条</td>
+<td>每条都带相关性得分与命中词，可抽查</td>
+</tr>
+<tr>
+<td>头部样本累计播放</td>
+<td>2.08 亿</td>
+<td>每日头部 20 条相关视频的合计，非全站绝对量</td>
+</tr>
+<tr>
+<td>有指标快照的梗</td>
+<td>67</td>
+<td>其余 17 个入池但窗口内未采到内容</td>
+</tr>
+<tr>
+<td>当前热榜</td>
+<td>12</td>
+<td>过气与残值梗已被门槛挡掉（见 4.6）</td>
+</tr>
+<tr>
+<td>统计截至</td>
+<td>2026-09-27</td>
+<td>滞后 1 天，窗口刻意不含当天</td>
+</tr>
+</tbody>
+</table>
+<p>采集接口：B 站 <code>wbi/search/type</code>（逐日区间）、<code>web-interface/view</code>（点赞/投币/收藏）、
+<code>space/wbi/arc/search</code>（UP 主投稿，匿名 + WBI 签名下按会话强风控，412/-352 需退避重试）。
+全库一轮采集 51 个梗约 30~45 分钟。</p>
+<hr />
+<h2>六、可行性分析与已完成工作</h2>
+<ul>
+<li><strong>系统已可运行</strong>：后端 61 个 Python 模块约 7,900 行，前端 29 个 TS/TSX 文件约 4,000 行，
+  测试 17 个文件约 2,660 行；一键启动脚本、CLI 采集/重算入口均已就绪。</li>
+<li><strong>质量验证已完成</strong>：单元与集成测试 <strong>169 项全部通过</strong>；对真实数据后端的接口冒烟 <strong>70 项全部通过</strong>
+  （含&rdquo;改元数据不影响热度与榜单&rdquo;&ldquo;重算幂等&rdquo;&ldquo;演示数据不得进真实榜单&rdquo;等关键断言）。</li>
+<li><strong>数据可得性已验证</strong>：接口可达性、限流边界、图床 Referer 规则等均为实测结论，非假设。</li>
+<li><strong>一个已完成的证伪实验</strong>（可作为答辩现场展示）：把&rdquo;解说视频破百万才值得做&rdquo;这一直觉
+  放到 31 个上榜梗上检验，得 Pearson r = <strong>+0.40</strong>（p = 0.028）、Spearman ρ = +0.29（p = 0.12，不显著），
+  即解说播放量只能解释热度方差的约 <strong>16%</strong>；反例同时存在——解说 64.6 万的「闪身步」热度 81.0 居首，
+  解说 160.7 万的「宗主第二招」热度 0.0。结论：该指标可用于<strong>采集成本预算</strong>，不可作为准入判据。</li>
+</ul>
+<hr />
+<h2>七、创新点</h2>
+<ol>
+<li><strong>对象创新</strong>：把&rdquo;梗&rdquo;从单条内容提升为<strong>跨创作者聚合的时间序列实体</strong>，并给出可复算的热度口径。</li>
+<li><strong>准入创新</strong>：以两位解说 UP 主的真实投稿作为梗的<strong>存在性证明</strong>，用 90 天滚动的并集准入替代交集闸门，
+   同时把&rdquo;双 UP 认证&rdquo;降级为可信度标签——覆盖率提升 6.4 倍而不损失可审计性（每条证据都是真 BV 号）。</li>
+<li><strong>输出创新</strong>：不止报热度，而是输出<strong>带置信度的赶梗时机判断</strong>，并把抽样口径、统计滞后、
+   认证强度全部直接显示在产品上，使结论可被质疑与复算。</li>
+</ol>
+<hr />
+<h2>八、局限与风险</h2>
+<table>
+<thead>
+<tr>
+<th>局限</th>
+<th>具体表现</th>
+<th>应对方案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>脉冲型梗的阶段误判</td>
+<td>琵琶曲 30 天仅 4 天有内容却播了 3,976 万，规则易判为过气</td>
+<td>上榜层已用播放量下限兜底；后续为脉冲型单独建模</td>
+</tr>
+<tr>
+<td>残值误判</td>
+<td>「omg你吓到我了」近 7 天仅 3,770 播放却判为&rdquo;萌芽期&rdquo;</td>
+<td>萌芽期增加最低活跃度约束（已列入下一步）</td>
+</tr>
+<tr>
+<td>平台风控</td>
+<td>匿名只能稳定取到账号最近约 50 条投稿，热搜/热门接口给空壳</td>
+<td>换指纹退避重试 + 索引缓存 + 缺口如实报告；可选 Cookie 增强</td>
+</tr>
+<tr>
+<td>抽样口径限制</td>
+<td>每日头部 20 条是&rdquo;头部内容合计&rdquo;，不是全站绝对播放</td>
+<td>界面与论文中明确口径，只做同尺子的相对比较</td>
+</tr>
+<tr>
+<td>伦理与合规</td>
+<td>采集公开接口数据、展示公开视频信息与封面</td>
+<td>只取公开元数据、不外存图片、遵守 robots 与频控，产品标注数据源</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>九、进度安排</h2>
+<table>
+<thead>
+<tr>
+<th>时间</th>
+<th>工作内容</th>
+<th>交付物</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>第 1-2 周</td>
+<td>上榜层口径重做（过气不出榜已完成，脉冲型单独处理）、阶段规则补最低活跃度约束</td>
+<td>口径说明 + 回归测试</td>
+</tr>
+<tr>
+<td>第 3 周</td>
+<td>增量刷新与调度；对 17 个采空梗用别名兜底再采一轮</td>
+<td>每日自动更新的数据集</td>
+</tr>
+<tr>
+<td>第 4 周</td>
+<td>用户实验：20 人对照&rdquo;看热搜&rdquo;与&rdquo;看本系统&rdquo;的选题准确率与主观有用性</td>
+<td>实验数据与分析</td>
+</tr>
+<tr>
+<td>第 5 周</td>
+<td>一致性检验：阶段判定混淆矩阵、热度与人工标注的 Spearman 相关、门槛消融实验</td>
+<td>图表与结论</td>
+</tr>
+<tr>
+<td>第 6 周</td>
+<td>撰写论文、整理代码与可复现说明</td>
+<td>论文 + 源码 + 数据集</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>十、预期成果</h2>
+<ol>
+<li>一个可运行的 B 站梗热度与生命周期分析系统（Web 端 + CLI + 后端 API）；</li>
+<li>一份可复现的真实数据集（梗库、日粒度统计、认证证据、采集与清洗脚本）；</li>
+<li>一套关于&rdquo;梗级热度指数 + 阶段判定 + 赶梗时机&rdquo;的评估报告（含混淆矩阵、相关性与消融实验）；</li>
+<li>学位论文（技术报告）一篇。</li>
+</ol>
+<hr />
+<h2>参考文献</h2>
+<blockquote>
+<p>说明：以下条目均已核验（Crossref DOI 解析 / CNKI 期刊门户 / 期刊官网元数据 / 论文原文）。
+完整核验记录与 DOI 见 <code>docs/research/related-literature.md</code>。</p>
+</blockquote>
+<p>[1] DAWKINS R. The Selfish Gene[M]. Oxford: Oxford University Press, 1976.
+[2] SHIFMAN L. An anatomy of a YouTube meme[J]. New Media &amp; Society, 2012, 14(2): 187-203.
+[3] SHIFMAN L. Memes in Digital Culture[M]. Cambridge: MIT Press, 2013.
+[4] BAUCKHAGE C. Insights into Internet Memes[C]// Proceedings of the International AAAI Conference on Web and Social Media, 2011, 5(1): 42-49.
+[5] WARD M R. Internet Meme Marketing over the Fad Cycle[J]. Journal of Interactive Marketing, 2026, 61(1): 25-40.
+[6] RAZA A, RAFIQ M, BALEANU D, et al. Numerical simulations for stochastic meme epidemic model[J]. Advances in Difference Equations, 2020, 2020(1).
+[7] ZHOU F, XU X, TRAJCEVSKI G, et al. A survey of information cascade analysis: models, foundations and applications[J]. ACM Computing Surveys, 2021, 54(2): 1-36.
+[8] 谢朝群, 何自然. 语言模因说略[J]. 现代外语, 2007(1): 30-39.
+[9] 薛一飞. 网络热梗背后的青年群体社会心态探析[J]. 人民论坛, 2024(10 下期).
+[10] DOWNS A. Up and down with ecology: the &ldquo;issue-attention cycle&rdquo;[J]. The Public Interest, 1972(28): 38-50.
+[11] CRANE R, SORNETTE D. Robust dynamic classes revealed by measuring the response function of a social system[J]. PNAS, 2008, 105(41): 15649-15653.
+[12] LORENZ-SPREEN P, MØNSTED B M, HÖVEL P, LEHMANN S. Accelerating dynamics of collective attention[J]. Nature Communications, 2019, 10(1).
+[13] KLEINBERG J. Bursty and hierarchical structure in streams[C]// KDD 2002: 91-101.
+[14] YANG J, LESKOVEC J. Patterns of temporal variation in online media[C]// WSDM 2011: 177-186.
+[15] 宋宁, 刘婵君. 过程与要素视角下的突发事件网络舆情演化规律研究综述[J]. 图书情报工作, 2016, 60(15).
+[16] 史伟, 薛广聪, 何绍义. 情感视角下的网络舆情研究综述[J]. 图书情报知识, 2022(1): 105-117.
+[17] SZABO G, HUBERMAN B A. Predicting the popularity of online content[J]. Communications of the ACM, 2010, 53(8): 80-88.
+[18] LI H, MA X, WANG F, et al. On popularity prediction of videos shared in online social networks[C]// CIKM 2013: 169-178.
+[19] TAN Z, ZHANG Y, LI C, LIU N. Lifetime popularity prediction for online videos[C]// BMSB 2014: 1-6.
+[20] LI C, LIU J, OUYANG S. Characterizing and predicting the popularity of online videos[J]. IEEE Access, 2016, 4: 1630-1641.
+[21] JENDERS M, KASNECI G, NAUMANN F. Analyzing and predicting viral tweets[C]// WWW 2013 Companion: 657-664.
+[22] XU Y, WU J, WAN H, et al. Forecasting the buzz: enriching hashtag popularity prediction with LLM reasoning[C]// CIKM 2025: 5396-5400.
+[23] ZHANG L T, CASSANY D. Making sense of danmu: coherence in massive anonymous chats on Bilibili.com[J]. Discourse Studies, 2020, 22(4): 483-502.
+[24] WANG R. Community-building on Bilibili: the social impact of danmu comments[J]. Media and Communication, 2022, 10(2): 54-65.
+[25] 闫方洁. 媒介文化研究视角下&rdquo;弹幕&rdquo;的生成机制及其亚文化意义[J]. 思想理论教育, 2017(10): 81-85.
+[26] 曾一果. 弹幕背后青年群体的情感需要与价值诉求[J]. 人民论坛, 2021(4 上期).
+[27] LIN C X, ZHAO B, MEI Q, HAN J. PET: a statistical model for popular events tracking in social contexts[C]// KDD 2010: 929-938.
+[28] 沈婕, 等. 网络舆情态势及情感多维特征分析与可视化——以 COVID-19 疫情为例[J]. 地球信息科学学报, 2021, 23(2): 318-330.
+[29] 汪明, 等. 基于改进 SEIQR 模型的网络舆情传播建模与仿真研究[J]. 知识管理论坛, 2026, 11(4): 381-399.</p></body></html>

@@ -311,6 +311,19 @@ page {
   padding: 46px 24px;
 }
 
+/* 空态/错误态里的吉祥物：素材底边已经淡出（见 scripts/cut_mp_assets.py），
+   所以直接居中摆着就行，不需要再遮罩。
+   text-align:left 不是笔误——H5 端 Taro 把 <Image> 编译成一个 position:absolute 的
+   <img>，它会继承卡片的 text-align:center 并据此算自己的静态位置，
+   结果整张图往右偏半个身位、被父级 overflow:hidden 切掉一半。微信端原生 image 没这问题。 */
+.state-mascot {
+  display: block;
+  width: 130px;
+  height: 139px;
+  margin: 0 auto;
+  text-align: left;
+}
+
 .state-title {
   display: block;
   margin-top: 10px;

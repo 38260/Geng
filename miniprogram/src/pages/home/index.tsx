@@ -1,8 +1,10 @@
-import { ScrollView, Text, View } from "@tarojs/components";
+import { Image, ScrollView, Text, View } from "@tarojs/components";
 import Taro, { usePullDownRefresh, useReachBottom, useShareAppMessage } from "@tarojs/taro";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { getMeta, listMemes } from "@/api/client";
+import heroArtUrl from "@/assets/hero/hero-art.png";
+import heroLineUrl from "@/assets/hero/underline.png";
 import { MemeCardView } from "@/components/MemeCardView";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "@/components/States";
 import { useLoad } from "@/hooks/useLoad";
@@ -87,9 +89,15 @@ export default function Home() {
 
   return (
     <View className="shell">
-      <View className="hero card">
-        <Text className="hero-title">今天，赶什么梗？</Text>
-        <Text className="hero-sub">只看 B 站 · 梗百科与梗指南介绍过的网络梗</Text>
+      <View className="hero">
+        <View className="hero-body">
+          <Image className="hero-art" src={heroArtUrl} mode="aspectFit" />
+          <View className="hero-copy">
+            <Text className="hero-title">今天，赶什么梗？</Text>
+            <Image className="hero-underline" src={heroLineUrl} mode="scaleToFill" />
+            <Text className="hero-sub">只看 B 站 · 梗百科与梗指南介绍过的网络梗</Text>
+          </View>
+        </View>
         <View className={`hero-fresh${stale ? " hero-fresh-stale" : ""}`}>
           <Text className="hero-fresh-text">
             {freshnessText(meta.data?.data_through ?? null, meta.data?.data_lag_days ?? null)}

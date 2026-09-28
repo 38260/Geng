@@ -1,30 +1,69 @@
 /* 首页 */
+/* Hero：底色与 Web 端 Hero 同一组采样值（参考图首页那条粉带），
+   右下角压一块透明底的水彩贴图（「现在不赶就晚了！」+ 吉祥物），
+   贴图由 scripts/cut_mp_assets.py 从参考素材抠出来。 */
 .hero {
-  background: linear-gradient(135deg, #fff 0%, $brand-soft 130%);
-  padding: 28px;
+  position: relative;
+  overflow: hidden;
+  border-radius: $radius-card;
+  background: linear-gradient(103deg, #fef0f5 0%, #fef2f6 42%, #feeff3 74%, #feeff2 100%);
+  box-shadow: 0 1px 2px rgba(24, 32, 48, 0.04), 0 8px 24px -12px rgba(24, 32, 48, 0.1);
+  padding: 26px 26px 20px;
+}
+
+.hero-body {
+  position: relative;
+  min-height: 182px;
+}
+
+/* 贴图贴着右下，脚被卡片下沿切掉一半——和参考图里"从带子底下探出来"一样 */
+.hero-art {
+  position: absolute;
+  right: -6px;
+  bottom: -2px;
+  width: 236px;
+  height: 170px;
+}
+
+/* 文字只占左半边，别伸到贴图底下。
+   46px 的八字标题刚好顶满 372px，一有 letter-spacing 就折行，所以标题降到 42px、
+   这一列给到 400px（400 + 236 = 636 < 卡片内宽 650）。 */
+.hero-copy {
+  width: 400px;
 }
 
 .hero-title {
   display: block;
-  font-size: 46px;
+  font-family: "FZShuTi", "方正舒体", "STHupo", "华文琥珀", "KaiTi", "楷体", $font-sans;
+  font-size: 42px;
   font-weight: 900;
+  line-height: 1.15;
   letter-spacing: 1px;
   color: $ink;
 }
 
+.hero-underline {
+  display: block;
+  width: 228px;
+  height: 18px;
+  margin-top: 2px;
+}
+
 .hero-sub {
   display: block;
-  margin-top: 6px;
-  font-size: 24px;
-  color: $ink-mute;
+  margin-top: 14px;
+  font-size: 23px;
+  line-height: 1.5;
+  color: $dusk;
 }
 
 .hero-fresh {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 18px;
+  margin-top: 16px;
   padding-top: 14px;
   border-top: 1PX solid rgba(251, 58, 94, 0.14);
 }

@@ -1,4 +1,17 @@
-import { View, Text } from "@tarojs/components";
+import { Image, View, Text } from "@tarojs/components";
+import type { ReactNode } from "react";
+
+import mascotUrl from "@/assets/hero/mascot.png";
+
+/** 空态/错误态共用：吉祥物从卡片里探一下，比一句"没数据"体面。 */
+function StateShell({ children }: { children: ReactNode }) {
+  return (
+    <View className="card state-card">
+      <Image className="state-mascot" src={mascotUrl} mode="aspectFit" />
+      {children}
+    </View>
+  );
+}
 
 /** 加载骨架：三张灰卡，不给转圈圈（用户看不出还要等多久）。 */
 export function LoadingBlock({ count = 3 }: { count?: number }) {
@@ -24,7 +37,7 @@ export function LoadingBlock({ count = 3 }: { count?: number }) {
  */
 export function ErrorBlock({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <View className="card state-card">
+    <StateShell>
       <Text className="state-title">没拿到数据</Text>
       <Text className="state-body">{message}</Text>
       {onRetry ? (
@@ -32,15 +45,15 @@ export function ErrorBlock({ message, onRetry }: { message: string; onRetry?: ()
           重试
         </View>
       ) : null}
-    </View>
+    </StateShell>
   );
 }
 
 export function EmptyBlock({ title, body }: { title: string; body?: string }) {
   return (
-    <View className="card state-card">
+    <StateShell>
       <Text className="state-title">{title}</Text>
       {body ? <Text className="state-body">{body}</Text> : null}
-    </View>
+    </StateShell>
   );
 }

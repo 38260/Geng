@@ -77,26 +77,61 @@ export function MemeCardView({
   );
 }
 
-/** 紧凑行：梗库/搜索结果用，一屏能看更多条。 */
-export function MemeRow({ meme, onOpen }: { meme: MemeCard; onOpen: (id: number) => void }) {
+/**
+ * 紧凑行：梗库与收藏列表用。
+ * 信息对齐 Web 的「热度趋势」表：热度条 + 阶段 + 7 天增幅 + 赶梗结论，
+ * 一屏能扫完相对位置，又不至于像表格那样在手机上看不下。
+ */
+export function MemeRow({
+  meme,
+  max = 100,
+  favoriteAt,
+  onOpen,
+}: {
+  meme: MemeCard;
+  max?: number;
+  favoriteAt?: string;
+  onOpen: (id: number) => void;
+}) {
   const stage = stageTone(meme.stage);
+  const catchStyle = catchTone(meme.catch_status);
+  const width = Math.max(4, Math.min(100, Math.round((meme.hotness / (max || 100)) * 100)));
+  const [coverFailed, setCoverFailed] = useState(false);
   return (
     <View className="meme-row" onClick={() => onOpen(meme.id)}>
       <View className="row-emoji" style={{ background: meme.thumbnail?.color || "#FFE9E4" }}>
         <Text>{meme.emoji || "🎬"}</Text>
-        {meme.thumbnail?.image ? (
-          <Image className="row-img" src={meme.thumbnail.image} mode="aspectFill" lazyLoad />
+        {meme.thumbnail?.image && !coverFailed ? (
+          <Image
+            className="row-img"
+            src={meme.thumbnail.image}
+            mode="aspectFill"
+            lazyLoad
+            onError={() => setCoverFailed(true)}
+          />
         ) : null}
       </View>
       <View className="row-main">
-        <Text className="row-name">{meme.name}</Text>
-        <Text className="row-sub">
-          {meme.stage_label} · {meme.cert_label}
-        </Text>
+        <View className="row-line">
+          <Text className="row-name">{meme.name}</Text>
+          <Text className="row-score tabular" style={{ color: stage.color }}>
+            {Math.round(meme.hotness)}
+          </Text>
+        </View>
+        <View className="row-bar">
+          <View className="row-bar-fill" style={{ width: `${width}%`, background: stage.color }} />
+        </View>
+        <View className="row-line row-meta">
+          <Text className="row-sub">
+            {meme.stage_label} · {meme.cert_label}
+            {favoriteAt ? ` · 收藏于 ${favoriteAt}` : ""}
+          </Text>
+          <Text className="row-growth tabular">
+            讨论 {growthText(meme.discussion_growth)}
+            <Text className={` chip ${catchStyle.chip} row-catch`}>{meme.catch_label}</Text>
+          </Text>
+        </View>
       </View>
-      <Text className="row-score tabular" style={{ color: stage.color }}>
-        {Math.round(meme.hotness)}
-      </Text>
     </View>
   );
 }

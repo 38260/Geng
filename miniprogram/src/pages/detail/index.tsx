@@ -2,6 +2,8 @@ import { Button, Image, Text, View } from "@tarojs/components";
 import Taro, { useRouter, usePullDownRefresh, useShareAppMessage } from "@tarojs/taro";
 import { useEffect, useRef, useState } from "react";
 
+import { openLibrarySearch } from "@/utils/nav";
+
 import { describeError, getDetail, getTrend, getVideos } from "@/api/client";
 import { TrendBars, type TrendMetric } from "@/components/TrendBars";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "@/components/States";
@@ -277,6 +279,10 @@ export default function Detail() {
               );
             })}
           </View>
+
+          <Text className="cross-link" onClick={() => openLibrarySearch(data.meme.name)}>
+            看它在所有梗里的位置 ›
+          </Text>
 
           <View className="card">
             <View className="row-between">

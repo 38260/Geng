@@ -1,5 +1,10 @@
 import { Input, Text, View } from "@tarojs/components";
-import Taro, { usePullDownRefresh, useReachBottom, useShareAppMessage } from "@tarojs/taro";
+import Taro, {
+  useDidShow,
+  usePullDownRefresh,
+  useReachBottom,
+  useShareAppMessage,
+} from "@tarojs/taro";
 import { useRef, useState } from "react";
 
 import { listMemes } from "@/api/client";
@@ -7,6 +12,7 @@ import { MemeRow } from "@/components/MemeCardView";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "@/components/States";
 import { useFavorites } from "@/hooks/useFavorites";
 import { usePaged } from "@/hooks/usePaged";
+import { takeLibraryQuery } from "@/utils/nav";
 
 import "./index.scss";
 
@@ -50,6 +56,15 @@ export default function Library() {
   if (board.total) shareTitle.current = `B 站梗库 ${board.total} 个梗，热度与生命周期都能查`;
   useShareAppMessage(() => ({ title: shareTitle.current, path: "/pages/library/index" }));
 
+  // 详情页「看它在所有梗里的位置」跳过来时带的搜索词（switchTab 不能带 query，走 storage 手递）
+  useDidShow(() => {
+    const pending = takeLibraryQuery();
+    if (pending) {
+      setOnlyFav(false);
+      onInput(pending);
+    }
+  });
+
   usePullDownRefresh(async () => {
     await board.refresh();
     Taro.stopPullDownRefresh();
@@ -57,6 +72,9 @@ export default function Library() {
   useReachBottom(() => {
     board.loadMore();
   });
+
+  const favoriteAt = new Map(favorites.items.map((row) => [row.id, row.at]));
+  const maxHotness = board.items.reduce((peak, item) => Math.max(peak, item.hotness), 0);
 
   return (
     <View className="shell">
@@ -115,6 +133,8 @@ export default function Library() {
             <MemeRow
               key={meme.id}
               meme={meme}
+              max={maxHotness}
+              favoriteAt={onlyFav ? favoriteAt.get(meme.id) : undefined}
               onOpen={(id) => Taro.navigateTo({ url: `/pages/detail/index?id=${id}` })}
             />
           ))}

@@ -14,7 +14,7 @@
     "dev:h5": "taro build --type h5 --watch",
     "build:h5": "taro build --type h5",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/format.test.ts tests/favorites.test.ts tests/contract.test.ts"
+    "test": "node --experimental-strip-types --test tests/format.test.ts tests/favorites.test.ts tests/featured.test.ts tests/contract.test.ts"
   },
   "browserslist": [
     "last 3 versions",

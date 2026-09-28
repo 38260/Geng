@@ -49,3 +49,75 @@
 .hero-demo {
   margin-top: 12px;
 }
+
+/* 精选推荐：横向滑，一屏露出两到三张 */
+.featured {
+  margin-top: 22px;
+}
+
+.featured-title {
+  display: block;
+  margin: 0 4px 12px;
+  font-size: 23px;
+  color: $ink-mute;
+}
+
+.featured-scroll {
+  width: 100%;
+  white-space: nowrap;
+}
+
+.featured-row {
+  display: inline-flex;
+  gap: 12px;
+  padding-right: 8px;
+}
+
+.featured-card {
+  @include card;
+  width: 240px;
+  padding: 16px;
+}
+
+.featured-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.featured-emoji {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+}
+
+.featured-score {
+  font-size: 34px;
+  font-weight: 900;
+}
+
+.featured-name {
+  display: block;
+  margin-top: 10px;
+  font-size: 27px;
+  font-weight: 800;
+  @include ellipsis(1);
+}
+
+.featured-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.list-title {
+  display: block;
+  margin: 26px 4px 4px;
+  font-size: 30px;
+  font-weight: 900;
+}

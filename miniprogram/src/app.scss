@@ -395,3 +395,41 @@ page {
   font-weight: 700;
   box-shadow: 0 6px 16px -8px rgba(255, 107, 95, 0.55);
 }
+
+/* 梗库行：名字 + 热度条 + 增幅 + 赶梗标签，对齐 Web 的热度趋势表 */
+.row-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.row-meta {
+  margin-top: 6px;
+}
+
+.row-bar {
+  height: 6px;
+  margin-top: 8px;
+  border-radius: 3px;
+  background: $rail;
+  overflow: hidden;
+}
+
+.row-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+}
+
+.row-growth {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 21px;
+  color: $ink-mute;
+}
+
+.row-catch {
+  font-size: 19px;
+  padding: 2px 8px;
+}

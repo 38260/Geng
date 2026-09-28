@@ -260,6 +260,8 @@ export interface VideoItem {
   view_text: string;
   danmaku_text: string;
   relevance_score: number;
+  /** B 站「综合排序」（搜这个词看到的默认顺序）里的名次；null = 不在抓到的那一页里 */
+  search_rank?: number | null;
   data_source: DataSource;
 }
 
@@ -267,6 +269,10 @@ export interface VideoList {
   total: number;
   items: VideoItem[];
   note?: string;
+  /** 请求的排法与实际生效的排法——库里一条名次都没抓到时后端会退回播放量 */
+  sort?: string;
+  sort_applied?: string;
+  sort_label?: string;
 }
 
 export interface TrendPoint {

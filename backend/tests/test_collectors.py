@@ -70,11 +70,17 @@ def test_parse_search_row_strips_highlight_tags():
 
 
 class FakeClient:
-    """替代 BiliClient：让我们能在不联网的情况下验证采集逻辑。"""
+    """替代 BiliClient：让我们能在不联网的情况下验证采集逻辑。
 
-    def __init__(self, *, blocked=False, rows=None):
+    ``rows`` 喂给逐日区间查询（search_range），``ranked`` 喂给"综合排序"那一页
+    （search_videos）——两者分开是因为真实接口的结果集根本不同：
+    逐日头部样本只有近 30 天的内容，综合排序会把几年前的老稿顶到第一页。
+    """
+
+    def __init__(self, *, blocked=False, rows=None, ranked=None):
         self.blocked = blocked
         self.rows = rows or []
+        self.ranked = ranked if ranked is not None else []
         self.requested: list[str] = []
 
     def probe(self):
@@ -83,12 +89,12 @@ class FakeClient:
         return True, "WBI 签名可用"
 
     def search_videos(self, keyword, *, pages=1, order="pubdate"):
-        self.requested.append(keyword)
+        self.requested.append(f"{keyword}#{order}")
         if self.blocked:
             from app.collectors.bilibili import BilibiliBlocked
 
             raise BilibiliBlocked("HTTP 412")
-        return self.rows
+        return self.ranked
 
     def search_range(self, keyword, *, begin, end, order="click", page=1, page_size=20):
         """模拟 B 站的发布时间区间过滤。"""
@@ -544,3 +550,39 @@ def test_unobserved_row_never_overwrites_real_observation(session, certified_mem
     )
     incoming, reuse = split_daily_stats(session, certified_meme, [good], "bilibili")
     assert reuse == 0 and incoming == [good], "补到的真观测必须写进去"
+
+
+class RankClient(FakeClient):
+    """只回应"综合排序"那一页：行按站内顺序给，无关内容混在里面。"""
+
+    def __init__(self, rows):
+        super().__init__(rows=rows)
+        self.ordered: list[str] = []
+
+    def search_videos(self, keyword, *, pages=1, order="pubdate"):
+        self.ordered.append(order)
+        return self.rows
+
+
+def test_totalrank_keeps_original_positions_and_drops_irrelevant(certified_meme):
+    """综合排序的名次取过滤前的位置：宁可跳号，也不把"站内第 7 条"谎称第 4 条。"""
+    name = certified_meme.name
+    rows = [
+        _row(0, days_ago=3, title=f"{name} 站内第1"),
+        _row(1, days_ago=3, title="完全无关的其它内容标题一"),
+        _row(2, days_ago=3, title=f"{name} 站内第3"),
+        _row(3, days_ago=3, title="完全无关的其它内容标题二"),
+        _row(4, days_ago=3, title=f"{name} 站内第5"),
+    ]
+    collector = BilibiliCollector(client=RankClient(rows), request_gap=0, enrich_limit=2)
+    ranked = collector._totalrank(certified_meme)
+
+    assert [item["search_rank"] for item in ranked] == [1, 3, 5], "名次要保留过滤前的原始位置"
+    assert all(item["relevance_score"] >= 0.5 for item in ranked), "无关内容不能进列表"
+
+
+def test_totalrank_asks_for_default_order(certified_meme):
+    """默认排序必须问的是 B 站"综合"那一档（不传 order），不是 click/pubdate。"""
+    client = RankClient([_row(0, days_ago=2, title=f"{certified_meme.name}名场面")])
+    BilibiliCollector(client=client, request_gap=0, enrich_limit=2)._totalrank(certified_meme)
+    assert client.ordered and set(client.ordered) == {""}

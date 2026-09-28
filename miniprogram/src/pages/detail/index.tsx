@@ -202,6 +202,9 @@ export default function Detail() {
   const [trend30, setTrend30] = useState<MemeDetail["trend"] | null>(null);
   const [videos, setVideos] = useState<VideoItem[]>([]);
   const [videoTotal, setVideoTotal] = useState(0);
+  // 两档排法：B 站搜这个词的默认（综合）顺序 vs 播放量
+  const [videoSort, setVideoSort] = useState<"rank" | "view">("rank");
+  const [videoSortLabel, setVideoSortLabel] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
@@ -215,23 +218,25 @@ export default function Detail() {
     let alive = true;
     setExpanded(false);
     setVideoError(null);
-    getVideos(id, VIDEO_PAGE, 0)
+    getVideos(id, VIDEO_PAGE, 0, videoSort)
       .then((page) => {
         if (!alive) return;
         setVideos(page.items);
         setVideoTotal(page.total);
+        // 后端在没抓到名次时会退回播放量，标签跟着它说，别自顾自写"默认排序"
+        setVideoSortLabel(page.sort_label || "");
       })
       .catch((error) => alive && setVideoError(describeError(error)));
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [id, videoSort]);
 
   const loadMoreVideos = async () => {
     setLoadingMore(true);
     setVideoError(null);
     try {
-      const page = await getVideos(id, VIDEO_PAGE, videos.length);
+      const page = await getVideos(id, VIDEO_PAGE, videos.length, videoSort);
       const seen = new Set(videos.map((item) => item.bvid));
       setVideos((prev) => [...prev, ...page.items.filter((item) => !seen.has(item.bvid))]);
       setVideoTotal(page.total);
@@ -377,8 +382,25 @@ export default function Detail() {
           </View>
 
           <View className="card">
-            <Text className="sec-title">相关视频（按播放量）</Text>
+            <View className="row-between">
+              <Text className="sec-title">相关视频</Text>
+              <View className="seg">
+                {([
+                  { key: "rank", label: "B站默认" },
+                  { key: "view", label: "播放量" },
+                ] as const).map((item) => (
+                  <Text
+                    key={item.key}
+                    className={`seg-item${videoSort === item.key ? " seg-on" : ""}`}
+                    onClick={() => setVideoSort(item.key)}
+                  >
+                    {item.label}
+                  </Text>
+                ))}
+              </View>
+            </View>
             <Text className="faint video-hint">
+              {videoSortLabel ? `当前顺序：${videoSortLabel} · ` : ""}
               {videoOpensExternally()
                 ? "点一条直接打开这条视频。"
                 : "点一条把地址复制到剪贴板——微信小程序打不开站外链接，去浏览器粘贴即可。"}

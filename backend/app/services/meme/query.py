@@ -386,16 +386,38 @@ def trend_payload(session: Session, meme_id: int, window: int) -> dict[str, Any]
     }
 
 
-def kept_videos(session: Session, meme: Meme, limit: int | None = None) -> list[Video]:
-    """按播放量降序取"确实还在讲这个梗"的视频（过相关性筛，不拿错片简介拼介绍）。"""
+def kept_videos(
+    session: Session, meme: Meme, limit: int | None = None, *, sort: str = "rank"
+) -> list[Video]:
+    """按播放量取"确实还在讲这个梗"的视频（过相关性筛，不拿错片简介拼介绍）。
+
+    ``sort``：``rank`` = B 站搜这个词的默认（综合）排序名次，``view`` = 播放量。
+    库里一条名次都没有时（演示梗、或还没抓过综合排序）如实退回播放量，
+    不返回一个看起来排过、其实按创建顺序摆着的列表。
+    """
     videos = list(
         session.scalars(
             select(Video).where(Video.meme_id == meme.id).order_by(Video.view.desc())
         )
     )
     kept, _ = match_videos(MemeTerms.from_meme(meme), videos)
-    kept.sort(key=lambda video: video.view, reverse=True)
+    if sort == "view" or not any(video.search_rank for video in kept):
+        kept.sort(key=lambda video: video.view, reverse=True)
+    else:
+        # 有名次的在前；同一名次（不该出现）或没名次的按播放量兜底
+        kept.sort(key=lambda video: (
+            video.search_rank is None, int(video.search_rank or 0), -int(video.view or 0)
+        ))
     return kept[:limit] if limit else kept
+
+
+def video_sort_state(kept: list[Video], requested: str) -> tuple[str, str]:
+    """请求的排序能不能真做到：返回 (实际生效的排序, 说明)。"""
+    if requested != "rank":
+        return "view", "按播放量从高到低。"
+    if not any(video.search_rank for video in kept):
+        return "view", "这条梗还没抓到 B 站综合排序的名次，先按播放量排。"
+    return "rank", "按你在 B 站搜这个词看到的默认（综合）顺序排，名次取自过滤前的原始位置。"
 
 
 def video_items(videos: list[Video]) -> list[dict[str, Any]]:
@@ -412,7 +434,7 @@ def video_items(videos: list[Video]) -> list[dict[str, Any]]:
 
 
 def video_page(
-    session: Session, meme: Meme, *, limit: int = 20, offset: int = 0
+    session: Session, meme: Meme, *, limit: int = 20, offset: int = 0, sort: str = "rank"
 ) -> dict[str, Any]:
     """相关视频分页。
 
@@ -420,17 +442,24 @@ def video_page(
     前端拿它决定"还有没有下一页"，之前把 limit 当 total 返回，
     125 条的梗会被显示成 3 条，用户根本翻不到后面的内容。
     """
-    kept = kept_videos(session, meme)
+    kept = kept_videos(session, meme, sort=sort)
+    applied, sort_note = video_sort_state(kept, sort)
     return {
         "items": video_items(kept[offset : offset + limit]),
         "total": len(kept),
         "offset": offset,
-        "note": "已按相关性过滤（标题/简介/标签命中梗名或别名才算），再按播放量排序",
+        "sort": sort,
+        "sort_applied": applied,
+        "sort_label": "B站默认排序" if applied == "rank" else "播放量",
+        "note": "已按相关性过滤（标题/简介/标签命中梗名或别名才算），再"
+                + sort_note,
     }
 
 
-def video_payloads(session: Session, meme: Meme, limit: int | None = 4) -> list[dict[str, Any]]:
-    return video_items(kept_videos(session, meme, limit))
+def video_payloads(
+    session: Session, meme: Meme, limit: int | None = 4, *, sort: str = "rank"
+) -> list[dict[str, Any]]:
+    return video_items(kept_videos(session, meme, limit, sort=sort))
 
 
 def _duration_text(seconds: int) -> str:

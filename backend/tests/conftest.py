@@ -102,6 +102,6 @@ def make_video(bvid: str, title: str, *, day: date | None = None, **kwargs) -> V
         description=kwargs.pop("description", ""),
         author=kwargs.pop("author", "测试UP"),
         publish_time=datetime(day.year, day.month, day.day, 12, 0),
-        data_source="mock",
-        **kwargs,
+        data_source=kwargs.pop("data_source", "mock"),
+        **kwargs
     )

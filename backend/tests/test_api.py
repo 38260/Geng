@@ -246,7 +246,7 @@ def test_videos_pagination_reports_real_total(client, top_meme_id):
     线上真实数据里有个梗采信了 125 条视频，接口却回 total=3（等于 limit），
     前端据此判断"没有下一页"，用户永远只能看到前 3 条。
     """
-    first = client.get(f"/api/memes/{top_meme_id}/videos?limit=2&offset=0").json()
+    first = client.get(f"/api/memes/{top_meme_id}/videos?limit=2&offset=0&sort=view").json()
     assert first["offset"] == 0
     assert len(first["items"]) <= 2
     assert first["total"] >= len(first["items"])
@@ -255,7 +255,7 @@ def test_videos_pagination_reports_real_total(client, top_meme_id):
     # 一页页翻到底，拿到的条数必须等于 total，且不许重复
     seen, offset, guard = [], 0, 0
     while guard < 40:
-        page = client.get(f"/api/memes/{top_meme_id}/videos?limit=2&offset={offset}").json()
+        page = client.get(f"/api/memes/{top_meme_id}/videos?limit=2&offset={offset}&sort=view").json()
         assert page["total"] == first["total"], "翻页过程中 total 不许变"
         seen += [item["bvid"] for item in page["items"]]
         if not page["items"]:
@@ -270,6 +270,78 @@ def test_videos_pagination_reports_real_total(client, top_meme_id):
     assert views == sorted(views, reverse=True)
     assert client.get(f"/api/memes/{top_meme_id}/videos?limit=99").status_code == 422
     assert client.get(f"/api/memes/{top_meme_id}/videos?offset=-1").status_code == 422
+
+
+def test_videos_sort_follows_bilibili_rank(session, meme_factory):
+    """相关视频两档排法：B 站综合排序名次 vs 播放量。
+
+    「默认排序」是用户在 B 站搜这个词实际看到的顺序，掺了相关性与时效，
+    头部常是几百万播放的老稿——跟"按播放量"是两套列表，不能混为一谈。
+    """
+    from app.services.meme import query as q
+
+    meme = meme_factory(name="排序测试梗")
+    session.add_all(
+        [
+            # 综合排序第 12 条，播放量最高（老稿）
+            make_video("BVrank12", "排序测试梗 老稿", meme_id=meme.id, view=9_000_000,
+                       search_rank=12, data_source="bilibili", relevance_score=0.9),
+            # 综合排序第 1 条，播放量很低（站内把它排前面是因为相关性/时效）
+            make_video("BVrank1", "排序测试梗 站内第一", meme_id=meme.id, view=30_000,
+                       search_rank=1, data_source="bilibili", relevance_score=0.9),
+            # 综合排序第 5 条
+            make_video("BVrank5", "排序测试梗 站内第五", meme_id=meme.id, view=3_000_000,
+                       search_rank=5, data_source="bilibili", relevance_score=0.9),
+            # 没有名次：只从逐日头部样本采到，排在有名次的后面
+            make_video("BVnorank", "排序测试梗 没名次", meme_id=meme.id, view=99_000_000,
+                       data_source="bilibili", relevance_score=0.9),
+        ]
+    )
+    session.flush()  # 不 commit：这个库是整模块共用的，留下脏梗会污染别的用例
+
+    by_rank = q.video_page(session, meme, sort="rank")
+    assert [item["bvid"] for item in by_rank["items"]] == [
+        "BVrank1", "BVrank5", "BVrank12", "BVnorank",
+    ], "默认排序必须按站内名次，没名次的垫底"
+    assert by_rank["sort_applied"] == "rank" and by_rank["sort_label"] == "B站默认排序"
+
+    by_view = q.video_page(session, meme, sort="view")
+    assert [item["bvid"] for item in by_view["items"]] == [
+        "BVnorank", "BVrank12", "BVrank5", "BVrank1",
+    ], "播放量档就是纯按播放量降序"
+    assert by_view["sort_label"] == "播放量"
+
+
+def test_videos_rank_sort_degrades_honestly(session, meme_factory):
+    """一条名次都没有时不许"假装排过"：退回播放量，并在 note 里说清楚。"""
+    from app.services.meme import query as q
+
+    meme = meme_factory(name="没名次测试梗")
+    session.add_all(
+        [
+            make_video("BVb", "没名次测试梗 B", meme_id=meme.id, view=500,
+                       data_source="bilibili", relevance_score=0.9),
+            make_video("BVa", "没名次测试梗 A", meme_id=meme.id, view=5000,
+                       data_source="bilibili", relevance_score=0.9),
+        ]
+    )
+    session.flush()  # 同上：不往共用库里留脏数据
+
+    page = q.video_page(session, meme, sort="rank")
+    assert page["sort"] == "rank" and page["sort_applied"] == "view"
+    assert [item["bvid"] for item in page["items"]] == ["BVa", "BVb"]
+    assert "还没抓到" in page["note"], page["note"]
+
+
+def test_videos_sort_param_validated(client, top_meme_id):
+    """非法排法要挡在入口，不能默默当成 rank 处理。"""
+    assert client.get(f"/api/memes/{top_meme_id}/videos?sort=bogus").status_code == 422
+    ok = client.get(f"/api/memes/{top_meme_id}/videos?sort=view").json()
+    assert ok["sort"] == "view" and ok["sort_applied"] == "view"
+    # 演示数据没有真实名次：请求 rank 也必须如实退回播放量，不能假装排过
+    rank = client.get(f"/api/memes/{top_meme_id}/videos?sort=rank").json()
+    assert rank["sort_applied"] == "view", rank
+    assert rank["sort_label"] == "播放量"
 
 
 def test_list_supports_ids_filter(client):

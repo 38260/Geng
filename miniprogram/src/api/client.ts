@@ -120,5 +120,6 @@ export const getDetail = (id: number) => request<MemeDetail>(`/api/memes/${id}`)
 export const getTrend = (id: number, window: number) =>
   request<Trend>(`/api/memes/${id}/trend`, { window });
 
-export const getVideos = (id: number, limit = 20, offset = 0) =>
-  request<VideoList>(`/api/memes/${id}/videos`, { limit, offset });
+/** 相关视频两档排法：rank = B 站搜这个词的默认（综合）顺序，view = 播放量。 */
+export const getVideos = (id: number, limit = 20, offset = 0, sort: "rank" | "view" = "rank") =>
+  request<VideoList>(`/api/memes/${id}/videos`, { limit, offset, sort });

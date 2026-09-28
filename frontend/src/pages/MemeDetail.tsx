@@ -306,15 +306,20 @@ export default function MemeDetail() {
   const [trendWindow, setTrendWindow] = useState<7 | 30>(7);
   const [trend30, setTrend30] = useState<TrendData | null>(null);
   const [videos, setVideos] = useState<VideoItem[] | null>(null);
+  // 相关视频两档排法：B 站搜这个词的默认（综合）顺序 vs 播放量
+  const [videoSort, setVideoSort] = useState<"rank" | "view">("rank");
+  const [videoSortLabel, setVideoSortLabel] = useState("");
 
   useEffect(() => {
     if (!valid) return;
     let alive = true;
-    Promise.all([api.memeTrend(memeId, 30), api.memeVideos(memeId, 3)])
+    Promise.all([api.memeTrend(memeId, 30), api.memeVideos(memeId, 3, videoSort)])
       .then(([trend, videoList]) => {
         if (!alive) return;
         setTrend30(trend);
         setVideos(videoList.items);
+        // 库里一条名次都没抓到时后端会退回播放量，标签要跟着说实话
+        setVideoSortLabel(videoList.sort_label || "");
       })
       .catch(() => {
         if (!alive) return;
@@ -324,7 +329,7 @@ export default function MemeDetail() {
     return () => {
       alive = false;
     };
-  }, [memeId, valid]);
+  }, [memeId, valid, videoSort]);
 
   const bundle = detail.data?.insight ?? EMPTY_BUNDLE;
 
@@ -443,17 +448,40 @@ export default function MemeDetail() {
               <CatchUpCards bundle={bundle} onRetry={regenerate} generating={generating} />
 
               <section id="videos">
-                <div className="mb-4 flex items-end justify-between">
+                <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
                   <h2 className="section-title">
                     <span className="grid h-[22px] w-[22px] place-items-center rounded-full bg-flare text-[10px] text-white">
                       <PlayIcon size={13} />
                     </span>
                     相关视频
+                    <span className="ml-2 text-[13px] font-normal text-ink-faint">
+                      {videoSortLabel || (videoSort === "rank" ? "B站默认排序" : "播放量")}
+                    </span>
                   </h2>
-                  <Link to="/library" className="link-quiet">
-                    查看梗库
-                    <ArrowRightIcon size={15} />
-                  </Link>
+                  <div className="flex items-center gap-3">
+                    <div className="flex rounded-full bg-rail p-1">
+                      {([
+                        { key: "rank", label: "B站默认排序" },
+                        { key: "view", label: "播放量" },
+                      ] as const).map((item) => (
+                        <button
+                          key={item.key}
+                          type="button"
+                          onClick={() => setVideoSort(item.key)}
+                          className={[
+                            "rounded-full px-3.5 py-1 text-[12px] font-semibold transition",
+                            videoSort === item.key ? "bg-flare text-white shadow-sm" : "text-ink-mute hover:text-ink",
+                          ].join(" ")}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                    <Link to="/library" className="link-quiet">
+                      查看梗库
+                      <ArrowRightIcon size={15} />
+                    </Link>
+                  </div>
                 </div>
                 {shownVideos.length ? (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">

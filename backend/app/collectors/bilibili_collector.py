@@ -242,6 +242,59 @@ class BilibiliCollector:
         stats.sort(key=lambda row: row.stat_date)
         return stats, seen, filtered_out
 
+    def _totalrank(self, meme: Meme) -> list[dict]:
+        """B 站「综合排序」（不传 order）的搜索结果，按站内名次返回。
+
+        这就是用户自己在 B 站搜这个梗看到的那个顺序，和"按播放量"是两套结果：
+        综合排序掺了相关性、UP 权重与时效，头部常是几百万播放的老稿。
+        名次取**过滤前的原始位置**，被相关性筛掉的不补位——宁可跳号，
+        也不把"站内第 7 条"谎称成第 4 条。
+        空返回跟逐日查询一样要重试（同一个接口同一个毛病）。
+        """
+        candidates = [meme.name] + [a for a in (meme.aliases or []) if a and a != meme.name][:2]
+        terms = MemeTerms.from_meme(meme)
+        threshold = settings.relevance_threshold
+        attempts = max(1, int(settings.collect_day_retries) + 1)
+
+        for term in candidates:
+            rows: list[dict] = []
+            for attempt in range(attempts):
+                try:
+                    rows = self.client.search_videos(term, pages=self.pages_per_term, order="")
+                except BilibiliBlocked:
+                    raise
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("梗「%s」综合排序查询异常（第 %d 次）：%s", term, attempt + 1, exc)
+                    rows = []
+                if rows:
+                    if attempt:
+                        log.info("梗「%s」综合排序第 %d 次才拿到结果", term, attempt + 1)
+                    break
+                time.sleep(settings.collect_retry_gap * (attempt + 1))
+            if not rows:
+                continue
+
+            ranked: list[dict] = []
+            for position, row in enumerate(rows, start=1):
+                item = parse_search_row(row)
+                if not item.get("bvid"):
+                    continue
+                score = score_text(terms, item["title"], item.get("description", ""),
+                                   [item.get("tag") or ""])
+                if score.score < threshold:
+                    continue
+                item["relevance_score"] = score.score
+                item["matched_terms"] = score.matched_terms
+                item["search_rank"] = position
+                ranked.append(item)
+            if ranked:
+                log.info(
+                    "梗「%s」综合排序：抓到 %d 条相关（站内名次 %s…%s）",
+                    meme.name, len(ranked), ranked[0]["search_rank"], ranked[-1]["search_rank"],
+                )
+                return ranked
+        return []
+
     def collect(self, meme: Meme, *, window_days: int = 30) -> CollectedBundle:
         """逐日采集 + 头部视频样本补齐，产出与 MockCollector 同构的 bundle。"""
         from app.models import Video
@@ -252,6 +305,15 @@ class BilibiliCollector:
             "梗「%s」逐日采集：%s/%s 天有内容，累计样本视频 %s 条",
             meme.name, len(active), len(stats), len(seen),
         )
+
+        # B 站综合排序那一页也进视频列表：那是用户自己在站内搜到的顺序，
+        # 头部常是逐日头部样本里根本不会出现的老稿（几百万播放那种）。
+        for item in self._totalrank(meme):
+            existing = seen.get(item["bvid"])
+            if existing is None:
+                seen[item["bvid"]] = item
+            else:
+                existing["search_rank"] = item["search_rank"]
 
         # 视频列表：按播放量取头部若干条，逐条补齐点赞/投币/收藏
         ranked = sorted(seen.values(), key=lambda item: int(item.get("view") or 0), reverse=True)
@@ -281,6 +343,7 @@ class BilibiliCollector:
                     danmaku=merged.get("danmaku", int(item.get("danmaku") or 0)),
                     relevance_score=float(item.get("relevance_score") or 0.0),
                     matched_terms=list(item.get("matched_terms") or []),
+                    search_rank=item.get("search_rank"),
                     data_source=SOURCE,
                 )
             )

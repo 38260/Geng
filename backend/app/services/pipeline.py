@@ -465,8 +465,8 @@ def collect_all(
                 session.add(stat)
             # 沿用旧观测的那些天、以及本次窗口之外的历史，样本都已经在库里：
             # 按 bvid 去重，别把同一条视频存两遍
-            kept_bvids = {
-                row.bvid
+            stored = {
+                row.bvid: row
                 for row in session.scalars(
                     select(Video).where(
                         Video.meme_id == meme.id, Video.data_source == collector.source
@@ -474,10 +474,15 @@ def collect_all(
                 )
             }
             for video in bundle.videos:
-                if video.bvid in kept_bvids:
+                existing = stored.get(video.bvid)
+                if existing is None:
+                    video.meme_id = meme.id
+                    session.add(video)
                     continue
-                video.meme_id = meme.id
-                session.add(video)
+                # 库里已有这条：只把新抓到的"B 站综合排序名次"补上。
+                # 逐日头部样本采到的视频本来就没有名次，不补的话默认排序永远是空的。
+                if video.search_rank and not existing.search_rank:
+                    existing.search_rank = video.search_rank
 
             # autoflush=False：不 flush 的话下面 recompute 读不到刚插入的行
             session.flush()

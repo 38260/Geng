@@ -89,10 +89,15 @@ def meme_videos(
     session: SessionDep,
     limit: int = Query(20, ge=1, le=50),
     offset: int = Query(0, ge=0),
+    sort: str = Query("rank", pattern="^(rank|view)$"),
 ):
-    """相关视频（已过相关性筛、按播放量排序），支持翻页。"""
+    """相关视频（已过相关性筛），支持翻页与两种排法。
+
+    ``sort=rank`` 是 B 站搜这个梗的默认（综合）顺序，``sort=view`` 是播放量。
+    库里一条名次都没抓到时，``sort_applied`` 会如实退回 ``view`` 并在 note 里说明。
+    """
     meme = _require_certified(meme_id, session)
-    return q.video_page(session, meme, limit=limit, offset=offset)
+    return q.video_page(session, meme, limit=limit, offset=offset, sort=sort)
 
 
 @router.post("/{meme_id}/insight")

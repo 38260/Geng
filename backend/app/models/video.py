@@ -56,6 +56,12 @@ class Video(Base):
     matched_terms: Mapped[list[str]] = mapped_column(JSON, default=list)
     relevance_score: Mapped[float] = mapped_column(Float, default=0.0)
 
+    # B 站"综合排序"（不传 order）里这条视频的名次，1 起。
+    # 这是站内默认列表的顺序，跟"按播放量"是两套结果：综合排序会掺进
+    # 相关性、UP 权重、时效等因素，头部往往是 9.8M 播放的老稿而不是今天的新稿。
+    # null = 这条不在我们抓到的综合列表里（比如只从逐日头部样本采到）。
+    search_rank: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+
     # mock = 演示数据；bilibili = 真实抓取
     data_source: Mapped[str] = mapped_column(String(16), default="mock")
 
@@ -87,6 +93,8 @@ class Video(Base):
             "danmaku": self.danmaku,
             "duration_seconds": self.duration_seconds,
             "relevance_score": round(self.relevance_score, 3),
+            # B 站综合排序里的名次；null 表示这条不在我们抓到的综合列表里
+            "search_rank": self.search_rank,
             "data_source": self.data_source,
             **({"meme_id": self.meme_id} if include_meme else {}),
         }

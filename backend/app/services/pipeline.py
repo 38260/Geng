@@ -86,16 +86,22 @@ def split_daily_stats(
     return kept, reuse
 
 
-def purge_previous_series(session: Session, meme: Meme, source: str, keep_days: set) -> None:
-    """删掉本次要覆盖的那些天（其他数据源的行一律清掉，演示数据不进真实序列）。"""
-    stale = session.query(MemeDailyStats).filter(
+def purge_previous_series(session: Session, meme: Meme, source: str, overwrite_days: set) -> None:
+    """只删本次真正要覆盖的那几天；其他数据源的行一律清掉（演示数据不进真实序列）。
+
+    原来这里是"删掉 keep_days 之外的所有行"，等于把没被重采的历史一起删——
+    跑一次 ``--days 1`` 就会把 30 天序列砍成 1 天，滚动窗口外的历史也永远留不下。
+    增量日更必须先修这条：只动本次覆盖到的日期。
+    """
+    session.query(MemeDailyStats).filter(
         MemeDailyStats.meme_id == meme.id, MemeDailyStats.data_source != source
-    )
-    stale.delete(synchronize_session=False)
-    stmt = session.query(MemeDailyStats).filter(MemeDailyStats.meme_id == meme.id)
-    if keep_days:
-        stmt = stmt.filter(~MemeDailyStats.stat_date.in_(keep_days))
-    stmt.delete(synchronize_session=False)
+    ).delete(synchronize_session=False)
+    if overwrite_days:
+        session.query(MemeDailyStats).filter(
+            MemeDailyStats.meme_id == meme.id,
+            MemeDailyStats.data_source == source,
+            MemeDailyStats.stat_date.in_(overwrite_days),
+        ).delete(synchronize_session=False)
     session.query(Video).filter(
         Video.meme_id == meme.id, Video.data_source != source
     ).delete(synchronize_session=False)
@@ -247,10 +253,16 @@ def _delete_other_source(session, model, meme_id: int, source: str) -> int:
     return count
 
 
-def _count_rows(session, model, meme_id: int, *, video_count_min: int | None = None) -> int:
+def _count_rows(
+    session, model, meme_id: int, *, video_count_min: int | None = None, within: set | None = None
+) -> int:
+    """数行数。``within`` 给定时只数这批日期——增量日更之后库里会留着长历史，
+    拿全表行数和"本次窗口内的行数"比会把正常累积说成"变薄了"。"""
     query = session.query(model).filter(model.meme_id == meme_id)
     if video_count_min is not None:
         query = query.filter(model.video_count >= video_count_min)
+    if within is not None:
+        query = query.filter(model.stat_date.in_(within))
     return query.count()
 
 
@@ -353,13 +365,12 @@ def collect_all(
                     log.info("梗「%s」窗口内没有可用视频，保留原数据", meme.name)
                 continue
 
-            had_days = _count_rows(session, MemeDailyStats, meme.id, video_count_min=1)
+            covered = {row.stat_date for row in bundle.daily_stats}
+            had_days = _count_rows(session, MemeDailyStats, meme.id, video_count_min=1, within=covered)
             new_days = sum(1 for stat in bundle.daily_stats if stat.video_count)
             # 已经过完的那一天只保留更好的一次观测：搜索抖动不该让一个梗从 44 分掉到 0 分
             incoming, reuse = split_daily_stats(session, meme, bundle.daily_stats, collector.source)
-            keep_days = {row.stat_date for row in bundle.daily_stats} - {
-                row.stat_date for row in incoming
-            }
+            overwrite = {row.stat_date for row in incoming}
             if had_days and new_days < had_days:
                 summary["thinned"] = int(summary["thinned"]) + 1
                 log.warning(
@@ -374,12 +385,13 @@ def collect_all(
                     meme.name, reuse,
                 )
 
-            purge_previous_series(session, meme, collector.source, keep_days)
+            purge_previous_series(session, meme, collector.source, overwrite)
 
             for stat in incoming:
                 stat.meme_id = meme.id
                 session.add(stat)
-            # 保留下来的那些天，它们的样本已经在库里：按 bvid 去重，别把同一条视频存两遍
+            # 沿用旧观测的那些天、以及本次窗口之外的历史，样本都已经在库里：
+            # 按 bvid 去重，别把同一条视频存两遍
             kept_bvids = {
                 row.bvid
                 for row in session.scalars(

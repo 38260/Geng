@@ -331,3 +331,66 @@ def test_purge_when_empty_keeps_previous_real_snapshot(certified_meme, session, 
     assert result["empty"] == 1 and result["kept_snapshots"] == 1
     assert [row.data_source for row in rows] == ["bilibili"], "真实快照留下，演示行清掉"
     assert rows[0].video_count == 3
+
+
+def test_incremental_run_keeps_history(certified_meme, session, monkeypatch):
+    """只补一天的增量跑，不许把历史砍掉。
+
+    自动日更的前提：每天只想补 T-1 那一天，不能顺手把之前 30 天删了。
+    原来 purge_previous_series 删的是"keep_days 之外的所有行"，
+    window_days=1 就会把整个序列砍成 1 天。
+    """
+    name = certified_meme.name
+    today = date.today()
+    for back in range(2, 32):
+        session.add(
+            MemeDailyStats(
+                meme_id=certified_meme.id,
+                stat_date=today - timedelta(days=back),
+                video_count=3,
+                view=30_000,
+                data_source="bilibili",
+            )
+        )
+    session.commit()
+
+    _patch_client(monkeypatch, FakeClient(rows=[_row(0, days_ago=1, title=f"{name}名场面")]))
+    result = collect_all("bilibili", meme_ids=[certified_meme.id], window_days=1)
+
+    assert result["ok"] is True and result["collected"] == 1
+    session.expire_all()
+    rows = session.query(MemeDailyStats).filter(
+        MemeDailyStats.meme_id == certified_meme.id, MemeDailyStats.data_source == "bilibili"
+    ).all()
+    assert len(rows) == 31, f"30 天历史 + 新补的 T-1，实际 {len(rows)} 行"
+    by_day = {row.stat_date: row for row in rows}
+    old = by_day[today - timedelta(days=20)]
+    assert (old.video_count, old.view) == (3, 30_000), "窗口外的历史行必须原样保留"
+    fresh = by_day[today - timedelta(days=1)]
+    assert fresh.video_count == 1 and fresh.view > 0, "本次采到的那天要写进来"
+
+
+def test_incremental_run_still_prefers_better_old_observation(certified_meme, session, monkeypatch):
+    """补采同一天时，旧观测样本更多就沿用旧的——这条规则对增量同样成立。"""
+    name = certified_meme.name
+    yesterday = date.today() - timedelta(days=1)
+    session.add(
+        MemeDailyStats(
+            meme_id=certified_meme.id,
+            stat_date=yesterday,
+            video_count=9,
+            view=900_000,
+            data_source="bilibili",
+        )
+    )
+    session.commit()
+
+    _patch_client(monkeypatch, FakeClient(rows=[_row(0, days_ago=1, title=f"{name}名场面")]))
+    result = collect_all("bilibili", meme_ids=[certified_meme.id], window_days=1)
+
+    assert result["kept_better_days"] == 1
+    session.expire_all()
+    row = session.query(MemeDailyStats).filter(
+        MemeDailyStats.meme_id == certified_meme.id, MemeDailyStats.stat_date == yesterday
+    ).one()
+    assert (row.video_count, row.view) == (9, 900_000), "更好的那次观测不能被覆盖"

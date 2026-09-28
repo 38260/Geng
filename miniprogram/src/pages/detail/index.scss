@@ -343,6 +343,18 @@
   color: $brand;
 }
 
+.video-more {
+  display: block;
+  margin-top: 12px;
+  padding: 14px 0;
+  text-align: center;
+  border-radius: $radius-tile;
+  background: $rail;
+  color: $nav;
+  font-size: 24px;
+  font-weight: 600;
+}
+
 .video-tip {
   display: block;
   margin-top: 10px;

@@ -1,12 +1,12 @@
 import { Button, Image, Text, View } from "@tarojs/components";
 import Taro, { useRouter, usePullDownRefresh, useShareAppMessage } from "@tarojs/taro";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { getDetail, getTrend } from "@/api/client";
+import { describeError, getDetail, getTrend, getVideos } from "@/api/client";
 import { TrendBars, type TrendMetric } from "@/components/TrendBars";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "@/components/States";
 import { copyText, useLoad } from "@/hooks/useLoad";
-import type { MemeDetail } from "@/types/api";
+import type { MemeDetail, VideoItem } from "@/types/api";
 import {
   catchTone,
   compact,
@@ -84,6 +84,28 @@ function IntroCard({ detail }: { detail: MemeDetail }) {
   );
 }
 
+function VideoRow({ video }: { video: VideoItem }) {
+  return (
+    <View className="video" onClick={() => copyText(video.url)}>
+      <View className="video-main">
+        <Text className="video-title">{video.title}</Text>
+        <Text className="video-sub">
+          {video.author} · {dateCn(video.publish_time)} · 相关性 {video.relevance_score.toFixed(2)}
+          {video.data_source !== "bilibili" ? " · 演示数据" : ""}
+        </Text>
+      </View>
+      <View className="video-num">
+        <Text className="video-view tabular">{video.view_text}</Text>
+        <Text className="faint tabular">{video.duration_text}</Text>
+      </View>
+    </View>
+  );
+}
+
+/** 详情页先给 4 条，其余靠展开——一次拉 20 条，展开是瞬时的，不用等第二个请求。 */
+const VIDEO_TEASER = 4;
+const VIDEO_PAGE = 20;
+
 function HeadCard({ detail }: { detail: MemeDetail }) {
   const meme = detail.meme;
   const stage = stageTone(meme.stage);
@@ -132,9 +154,47 @@ export default function Detail() {
   const id = Number(router.params.id || 0);
   const [metric, setMetric] = useState<TrendMetric>("hotness");
   const [trend30, setTrend30] = useState<MemeDetail["trend"] | null>(null);
+  const [videos, setVideos] = useState<VideoItem[]>([]);
+  const [videoTotal, setVideoTotal] = useState(0);
+  const [expanded, setExpanded] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [videoError, setVideoError] = useState<string | null>(null);
 
   const detail = useLoad(() => getDetail(id), [id]);
   const data = detail.data;
+
+  // 视频列表单独拉一次：详情接口只带 4 条，而"到底有几条"只有视频接口知道
+  useEffect(() => {
+    if (!id) return undefined;
+    let alive = true;
+    setExpanded(false);
+    setVideoError(null);
+    getVideos(id, VIDEO_PAGE, 0)
+      .then((page) => {
+        if (!alive) return;
+        setVideos(page.items);
+        setVideoTotal(page.total);
+      })
+      .catch((error) => alive && setVideoError(describeError(error)));
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  const loadMoreVideos = async () => {
+    setLoadingMore(true);
+    setVideoError(null);
+    try {
+      const page = await getVideos(id, VIDEO_PAGE, videos.length);
+      const seen = new Set(videos.map((item) => item.bvid));
+      setVideos((prev) => [...prev, ...page.items.filter((item) => !seen.has(item.bvid))]);
+      setVideoTotal(page.total);
+    } catch (error) {
+      setVideoError(describeError(error));
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   usePullDownRefresh(async () => {
     await detail.reload();
@@ -162,6 +222,7 @@ export default function Detail() {
     );
   }
 
+  const shownVideos = videos.length ? videos : (data?.videos ?? []);
   const points = metric === "hotness" ? (data?.trend.points ?? []) : (trend30?.points ?? data?.trend.points ?? []);
 
   return (
@@ -243,27 +304,33 @@ export default function Detail() {
 
           <View className="card">
             <Text className="sec-title">相关视频（按播放量）</Text>
-            {data.videos.length ? (
+            {shownVideos.length ? (
               <View>
-                {data.videos.map((video) => (
-                  <View className="video" key={video.bvid} onClick={() => copyText(video.url)}>
-                    <View className="video-main">
-                      <Text className="video-title">{video.title}</Text>
-                      <Text className="video-sub">
-                        {video.author} · {dateCn(video.publish_time)} · 相关性 {video.relevance_score.toFixed(2)}
-                        {video.data_source !== "bilibili" ? " · 演示数据" : ""}
-                      </Text>
-                    </View>
-                    <View className="video-num">
-                      <Text className="video-view tabular">{video.view_text}</Text>
-                      <Text className="faint tabular">{video.duration_text}</Text>
-                    </View>
-                  </View>
+                {(expanded ? shownVideos : shownVideos.slice(0, VIDEO_TEASER)).map((video) => (
+                  <VideoRow key={video.bvid} video={video} />
                 ))}
+                {!expanded && videoTotal > shownVideos.length ? (
+                  <Text className="video-more" onClick={() => setExpanded(true)}>
+                    展开全部 {videoTotal} 条（已加载 {shownVideos.length} 条）
+                  </Text>
+                ) : null}
+                {expanded && shownVideos.length < videoTotal ? (
+                  <Text className="video-more" onClick={loadMoreVideos}>
+                    {loadingMore ? "加载中…" : `再加载 ${Math.min(VIDEO_PAGE, videoTotal - shownVideos.length)} 条`}
+                  </Text>
+                ) : null}
+                {expanded && shownVideos.length >= videoTotal && videoTotal > VIDEO_TEASER ? (
+                  <Text className="video-more" onClick={() => setExpanded(false)}>
+                    收起
+                  </Text>
+                ) : null}
                 <Text className="faint video-tip">点一条即可复制视频地址（小程序打不开站外链接）</Text>
               </View>
             ) : (
-              <EmptyBlock title="还没有采信的视频" body="这个梗的数据还在积累，或采集时被风控挡住了。" />
+              <EmptyBlock
+                title="还没有采信的视频"
+                body={videoError || "这个梗的数据还在积累，或采集时被风控挡住了。"}
+              />
             )}
           </View>
 

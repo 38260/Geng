@@ -238,6 +238,24 @@ def on_board(hotness: HotnessSnapshot, lifecycle: LifecycleSnapshot) -> bool:
     return not board_gate_reason(hotness, lifecycle)
 
 
+def parse_ids(raw: str, *, cap: int = 100) -> list[int]:
+    """把 "1,2, 3" 解析成 [1,2,3]；非数字丢掉，超出上限截断。
+
+    小程序的收藏只存在本机，要拿实时数据只能把 id 传回来查，
+    所以列表接口得支持按 id 取——不能为了一个本地功能去存梗的副本，
+    那样收藏页会显示过期热度。
+    """
+    out: list[int] = []
+    for chunk in (raw or "").split(","):
+        chunk = chunk.strip()
+        if not chunk.isdigit():
+            continue
+        value = int(chunk)
+        if value > 0 and value not in out:
+            out.append(value)
+    return out[:cap]
+
+
 def list_memes(
     session: Session,
     *,
@@ -247,6 +265,7 @@ def list_memes(
     limit: int | None = None,
     offset: int = 0,
     scope: str = "board",
+    ids: list[int] | None = None,
 ) -> dict[str, Any]:
     """scope=board 是热榜口径（还要过"活着"门槛）；scope=all 是完整梗库。"""
     rows = _load_rows(session)
@@ -256,6 +275,10 @@ def list_memes(
         kept = [row for row in rows if on_board(row[1], row[2])]
         gated = library_total - len(kept)
         rows = kept
+
+    if ids:
+        wanted = set(ids)
+        rows = [row for row in rows if row[0].id in wanted]
 
     stages = HOME_FILTERS.get(filter_key)
     if stages:

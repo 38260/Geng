@@ -72,7 +72,18 @@ npm run build:weapp         # 产出 dist/weapp
 打开的是受限的 singlePage 环境，本机没有开发者工具无法核验，宁可不给）。
 `open-type="share"` 只在微信里生效，H5 预览上那个按钮点了没反应，属正常。
 
-## 五、响应式做法
+## 五、收藏（本机）
+
+V1 不做账号体系，所以收藏**只写在这台设备的本地存储里**：不上传、不跨端同步，
+和 Web 端 localStorage 里那份互不可见，换手机或清缓存就没了——这句话在详情页
+按钮的 toast、梗库的收藏说明、口径页的收藏卡片上都写了一遍。
+
+存的是 `{id, name, at}`，**不存梗的数据副本**：热度每天都在变，收藏页要的是实时数，
+所以列表靠 `GET /api/memes?ids=51,42` 现取（这个参数是为收藏功能加的，
+上限 100 个 id，脏输入忽略、超限截断）。入口有三处：详情页「收藏」按钮、
+梗库顶部「我的收藏 N」pill、口径页的列表与「清空本机收藏」。
+
+## 六、响应式做法
 
 - 样式里写小写 `px`，Taro 按 `designWidth: 750` 编译成 `rpx`，跟着屏宽缩放；
   不想跟着放大的（1 物理像素分割线、平板上给内容列封顶）写大写 `PX`。
@@ -80,7 +91,7 @@ npm run build:weapp         # 产出 dist/weapp
 - `@media (min-width: 500PX)` 把内容列封顶 480PX 居中，iPad/桌面大屏不会拉成横幅。
 - 数字统一 `font-variant-numeric: tabular-nums`，榜单右对齐不抖。
 
-## 六、测试
+## 七、测试
 
 ```bash
 npm test          # node --test，不引 jest/vitest
@@ -90,11 +101,14 @@ npm run build:weapp && npm run build:h5
 
 - `tests/format.test.ts`：格式化与配色映射的纯函数单测（万/亿、增长率 `—`、
   新鲜度文案、真实/演示判定、趋势归一不产生 NaN）。
+- `tests/favorites.test.ts`：收藏读写逻辑（脏数据丢弃、取消后删键、新收藏排最前）。
+  纯逻辑与 Taro 存储适配层分在 `utils/favorites.ts` / `utils/store-taro.ts` 两个文件，
+  否则顶层 `import @tarojs/taro` 会让 Node 跑不了单测。
 - `tests/contract.test.ts`：对着**真实后端**逐字段核对小程序的类型假设——
   榜单与梗库的分母关系、卡片必填字段、详情介绍不许空白、趋势窗口只收 7/30、
   采信视频都过相关性阈值。后端没起时每条各自 skip 并说明原因，不会静默假通过。
 
-## 七、这一端刻意没做什么
+## 八、这一端刻意没做什么
 
 - 没有收藏/登录：V1 不做用户体系，Web 端的收藏是 localStorage，不跨端同步。
 - 趋势图用 CSS 柱子而不是 ECharts/canvas：canvas 在 weapp 与 h5 两套实现差异大，

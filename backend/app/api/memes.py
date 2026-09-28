@@ -41,6 +41,7 @@ def list_memes(
     limit: int | None = Query(None, ge=1, le=100),
     offset: int = Query(0, ge=0),
     scope: str = Query("board", description="board=热榜（过气与死梗不进）| all=完整梗库"),
+    ids: str = Query("", max_length=600, description="只取这些 id，逗号分隔；给本机收藏列表用"),
 ):
     if filter not in HOME_FILTER_LABELS:
         raise HTTPException(status_code=400, detail=f"未知筛选：{filter}")
@@ -51,7 +52,7 @@ def list_memes(
 
     payload = q.list_memes(
         session, filter_key=filter, search=search, sort=sort, limit=limit,
-        offset=offset, scope=scope,
+        offset=offset, scope=scope, ids=q.parse_ids(ids),
     )
     return {
         **payload,

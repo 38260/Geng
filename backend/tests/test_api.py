@@ -271,6 +271,24 @@ def test_videos_pagination_reports_real_total(client, top_meme_id):
     assert client.get(f"/api/memes/{top_meme_id}/videos?offset=-1").status_code == 422
 
 
+def test_list_supports_ids_filter(client):
+    """收藏只存在本机，收藏页要靠 ids 参数拿实时数据（不能存梗的副本）。"""
+    library = client.get("/api/memes?scope=all&limit=100").json()["items"]
+    assert len(library) >= 3
+    picked = [library[0]["id"], library[2]["id"]]
+    got = client.get(f"/api/memes?scope=all&ids={picked[0]},{picked[1]}").json()
+    assert got["total"] == 2, "只应返回点名的那两个"
+    assert {row["id"] for row in got["items"]} == set(picked)
+    assert [row["hotness"] for row in got["items"]] == sorted(
+        [row["hotness"] for row in got["items"]], reverse=True
+    ), "按 id 取也要照排序规则返回"
+
+    # 垃圾输入不该让接口报错，也不该把全部梗放出来
+    junk = client.get(f"/api/memes?scope=all&ids=abc,,{picked[0]},-5,0").json()
+    assert [row["id"] for row in junk["items"]] == [picked[0]]
+    assert client.get("/api/memes?scope=all&ids=").json()["total"] == len(library), "空 ids 等于不过滤"
+
+
 def test_no_meme_detail_is_blank(client):
     """整库扫一遍：点进任何一条详情都不该看到空白介绍。"""
     items = client.get("/api/memes?scope=all&limit=100").json()["items"]

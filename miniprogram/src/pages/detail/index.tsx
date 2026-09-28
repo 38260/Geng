@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { describeError, getDetail, getTrend, getVideos } from "@/api/client";
 import { TrendBars, type TrendMetric } from "@/components/TrendBars";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "@/components/States";
+import { useFavorites } from "@/hooks/useFavorites";
 import { copyText, useLoad } from "@/hooks/useLoad";
 import type { MemeDetail, VideoItem } from "@/types/api";
 import {
@@ -106,7 +107,17 @@ function VideoRow({ video }: { video: VideoItem }) {
 const VIDEO_TEASER = 4;
 const VIDEO_PAGE = 20;
 
-function HeadCard({ detail }: { detail: MemeDetail }) {
+function HeadCard({
+  detail,
+  id,
+  favorited,
+  onToggleFavorite,
+}: {
+  detail: MemeDetail;
+  id: number;
+  favorited: boolean;
+  onToggleFavorite: () => void;
+}) {
   const meme = detail.meme;
   const stage = stageTone(meme.stage);
   const catchT = catchTone(detail.lifecycle.catch_up.status);
@@ -136,10 +147,19 @@ function HeadCard({ detail }: { detail: MemeDetail }) {
             {Math.round(detail.hotness.score)}
           </Text>
           <Text className="faint">热度</Text>
-          {/* 小程序没有"复制链接"这种入口，转发才是原生分发路径 */}
-          <Button className="head-share" openType="share">
-            分享
-          </Button>
+          <View className="head-actions">
+            {/* 收藏只写本机 storage：V1 没有账号体系，不跨端同步，界面也这么写 */}
+            <Text
+              className={`head-btn${favorited ? " head-btn-on" : ""}`}
+              onClick={onToggleFavorite}
+            >
+              {favorited ? "已收藏" : "收藏"}
+            </Text>
+            {/* 小程序没有"复制链接"这种入口，转发才是原生分发路径 */}
+            <Button className="head-btn head-btn-share" openType="share">
+              分享
+            </Button>
+          </View>
         </View>
       </View>
       <Text className="head-note">
@@ -152,6 +172,7 @@ function HeadCard({ detail }: { detail: MemeDetail }) {
 export default function Detail() {
   const router = useRouter();
   const id = Number(router.params.id || 0);
+  const favorites = useFavorites();
   const [metric, setMetric] = useState<TrendMetric>("hotness");
   const [trend30, setTrend30] = useState<MemeDetail["trend"] | null>(null);
   const [videos, setVideos] = useState<VideoItem[]>([]);
@@ -232,7 +253,12 @@ export default function Detail() {
 
       {data ? (
         <View>
-          <HeadCard detail={data} />
+          <HeadCard
+            detail={data}
+            id={id}
+            favorited={favorites.has(id)}
+            onToggleFavorite={() => favorites.toggle({ id, name: data.meme.name })}
+          />
           <IntroCard detail={data} />
 
           <View className="metrics">

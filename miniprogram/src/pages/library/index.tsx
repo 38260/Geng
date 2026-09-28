@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { listMemes } from "@/api/client";
 import { MemeRow } from "@/components/MemeCardView";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "@/components/States";
+import { useFavorites } from "@/hooks/useFavorites";
 import { usePaged } from "@/hooks/usePaged";
 
 import "./index.scss";
@@ -20,6 +21,8 @@ export default function Library() {
   const [input, setInput] = useState("");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState("hotness");
+  const [onlyFav, setOnlyFav] = useState(false);
+  const favorites = useFavorites();
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 输入停顿 400ms 才发请求：小程序里每敲一个字就打一次接口会被限流
@@ -30,8 +33,17 @@ export default function Library() {
   };
 
   const board = usePaged(
-    (offset, limit) => listMemes({ scope: "all", search, sort, limit, offset }),
-    [search, sort],
+    (offset, limit) =>
+      listMemes({
+        scope: "all",
+        search,
+        sort,
+        limit,
+        offset,
+        // 收藏是本机存的，只能把 id 传回去取实时数据；一条都没收藏时不给 ids 参数
+        ids: onlyFav ? favorites.idParam : "",
+      }),
+    [search, sort, onlyFav, favorites.count],
   );
 
   const shareTitle = useRef("B 站梗库");
@@ -65,6 +77,12 @@ export default function Library() {
       </View>
 
       <View className="pills">
+        <Text
+          className={`pill${onlyFav ? " pill-on" : ""}`}
+          onClick={() => setOnlyFav((prev) => !prev)}
+        >
+          我的收藏 {favorites.count}
+        </Text>
         {SORTS.map((item) => (
           <Text
             key={item.key}
@@ -77,15 +95,16 @@ export default function Library() {
       </View>
 
       <Text className="lib-note">
-        梗库是完整口径：包含没上热榜的过气梗与只剩残值的梗，共 {board.total || "—"} 条。
-        热榜只留还在被做的，所以这里比首页多。
+        {onlyFav
+          ? `只看本机收藏的 ${favorites.count} 个梗（收藏存在这台设备上，不跨端同步；热度是实时算的）。`
+          : `梗库是完整口径：包含没上热榜的过气梗与只剩残值的梗，共 ${board.total || "—"} 条。热榜只留还在被做的，所以这里比首页多。`}
       </Text>
 
       {board.loading ? <LoadingBlock count={4} /> : null}
       {!board.loading && board.error ? <ErrorBlock message={board.error} onRetry={board.refresh} /> : null}
       {!board.loading && !board.error && !board.items.length ? (
         <EmptyBlock
-          title={search ? `没搜到「${search}」` : "梗库是空的"}
+          title={onlyFav && !favorites.count ? "还没有收藏" : search ? `没搜到「${search}」` : "梗库是空的"}
           body={search ? "试试别名或关键词，比如「黄豆」「宗主」。" : "后端还没有可分析的梗，先在后台跑一轮采集。"}
         />
       ) : null}

@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { apiBase, getMeta, setApiBase, DEFAULT_API_BASE } from "@/api/client";
 import { ErrorBlock, LoadingBlock } from "@/components/States";
+import { useFavorites } from "@/hooks/useFavorites";
 import { useLoad } from "@/hooks/useLoad";
 import { freshnessText, isStale } from "@/utils/format";
 
@@ -20,6 +21,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 export default function About() {
   const meta = useLoad(() => getMeta(), []);
+  const favorites = useFavorites();
   const [base, setBase] = useState(apiBase());
 
   useShareAppMessage(() => ({ title: "赶梗潮：这些数字是怎么算出来的", path: "/pages/about/index" }));
@@ -76,6 +78,29 @@ export default function About() {
           <Text className="para">{t.llm_role}</Text>
         </View>
       ) : null}
+
+      <View className="card">
+        <Text className="sec">我的收藏（{favorites.count} 个）</Text>
+        <Text className="para faint">
+          V1 不做账号体系，收藏只写在这台设备的本地存储里：不上传、不跨端同步，
+          换手机或清缓存就没了。梗库页顶部可以只看收藏，热度数字仍是实时算的。
+        </Text>
+        {favorites.items.length ? (
+          <View>
+            {favorites.items.map((row) => (
+              <View className="fav-row" key={row.id}>
+                <Text className="fav-name">{row.name}</Text>
+                <Text className="faint">{row.at}</Text>
+              </View>
+            ))}
+            <Text className="fav-clear" onClick={favorites.clear}>
+              清空本机收藏
+            </Text>
+          </View>
+        ) : (
+          <Text className="para">还没有收藏。进任意一个梗的详情页点「收藏」即可。</Text>
+        )}
+      </View>
 
       <View className="card">
         <Text className="sec">后端地址（调试用）</Text>

@@ -68,20 +68,33 @@
   gap: 6px;
 }
 
-/* Taro 的 Button 自带白底边框，得先清成一行文字 */
-.head-share {
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+/* Taro 的 Button 自带白底边框，先清成和 Text 一样的一枚胶囊 */
+.head-btn,
+.head-btn:after {
   margin: 0;
   padding: 6px 18px;
   line-height: 1.4;
+  font-size: 22px;
+  border: none;
   border-radius: $radius-pill;
   background: $brand-soft;
   color: $brand-deep;
-  font-size: 22px;
-  border: none;
+}
 
-  &::after {
-    border: none;
-  }
+.head-btn::after {
+  border: none;
+}
+
+.head-btn-on {
+  background: $brand;
+  color: #fff;
 }
 
 .head-score-num {

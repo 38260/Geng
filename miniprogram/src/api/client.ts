@@ -105,6 +105,8 @@ export interface ListParams {
   search?: string;
   sort?: string;
   scope?: "board" | "all";
+  /** 逗号分隔的 id 列表：收藏页要实时数据，只能把本机存的 id 传回来查 */
+  ids?: string;
   limit?: number;
   offset?: number;
 }

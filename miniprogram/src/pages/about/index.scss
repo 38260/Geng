@@ -85,3 +85,27 @@
   color: #fff;
   font-size: 24px;
 }
+
+.fav-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1PX solid $line;
+}
+
+.fav-name {
+  font-size: 25px;
+  font-weight: 600;
+}
+
+.fav-clear {
+  display: inline-block;
+  margin-top: 14px;
+  padding: 10px 22px;
+  border-radius: $radius-pill;
+  background: $rail;
+  color: $ink-mute;
+  font-size: 22px;
+}

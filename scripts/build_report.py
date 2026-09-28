@@ -2,12 +2,14 @@
 
     python scripts/build_report.py
 
-用 LibreOffice 做 HTML→docx/pdf 的转换：这样报告只有一份 Markdown 源，
-改内容不用在 Word 里重排版；生成物（.docx 可继续编辑，.pdf 用来交）。
+docx 走 pandoc（Markdown → docx，标题层级和表格都保留，可在 Word 里继续编辑）；
+pdf 走 LibreOffice 的 HTML→pdf（本机 LibreOffice 的 docx 导出组件是坏的，
+报 `impl_store ... 0x81a`，所以 docx 不要再交给它）。
 """
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -42,6 +44,20 @@ strong { color: #0b1a33; }
 """
 
 
+def docx_via_pandoc() -> bool:
+    """pandoc 能把 Markdown 直接转成可编辑的 docx（本机 LibreOffice 不行）。"""
+    pandoc = shutil.which("pandoc")
+    if not pandoc:
+        return False
+    subprocess.run(
+        [pandoc, str(SRC), "-o", str(OUT_DIR / "开题报告.docx"),
+         "--from", "markdown", "--to", "docx",
+         "--metadata", "title=赶梗潮 开题报告"],
+        check=False, capture_output=True, timeout=240,
+    )
+    return (OUT_DIR / "开题报告.docx").exists()
+
+
 def main() -> int:
     if not SRC.exists():
         raise SystemExit(f"找不到源文件：{SRC}")
@@ -54,26 +70,27 @@ def main() -> int:
     interim = OUT_DIR / "开题报告.html"
     interim.write_text(html, encoding="utf-8")
 
+    if docx_via_pandoc():
+        produced = OUT_DIR / "开题报告.docx"
+        print(f"已生成 {produced}（{produced.stat().st_size // 1024} KB）")
+    else:
+        print(f"pandoc 不可用：用 Word/WPS 打开 {interim} → 另存为 .docx 即可，"
+              f"样式（标题层级、表格边框、字体）都在。")
+
     if not SOFFICE.exists():
-        print(f"未找到 LibreOffice（{SOFFICE}），已生成 {interim}，可手工另存为 docx/pdf")
+        print(f"未找到 LibreOffice（{SOFFICE}），pdf 未生成，可打印 {interim}")
         return 1
 
-    # 过滤器要写死：只写 "docx" 时 LibreOffice 会把 HTML 当 Writer/Web 文档而失败
+    # 过滤器要写死：只写 "pdf" 时 LibreOffice 会挑错导出组件而失败
     # subprocess 不过 shell，引号要原样给 soffice，不要再转义
-    filters = {"docx": 'docx:"MS Word 2007 XML"', "pdf": "pdf:writer_pdf_Export"}
-    for target, filt in filters.items():
-        subprocess.run(
-            [str(SOFFICE), "--headless", "--convert-to", filt, "--outdir", str(OUT_DIR), str(interim)],
-            check=False, capture_output=True, timeout=240,
-        )
-        produced = OUT_DIR / f"开题报告.{target}"
-        size = produced.stat().st_size if produced.exists() else 0
-        print(f"{'已生成' if size else '生成失败'} {produced}（{size // 1024} KB）")
-        if target == "docx" and not size:
-            # 这台机器的 LibreOffice 装不上 Writer 的 docx 导出组件（pdf 正常），
-            # 所以给出等价出路：HTML 用 Word/WPS 直接打开，另存即为 .docx。
-            print(f"        本机 docx 导出不可用：用 Word/WPS 打开 {interim} → 另存为 .docx 即可，"
-                  f"样式（标题层级、表格边框、字体）都在。")
+    subprocess.run(
+        [str(SOFFICE), "--headless", "--convert-to", "pdf:writer_pdf_Export",
+         "--outdir", str(OUT_DIR), str(interim)],
+        check=False, capture_output=True, timeout=240,
+    )
+    produced = OUT_DIR / "开题报告.pdf"
+    size = produced.stat().st_size if produced.exists() else 0
+    print(f"{'已生成' if size else '生成失败'} {produced}（{size // 1024} KB）")
     return 0
 
 

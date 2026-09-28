@@ -131,6 +131,11 @@ test("趋势与视频：窗口只接受 7/30，视频带相关性分", async (t)
   for (const video of videos.items) {
     assert.ok(video.relevance_score >= 0.5, `${video.title} 没到相关性阈值却进了采信列表`);
     assert.ok(video.view_text && video.duration_text, "视频卡要用的格式化字段不能缺");
+    // 视频行要能跳、要有封面：真实投稿必须有可打开的地址与图床封面
+    if (video.data_source === "bilibili") {
+      assert.ok(/^https:\/\/www\.bilibili\.com\/video\/BV\w+/.test(video.url), `${video.title} 的跳转地址不对：${video.url}`);
+      assert.ok(/^https:\/\/i\d\.hdslb\.com\//.test(video.cover), `${video.title} 没有真实封面：${video.cover}`);
+    }
   }
 });
 

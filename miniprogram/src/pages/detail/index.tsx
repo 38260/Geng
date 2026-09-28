@@ -2,14 +2,14 @@ import { Button, Image, Text, View } from "@tarojs/components";
 import Taro, { useRouter, usePullDownRefresh, useShareAppMessage } from "@tarojs/taro";
 import { useEffect, useRef, useState } from "react";
 
-import { openLibrarySearch } from "@/utils/nav";
+import { openLibrarySearch, openVideoUrl, videoOpensExternally } from "@/utils/nav";
 
 import { describeError, getDetail, getTrend, getVideos } from "@/api/client";
 import { TrendBars, type TrendMetric } from "@/components/TrendBars";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "@/components/States";
 import { PageBack } from "@/components/PageBack";
 import { useFavorites } from "@/hooks/useFavorites";
-import { copyText, useLoad } from "@/hooks/useLoad";
+import { useLoad } from "@/hooks/useLoad";
 import type { MemeDetail, VideoItem } from "@/types/api";
 import {
   catchTone,
@@ -70,18 +70,20 @@ function IntroCard({ detail }: { detail: MemeDetail }) {
             <View
               className="evidence-row"
               key={`${item.role}-${item.bvid}`}
-              onClick={() =>
-                item.video_url
-                  ? copyText(item.video_url)
-                  : Taro.showToast({ title: "这条证据不是真实投稿，没有链接", icon: "none" })
-              }
+              onClick={() => openVideoUrl(item.video_url || "")}
             >
               <Text className="chip chip-flare">{item.up_label}</Text>
               <Text className="evidence-title">{item.published_at ? `${item.published_at} · ` : ""}{item.video_title}</Text>
-              <Text className="evidence-copy">{item.video_url ? "复制链接" : "无链接"}</Text>
+              <Text className="evidence-copy">
+                {item.video_url ? (videoOpensExternally() ? "打开" : "复制") : "无链接"}
+              </Text>
             </View>
           ))}
-          <Text className="faint evidence-tip">小程序打不开站外链接，点一条即可复制视频地址</Text>
+          <Text className="faint evidence-tip">
+            {videoOpensExternally()
+              ? "介绍引的就是这两条解说投稿，点一条直接打开。"
+              : "微信小程序打不开站外链接，点一条把视频地址复制到剪贴板。"}
+          </Text>
         </View>
       ) : null}
     </View>
@@ -89,8 +91,25 @@ function IntroCard({ detail }: { detail: MemeDetail }) {
 }
 
 function VideoRow({ video }: { video: VideoItem }) {
+  // 封面挂了（图床 403 / 无网）也要留一块能看出是视频的东西，不能是个白框
+  const [coverFailed, setCoverFailed] = useState(false);
+  const noCover = !video.cover || coverFailed;
   return (
-    <View className="video" onClick={() => copyText(video.url)}>
+    <View className="video" onClick={() => openVideoUrl(video.url)}>
+      <View className={`video-cover${noCover ? " video-cover-none" : ""}`}>
+        {noCover ? null : (
+          <Image
+            className="video-cover-img"
+            src={video.cover}
+            mode="aspectFill"
+            lazyLoad
+            onError={() => setCoverFailed(true)}
+          />
+        )}
+        {video.duration_text ? (
+          <Text className="video-cover-duration tabular">{video.duration_text}</Text>
+        ) : null}
+      </View>
       <View className="video-main">
         <Text className="video-title">{video.title}</Text>
         <Text className="video-sub">
@@ -100,7 +119,8 @@ function VideoRow({ video }: { video: VideoItem }) {
       </View>
       <View className="video-num">
         <Text className="video-view tabular">{video.view_text}</Text>
-        <Text className="faint tabular">{video.duration_text}</Text>
+        <Text className="faint tabular">{video.danmaku_text} 弹幕</Text>
+        <Text className="video-go">{video.url ? (videoOpensExternally() ? "打开" : "复制") : "无链接"}</Text>
       </View>
     </View>
   );
@@ -358,6 +378,11 @@ export default function Detail() {
 
           <View className="card">
             <Text className="sec-title">相关视频（按播放量）</Text>
+            <Text className="faint video-hint">
+              {videoOpensExternally()
+                ? "点一条直接打开这条视频。"
+                : "点一条把地址复制到剪贴板——微信小程序打不开站外链接，去浏览器粘贴即可。"}
+            </Text>
             {shownVideos.length ? (
               <View>
                 {(expanded ? shownVideos : shownVideos.slice(0, VIDEO_TEASER)).map((video) => (
@@ -378,7 +403,7 @@ export default function Detail() {
                     收起
                   </Text>
                 ) : null}
-                <Text className="faint video-tip">点一条即可复制视频地址（小程序打不开站外链接）</Text>
+                {/* 上面那行 video-hint 已经说清点一条会怎样，不再重复一遍 */}
               </View>
             ) : (
               <EmptyBlock

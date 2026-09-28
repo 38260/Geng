@@ -24,6 +24,9 @@ class DayPoint:
     favorite: int = 0
     reply: int = 0
     danmaku: int = 0
+    # False = 这一天接口没返回（B站搜索抖动），不代表当天真的没内容。
+    # 任何"趋势/阶段"结论都不许拿它当零活动用。
+    observed: bool = True
 
     @property
     def interaction(self) -> int:
@@ -49,10 +52,16 @@ class WindowAgg:
     danmaku: int = 0
     discussion: int = 0
     active_days: int = 0
+    observed_days: int = 0          # 真正观测到的天数（不含接口空返回的洞）
 
     @property
     def is_empty(self) -> bool:
         return self.video_count == 0 and self.view == 0
+
+    @property
+    def coverage(self) -> float:
+        """窗口覆盖度：观测到的天数 / 窗口天数。"""
+        return round(self.observed_days / self.days, 3) if self.days else 0.0
 
 
 @dataclass
@@ -86,6 +95,10 @@ class Series:
                     favorite=row.favorite if row else 0,
                     reply=row.reply if row else 0,
                     danmaku=row.danmaku if row else 0,
+                    # 库里没有这一行 = 这一天没被观测过；有行但 observed=False
+                    # = 观测了但接口给了空壳。两者都不能当"当天没内容"用。
+                    # （未 flush 的行 observed 还是 None，按默认值 True 处理。）
+                    observed=(row.observed is not False) if row else False,
                 )
             )
             cursor += timedelta(days=1)
@@ -126,6 +139,7 @@ class Series:
             danmaku=sum(p.danmaku for p in chunk),
             discussion=sum(p.discussion for p in chunk),
             active_days=sum(1 for p in chunk if p.video_count > 0 or p.view > 0),
+            observed_days=sum(1 for p in chunk if p.observed),
         )
 
 

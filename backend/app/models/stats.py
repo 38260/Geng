@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from .meme import Meme
 
-from sqlalchemy import Date, Float, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import Boolean, Date, Float, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
@@ -41,6 +41,12 @@ class MemeDailyStats(Base):
 
     # B 站搜索给出的该日结果总数（含模糊匹配，仅作"讨论面有多宽"的辅助信号）
     search_total: Mapped[int] = mapped_column(Integer, default=0)
+
+    # 这一天到底"看到了没有"。B 站匿名搜索会随机返回空壳（实测命中率约 40%），
+    # 空壳写进来就是 video_count=0，跟"当天真的没人做这个梗"完全一样，
+    # 于是增长和阶段判的全是接口抖动。observed=False 的行只表示"没观测到"，
+    # 任何趋势结论都不许拿它当零活动用。
+    observed: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
 
     # 当日热度指数（0-100），由算法预计算，接口不再现算
     hotness: Mapped[float] = mapped_column(Float, default=0.0)

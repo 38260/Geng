@@ -76,7 +76,8 @@ def test_health_and_meta(client):
     assert payload["data_lag_days"] >= 0
     assert "不含今天" in payload["transparency"]["sampling"] or payload["is_demo"]
     assert [f["key"] for f in payload["filters"]] == ["all", "hot", "taking_off", "receding"]
-    assert len(payload["lifecycle_stages"]) == 6
+    # 六个真实阶段 + 一个「数据不足」闸门态
+    assert len(payload["lifecycle_stages"]) == 7
     assert payload["transparency"]["data_platform"] == "Bilibili"
     assert payload["transparency"]["certification"] == ["梗百科", "梗指南"]
 
@@ -209,9 +210,9 @@ def test_detail_shape(client, top_meme_id):
     for value in payload["hotness"]["components"].values():
         assert 0 <= value <= 100
 
-    # 生命周期六态，且只有一个"现在"
+    # 生命周期六态 + 「数据不足」闸门态，且只有一个"当前所处"
     stages = payload["lifecycle"]["stages"]
-    assert len(stages) == 6
+    assert len(stages) == 7
     assert sum(1 for stage in stages if stage["active"]) == 1
     assert payload["lifecycle"]["reasons"]
 

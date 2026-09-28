@@ -92,12 +92,13 @@ BOARD_HIDE_OBSOLETE = True
 # Lifecycle classification
 # --------------------------------------------------------------------------- #
 LIFECYCLE_STAGES = [
-    "sprouting",   # 🌱 萌芽期
-    "rising",      # 📈 上升期
-    "explosive",   # 🔥 爆发期
-    "plateau",     # 🌊 平稳期
-    "receding",    # 📉 退潮期
-    "obsolete",    # 🪦 过气
+    "sprouting",     # 🌱 萌芽期
+    "rising",        # 📈 上升期
+    "explosive",     # 🔥 爆发期
+    "plateau",       # 🌊 平稳期
+    "receding",      # 📉 退潮期
+    "obsolete",      # 🪦 过气
+    "insufficient",  # 数据不足：窗口里洞太多，趋势结论没有地基
 ]
 
 LIFECYCLE_LABELS = {
@@ -107,6 +108,7 @@ LIFECYCLE_LABELS = {
     "plateau": "平稳期",
     "receding": "退潮期",
     "obsolete": "过气",
+    "insufficient": "数据不足",
 }
 
 LIFECYCLE_EMOJI = {
@@ -116,6 +118,7 @@ LIFECYCLE_EMOJI = {
     "plateau": "🌊",
     "receding": "📉",
     "obsolete": "🪦",
+    "insufficient": "",
 }
 
 
@@ -160,6 +163,12 @@ class LifecycleThresholds:
     # 🌊 平稳：以上都不命中（|增长| 很小）
     plateau_band: float = 0.12
 
+    # 数据不足闸门：最近 7 天里真正观测到几天，才允许谈"阶段/赶来不及"。
+    # B 站匿名搜索会随机把有内容的日子返回成空壳（实测单次命中率约 40%），
+    # 洞太多时增长与退潮判的都是接口抖动，不是梗本身。
+    # 这条只管趋势结论，不管热度排序与上榜门槛——那用的是存量水平，同一把尺子。
+    min_observed_days: int = 4
+
 
 LIFECYCLE_THRESHOLDS = LifecycleThresholds()
 
@@ -189,9 +198,11 @@ CATCHUP_LABELS = {
     "can_catch": "还来得及",
     "caution": "慎赶",
     "too_late": "你来晚了",
+    # 第四个值不是"结论"，是闸门：趋势没观测够就不给结论。
+    "insufficient": "说不准",
 }
 
-CATCHUP_EMOJI = {"can_catch": "🟢", "caution": "🟡", "too_late": "🔴"}
+CATCHUP_EMOJI = {"can_catch": "🟢", "caution": "🟡", "too_late": "🔴", "insufficient": "⚪"}
 
 # Homepage filter chips -> the lifecycle/heat set they select.
 HOME_FILTERS = {

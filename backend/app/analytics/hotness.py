@@ -143,6 +143,13 @@ def compute_hotness(series: Series, *, end_index: int | None = None) -> HotnessR
         # 和近 7 天头部样本播放合计（PRIMARY_WINDOW=7，所以下面的 view 就是近 7 天）。
         "active_days": sum(1 for point in sub.points if point.video_count > 0),
         "series_days": len(sub.points),
+        # 覆盖度：近 7 天里真正观测到几天。B站搜索会把有内容的日子随机返回成空壳，
+        # 所以"7 天合计"这种数必须先说清是几天观测出来的，否则界面就会拿
+        # 2 天的合计去跟另外 2 天的合计比增长。
+        "observed_days": cur.observed_days,
+        "window_days_observed": PRIMARY_WINDOW,
+        "coverage": cur.coverage,
+        "prev_observed_days": prev.observed_days,
         "view": cur.view,
         "interaction": cur.interaction,
         "video_count": cur.video_count,

@@ -137,6 +137,42 @@ class BilibiliCollector:
                 )
         return best or ([], {}, 0)
 
+    def _search_day(
+        self, term: str, *, begin: datetime, end: datetime
+    ) -> tuple[list[dict], int, bool]:
+        """查一个发布区间，返回 (原始行, B站报的总数, 这一天到底观测到没有)。
+
+        B 站匿名搜索对同一个词、同一天会随机返回空壳（实测逐日 15 天 × 2 次，
+        30 次只有 12 次有货，且同一天两次能一次 20 条一次 0 条）。空壳不等于
+        "当天没人做这个梗"，所以拿到空结果要重试；几次都空就如实标 observed=False，
+        让上层知道这是洞、不是零。
+
+        注意：拿到行但全被相关性过滤掉，算**真观测到零活动**（返回行 > 0），
+        不在这个函数里管。
+        """
+        attempts = max(1, int(settings.collect_day_retries) + 1)
+        day = begin.date()
+        rows: list[dict] = []
+        total = 0
+        for attempt in range(attempts):
+            try:
+                rows, total = self.client.search_range(term, begin=begin, end=end, order="click")
+            except BilibiliBlocked:
+                raise                      # 被风控是全局状态，交给上层决定停不停
+            except Exception as exc:  # noqa: BLE001 - 单日失败不该毁掉整条序列
+                log.warning("梗「%s」%s 查询异常（第 %d 次）：%s", term, day, attempt + 1, exc)
+                rows, total = [], 0
+            if rows:
+                if attempt:
+                    log.info(
+                        "梗「%s」%s 重试第 %d 次才拿到 %d 条（B站搜索抖动）",
+                        term, day, attempt + 1, len(rows),
+                    )
+                return rows, total, True
+            if attempt < attempts - 1:
+                time.sleep(settings.collect_retry_gap * (attempt + 1))
+        return [], total, False
+
     def _daily_pass(
         self, meme: Meme, term: str, *, window_days: int = 30
     ) -> tuple[list, dict, int]:
@@ -162,13 +198,10 @@ class BilibiliCollector:
             begin = datetime.combine(day, _time.min)
             end = begin + timedelta(days=1)
             try:
-                rows, total = self.client.search_range(term, begin=begin, end=end, order="click")
+                rows, total, observed = self._search_day(term, begin=begin, end=end)
             except BilibiliBlocked as exc:
                 log.warning("梗「%s」%s 采集被拒：%s", term, day, exc)
                 raise
-            except Exception as exc:  # noqa: BLE001 - 单日失败不该毁掉整条序列
-                log.warning("梗「%s」%s 查询异常：%s", term, day, exc)
-                rows, total = [], 0
 
             parsed = []
             for row in rows:
@@ -200,6 +233,7 @@ class BilibiliCollector:
                     reply=sum(int(item.get("reply") or 0) for item in parsed),
                     danmaku=sum(int(item.get("danmaku") or 0) for item in parsed),
                     search_total=total,
+                    observed=observed,
                     data_source=SOURCE,
                 )
             )

@@ -53,9 +53,18 @@ class MemeMetrics:
     data_version: str
 
 
-def _quality(row: MemeDailyStats) -> tuple[int, int]:
-    """同一天两次采集谁更好：先看头部样本条数，再看合计播放量。"""
-    return (int(row.video_count or 0), int(row.view or 0))
+def _quality(row: MemeDailyStats) -> tuple[int, int, int]:
+    """同一天两次采集谁更好：**先看到没看到**，再看头部样本条数，最后看合计播放量。
+
+    第一位是后加的：B 站搜索抖动会让一次采集把有内容的日子返回成空壳，
+    如果只比 video_count，空壳 (0,0) 和"当天真的没人做"的 (0,0) 一样好，
+    于是新采的一次空返回就能把上次真正观测到的那天覆盖掉。
+    """
+    return (
+        1 if getattr(row, "observed", True) else 0,
+        int(row.video_count or 0),
+        int(row.view or 0),
+    )
 
 
 def split_daily_stats(

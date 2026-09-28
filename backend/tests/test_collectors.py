@@ -446,3 +446,101 @@ def test_explicit_ids_bypass_scope(session, monkeypatch, certified_meme):
     assert result["targets"] == 1
     assert "不套 scope" in str(result["scope_note"])
     assert result["collected"] == 1
+
+
+class FlakyClient(FakeClient):
+    """按"第几次请求这一天"决定给不给货，用来复现 B 站搜索的空壳抖动。
+
+    实测：同一个词同一天连打两次，能一次返回 20 条、一次返回 0 条，
+    而两种情况在返回体里长得一模一样（HTTP 200 + 空 result）。
+    """
+
+    def __init__(self, *, rows=None, give_on: int = 2):
+        super().__init__(rows=rows)
+        self.give_on = give_on
+        self.attempts: dict[str, int] = {}
+
+    def search_range(self, keyword, *, begin, end, order="click", page=1, page_size=20):
+        key = f"{keyword}@{begin.date()}"
+        self.attempts[key] = self.attempts.get(key, 0) + 1
+        rows = [
+            row for row in self.rows
+            if begin.timestamp() <= row["pubdate"] < end.timestamp()
+        ]
+        if self.attempts[key] < self.give_on or not rows:
+            return [], 0                 # 空壳：接口没给这一天的数据
+        return rows[:page_size], len(rows)
+
+
+def test_flaky_day_is_retried_and_recovered(certified_meme, monkeypatch):
+    """第二次才给货的日子，必须被记成"观测到了"，而不是留一个 0。"""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "collect_day_retries", 2, raising=False)
+    name = certified_meme.name
+    client = FlakyClient(rows=[_row(0, days_ago=2, title=f"{name}名场面")], give_on=2)
+    collector = BilibiliCollector(client=client, request_gap=0, enrich_limit=2)
+    bundle = collector.collect(certified_meme, window_days=5)
+
+    day2 = [s for s in bundle.daily_stats if s.video_count > 0]
+    assert len(day2) == 1, "重试拿到内容的那天应该有数"
+    assert day2[0].observed is True
+    assert client.attempts[f"{name}@{day2[0].stat_date}"] == 2, "应该是第二次请求才拿到"
+
+
+def test_all_empty_days_marked_unobserved_not_zero(certified_meme, monkeypatch):
+    """几次都空的日子要标 observed=False：它是洞，不是"当天没人做这个梗"。"""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "collect_day_retries", 2, raising=False)
+    collector = BilibiliCollector(client=FakeClient(rows=[]), request_gap=0, enrich_limit=2)
+    bundle = collector.collect(certified_meme, window_days=5)
+
+    assert len(bundle.daily_stats) == 5, "窗口骨架仍然要跑满"
+    assert all(row.observed is False for row in bundle.daily_stats), "全是空壳，一天都没观测到"
+    assert all(row.video_count == 0 for row in bundle.daily_stats)
+
+
+def test_filtered_out_content_still_counts_as_observed(certified_meme, monkeypatch):
+    """接口给了行、但全被相关性过滤掉 —— 这是"观测到了，当天确实没人做"，不是洞。"""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "collect_day_retries", 2, raising=False)
+    rows = [_row(0, days_ago=2, title="完全无关的其它内容标题")]
+    collector = BilibiliCollector(client=FakeClient(rows=rows), request_gap=0, enrich_limit=2)
+    bundle = collector.collect(certified_meme, window_days=5)
+
+    hit = next(s for s in bundle.daily_stats if s.search_total)
+    assert hit.observed is True
+    assert hit.video_count == 0, "无关内容不能进统计，但这一天确实被观测过"
+
+
+def test_unobserved_row_never_overwrites_real_observation(session, certified_meme):
+    """同日合并：一次空返回不许把上次真正观测到的那天盖掉。"""
+    from app.services.pipeline import split_daily_stats
+
+    day = date.today() - timedelta(days=3)
+    stored = MemeDailyStats(
+        meme_id=certified_meme.id, stat_date=day, video_count=14, creator_count=12,
+        view=1_400_000, reply=100, danmaku=50, search_total=900,
+        data_source="bilibili", observed=True,
+    )
+    session.add(stored)
+    session.flush()
+
+    hole = MemeDailyStats(
+        meme_id=certified_meme.id, stat_date=day, video_count=0, creator_count=0,
+        view=0, data_source="bilibili", observed=False,
+    )
+    incoming, reuse = split_daily_stats(session, certified_meme, [hole], "bilibili")
+
+    assert reuse == 1 and incoming == [], "空壳不许覆盖真观测"
+    # 反过来：真观测要能盖掉之前的空壳
+    stored.observed, stored.video_count, stored.view = False, 0, 0
+    session.flush()
+    good = MemeDailyStats(
+        meme_id=certified_meme.id, stat_date=day, video_count=9, creator_count=8,
+        view=300_000, data_source="bilibili", observed=True,
+    )
+    incoming, reuse = split_daily_stats(session, certified_meme, [good], "bilibili")
+    assert reuse == 0 and incoming == [good], "补到的真观测必须写进去"

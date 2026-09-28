@@ -11,6 +11,9 @@ os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 os.environ["DATA_SOURCE"] = "mock"
 os.environ["LLM_API_KEY"] = ""
 os.environ["APP_ENVIRONMENT"] = "Test"
+# 逐日采集的空返回重试是真 sleep（生产要躲风控），测试里绝不能睡：
+# 一个 30 天窗口的用例会因此多花 100 秒以上。重试次数保留，间隔归零。
+os.environ["COLLECT_RETRY_GAP"] = "0"
 
 from datetime import date, datetime, timedelta  # noqa: E402
 

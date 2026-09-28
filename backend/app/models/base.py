@@ -114,6 +114,16 @@ def ensure_schema() -> list[str]:
                 conn.execute(text(f"ALTER TABLE {table.name} ADD COLUMN {column.name} {column_type} DEFAULT {default}"))
             added.append(f"{table.name}.{column.name}")
 
+    if "meme_daily_stats.observed" in added:
+        # 老库里那一列是刚补出来的，默认全 1；但旧采集器分不清"接口给了空壳"和
+        # "当天真的没人做"，那些 video_count=0 且 search_total=0 的行其实是我们没看见。
+        # 如实地把它们标成未观测，否则第一次重算会拿这些洞去判退潮。
+        with engine.begin() as conn:
+            conn.execute(text(
+                "UPDATE meme_daily_stats SET observed = 0"
+                " WHERE data_source = 'bilibili' AND video_count = 0 AND search_total = 0"
+            ))
+
     if added:
         from app.config import get_logger
 

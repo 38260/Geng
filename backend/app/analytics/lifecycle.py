@@ -22,8 +22,9 @@ class LifecycleInput:
     activity: int = 0            # 近 7 天新增相关视频数
     view_7d: int = 0
     peak_heat: float = 0.0       # 30 天内滚动热度峰值
-    stale_days: int = 0          # 距今多少天没有新内容
+    stale_days: int = 0          # 距今多少天没有新内容（只数真正观测到的日子）
     active_days_7: int = 0
+    observed_days_7: int = 0     # 近 7 天里真正观测到几天，其余是接口的洞
     declining_days: int = 0      # 热度连续下滑的天数（末尾连续）
     window_days: int = 30
 
@@ -67,7 +68,9 @@ def build_input(
     for point in reversed(series.points):
         if point.video_count > 0:
             break
-        stale_days += 1
+        # 接口没返回的日子不算"没有新内容"，只算"不知道"——不能拿洞去判过气
+        if point.observed:
+            stale_days += 1
 
     peak = max(daily_hotness) if daily_hotness else heat
     declining = 0
@@ -84,6 +87,7 @@ def build_input(
         peak_heat=peak,
         stale_days=stale_days,
         active_days_7=sum(1 for p in last7 if p.video_count > 0),
+        observed_days_7=sum(1 for p in last7 if p.observed),
         declining_days=declining,
         window_days=len(series.points),
     )
@@ -103,6 +107,16 @@ def classify(inp: LifecycleInput) -> LifecycleResult:
             emoji=LIFECYCLE_EMOJI[stage],
             reasons=reasons,
             indicators={**asdict(inp), "peak_gap": round(peak_gap, 3)},
+        )
+
+    # 数据不足：窗口里洞太多，后面每一条规则拿到的 activity/view_7d/stale_days
+    # 都是被空洞压低过的数，判出来的"退潮/过气"其实是接口抖动（「琵琶曲」-62% 就是这么来的）。
+    # 宁可不给结论，也不给一个建在空洞上的结论。
+    if inp.observed_days_7 < t.min_observed_days:
+        return _make(
+            "insufficient",
+            f"最近 7 天只观测到 {inp.observed_days_7} 天数据，趋势说不准（B站搜索接口对同一天"
+            f"会随机返回空结果，观测不够时不给阶段结论）",
         )
 
     # 🪦 过气
@@ -172,6 +186,7 @@ NICKNAMES = {
     "plateau": "平稳期",
     "receding": "退潮中",
     "obsolete": "考古区",
+    "insufficient": "数据不足",
 }
 
 

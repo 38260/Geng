@@ -39,8 +39,8 @@ def _name_key(name: str) -> str:
     return (name or "").strip().lower()
 
 
-def _quality_of(video_count: int, view: int) -> tuple[int, int]:
-    return _quality(SimpleNamespace(video_count=video_count, view=view))
+def _quality_of(video_count: int, view: int, observed: bool = True) -> tuple[int, int, int]:
+    return _quality(SimpleNamespace(video_count=video_count, view=view, observed=observed))
 
 
 def snapshot_stats(path: Path, source: str) -> dict[str, dict[date, dict]]:
@@ -90,16 +90,18 @@ def build_plan(session: Session, snapshot: dict[str, dict[date, dict]], source: 
             quality = _quality_of(values["video_count"], values["view"])
             row = live.get(day)
             if row is not None:
-                if _quality_of(row.video_count, row.view) >= quality:
+                # 线上那行是接口空壳（observed=False）时，快照里有内容就该盖回去
+                if _quality_of(row.video_count, row.view, row.observed is not False) >= quality:
                     continue
                 action, before = "update", (row.video_count, row.view)
             else:
-                if quality == (0, 0):
+                if (values["video_count"], values["view"]) == (0, 0):
                     continue        # 空的一天不值得补
                 action, before = "insert", (0, 0)
             plan.append({
                 "meme_id": meme.id, "name": meme.name, "day": day, "action": action,
-                "before": before, "after": quality, "values": values,
+                "before": before, "after": (values["video_count"], values["view"]),
+                "values": values,
             })
     return plan
 

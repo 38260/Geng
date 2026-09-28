@@ -58,8 +58,10 @@ def test_every_stage_returns_label_emoji_and_indicators(archetype):
 def test_obsolete_when_no_content_for_two_weeks():
     from app.analytics.lifecycle import LifecycleInput
 
+    # observed_days_7=7：这七天每天都真去看过了，确实一条新内容都没有。
+    # 要是没观测（接口给空壳），下面该判的是「数据不足」而不是「过气」。
     inp = LifecycleInput(heat=6.0, growth=0.0, activity=0, view_7d=0,
-                         peak_heat=40.0, stale_days=21, active_days_7=0)
+                         peak_heat=40.0, stale_days=21, active_days_7=0, observed_days_7=7)
     assert classify(inp).stage == "obsolete"
 
 
@@ -68,7 +70,8 @@ def test_plateau_is_not_called_receding_by_small_wobble():
     from app.analytics.lifecycle import LifecycleInput
 
     inp = LifecycleInput(heat=44.0, growth=-0.05, activity=21, view_7d=300_000,
-                         peak_heat=47.0, stale_days=0, active_days_7=7, declining_days=2)
+                         peak_heat=47.0, stale_days=0, active_days_7=7, observed_days_7=7,
+                         declining_days=2)
     assert classify(inp).stage == "plateau"
 
 
@@ -76,11 +79,44 @@ def test_explosive_needs_both_height_and_steep_growth():
     from app.analytics.lifecycle import LifecycleInput
 
     steep_and_high = LifecycleInput(heat=92.0, growth=1.6, activity=180, view_7d=5_000_000,
-                                    peak_heat=93.0, stale_days=0, active_days_7=7)
+                                    peak_heat=93.0, stale_days=0, active_days_7=7,
+                                    observed_days_7=7)
     fast_but_small = LifecycleInput(heat=40.0, growth=1.6, activity=180, view_7d=5_000_000,
-                                    peak_heat=41.0, stale_days=0, active_days_7=7)
+                                    peak_heat=41.0, stale_days=0, active_days_7=7,
+                                    observed_days_7=7)
     assert classify(steep_and_high).stage == "explosive"
     assert classify(fast_but_small).stage == "rising"
+
+
+def test_sparse_observation_refuses_a_trend_verdict():
+    """「琵琶曲」那种序列：7 天里只观测到 2 天，其余是接口空壳。
+
+    这时 activity/view_7d 都是被洞压低过的数，判退潮、判过气都等于把抖动
+    当成结论。宁可不给结论。
+    """
+    from app.analytics.lifecycle import LifecycleInput
+    from app.analytics.catch_up import INSUFFICIENT, decide
+    from app.config import LIFECYCLE_THRESHOLDS
+
+    holey = LifecycleInput(heat=49.5, growth=-0.62, activity=26, view_7d=6_315_597,
+                           peak_heat=80.1, stale_days=0, active_days_7=2, observed_days_7=2)
+    result = classify(holey)
+    assert result.stage == "insufficient"
+    assert LIFECYCLE_THRESHOLDS.min_observed_days > holey.observed_days_7
+    assert "观测" in result.reasons[0]
+    # 同一个梗即使热度分数照旧，趋势结论也必须被闸门挡住
+    verdict = decide(holey, stage=result.stage, heat=holey.heat, growth=holey.growth,
+                     peak_gap=holey.peak_gap)
+    assert verdict.status == INSUFFICIENT and verdict.confidence == 0.0
+
+
+def test_full_observation_still_gets_a_real_verdict():
+    """补够观测天数，同样的数字就该正常给结论——闸门不能变成万能挡箭牌。"""
+    from app.analytics.lifecycle import LifecycleInput
+
+    inp = LifecycleInput(heat=49.5, growth=-0.62, activity=26, view_7d=6_315_597,
+                         peak_heat=80.1, stale_days=0, active_days_7=6, observed_days_7=7)
+    assert classify(inp).stage == "receding"
 
 
 def test_nickname_uses_playful_wording_for_fast_risers():

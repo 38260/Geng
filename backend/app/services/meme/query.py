@@ -202,6 +202,12 @@ def card_payload(
         "catch_label": lifecycle.catch_label or CATCHUP_LABELS.get(lifecycle.catch_status, ""),
         "catch_reason": lifecycle.catch_reason,
         "catch_confidence": round(lifecycle.catch_confidence, 2),
+        # 覆盖度自解释：卡片上那几个百分比是"几天观测出来的"必须能查到，
+        # 否则用户没法分辨"-62%"是真跌还是接口给了几个空壳。
+        "observed_days": metrics.get("observed_days"),
+        "observed_window_days": metrics.get("window_days"),
+        "coverage": metrics.get("coverage"),
+        "prev_observed_days": metrics.get("prev_observed_days"),
         "thumbnail": thumbnail_for(meme, real_cover),
         "meme_data_source": meme.data_source or settings.data_source,
         "verification_state": meme.verification_state or "unverified",
@@ -221,6 +227,10 @@ def board_gate_reason(hotness: HotnessSnapshot, lifecycle: LifecycleSnapshot) ->
     准入（并集）只解决"这是不是个真梗"；热榜还要回答"今天玩什么"，
     所以过气的、以及 30 天里几乎没内容的都要挡在外面——但脉冲型梗例外：
     天数少不代表不火，近 7 天头部播放够大就照样上榜。
+
+    注意 ``insufficient``（数据不足）这个状态**不参与门槛**：门槛看的是存量水平
+    （近 7 天头部播放），跨梗用的是同一把尺子，偏差共通；被观测洞影响的是
+    "涨还是退"这类趋势结论，那个由生命周期闸门去管。
     """
     if not settings.leaderboard_gate:
         return ""
@@ -353,19 +363,25 @@ def _metric_block(session: Session, meme: Meme, hotness: HotnessSnapshot) -> dic
 
 def trend_payload(session: Session, meme_id: int, window: int) -> dict[str, Any]:
     rows = _daily_rows(session, meme_id, window)
+    points = [
+        {
+            "date": row.stat_date.isoformat(),
+            "hotness": round(row.hotness, 1),
+            "view": row.view,
+            "discussion": row.discussion,
+            "video_count": row.video_count,
+            "creator_count": row.creator_count,
+            # false = 这天接口给了个空壳，画图上必须跟"真的是 0"分开画
+            "observed": row.observed is not False,
+        }
+        for row in rows
+    ]
+    observed_days = sum(1 for point in points if point["observed"])
     return {
         "window": window,
-        "points": [
-            {
-                "date": row.stat_date.isoformat(),
-                "hotness": round(row.hotness, 1),
-                "view": row.view,
-                "discussion": row.discussion,
-                "video_count": row.video_count,
-                "creator_count": row.creator_count,
-            }
-            for row in rows
-        ],
+        "observed_days": observed_days,
+        "coverage": round(observed_days / len(points), 2) if points else 0.0,
+        "points": points,
     }
 
 

@@ -1,6 +1,8 @@
 """赶梗判断：现在赶这个梗还来得及吗？
 
-状态只能落在三个枚举上：``can_catch`` / ``caution`` / ``too_late``。
+结论落在三个枚举上：``can_catch`` / ``caution`` / ``too_late``。
+另有第四个值 ``insufficient``——它不是结论，是**闸门**：最近 7 天真正观测到的
+天数不够时，宁可不给结论，也不给一个建在接口空洞上的结论。
 
 **由算法决定，不由 LLM 决定。** LLM 只拿到这里算好的指标，把结论讲成人话；
 LLM 不可用时，本模块给出的规则文案也能直接把卡片填满，产品不瘸腿。
@@ -16,6 +18,8 @@ from app.config import CATCHUP_EMOJI, CATCHUP_LABELS, CATCHUP_THRESHOLDS
 from .lifecycle import LifecycleInput
 
 STATUSES = ("can_catch", "caution", "too_late")
+# 闸门值：出现在观测天数不足时，不属于"结论"
+INSUFFICIENT = "insufficient"
 
 
 @dataclass
@@ -55,6 +59,30 @@ def decide(
     g = 0.0 if growth is None else growth
     stability = _stability(inp)
     margin = 0.0
+
+    # 闸门：观测天数不够就不给结论。这里的 confidence 必须是 0，
+    # 界面上"置信度 0"就是"算法没敢说"，不能显示成 0% 把握的某种判断。
+    if stage == "insufficient":
+        return CatchUpResult(
+            status=INSUFFICIENT,
+            label=CATCHUP_LABELS[INSUFFICIENT],
+            emoji=CATCHUP_EMOJI[INSUFFICIENT],
+            reason=(
+                f"最近 7 天只观测到 {inp.observed_days_7} 天数据，说不准是在涨还是在退。"
+                f"先等采集把洞补上再决定赶不赶。"
+            ),
+            confidence=0.0,
+            indicators={
+                "stage": stage,
+                "heat": round(heat, 1),
+                "growth": None if growth is None else round(growth, 3),
+                "peak_gap": round(peak_gap, 3),
+                "creator_growth": None if creator_growth is None else round(creator_growth, 3),
+                "stability": round(stability, 2),
+                "observed_days_7": inp.observed_days_7,
+                "rule": "insufficient_data",
+            },
+        )
 
     if stage == "obsolete":
         status, reason = "too_late", "这个梗已经没什么人做了，现在赶上去会被当成考古。"

@@ -57,9 +57,7 @@ export function MemeCardView({
             </Text>
           </View>
           <View className="row meme-chips">
-            <Text className={`chip ${stage.chip}`}>
-              {meme.emoji} {meme.nickname}
-            </Text>
+            <Text className={`chip ${stage.chip}`}>{meme.nickname}</Text>
             <Text className={`chip ${catchT.chip}`}>{meme.catch_label}</Text>
           </View>
           {meme.description || meme.catch_reason ? (

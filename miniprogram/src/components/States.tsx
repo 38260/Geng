@@ -25,7 +25,6 @@ export function LoadingBlock({ count = 3 }: { count?: number }) {
 export function ErrorBlock({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <View className="card state-card">
-      <Text className="state-emoji">📡</Text>
       <Text className="state-title">没拿到数据</Text>
       <Text className="state-body">{message}</Text>
       {onRetry ? (
@@ -40,7 +39,6 @@ export function ErrorBlock({ message, onRetry }: { message: string; onRetry?: ()
 export function EmptyBlock({ title, body }: { title: string; body?: string }) {
   return (
     <View className="card state-card">
-      <Text className="state-emoji">🫥</Text>
       <Text className="state-title">{title}</Text>
       {body ? <Text className="state-body">{body}</Text> : null}
     </View>

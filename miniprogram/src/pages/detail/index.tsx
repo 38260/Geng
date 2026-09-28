@@ -35,7 +35,7 @@ function IntroCard({ detail }: { detail: MemeDetail }) {
   return (
     <View className="card">
       <View className="row-between">
-        <Text className="sec-title">📖 这个梗是什么</Text>
+        <Text className="sec-title">这个梗是什么</Text>
         <Text className={`chip ${introTone(intro.source)}`} onClick={() => intro.note && Taro.showToast({ title: intro.note, icon: "none" })}>
           {intro.source_label}
         </Text>
@@ -182,7 +182,7 @@ export default function Detail() {
 
           <View className="card">
             <View className="row-between">
-              <Text className="sec-title">🔥 趋势</Text>
+              <Text className="sec-title">趋势</Text>
               <View className="seg">
                 {(["hotness", "view", "discussion"] as TrendMetric[]).map((key) => (
                   <Text
@@ -199,7 +199,7 @@ export default function Detail() {
           </View>
 
           <View className="card">
-            <Text className="sec-title">🧬 生命周期</Text>
+            <Text className="sec-title">生命周期</Text>
             <View className="stages">
               {data.lifecycle.stages.map((step) => (
                 <View key={step.key} className={`stage${step.active ? " stage-on" : ""}`}>
@@ -219,7 +219,7 @@ export default function Detail() {
 
           <View className="card">
             <View className="row-between">
-              <Text className="sec-title">🏃 现在赶这个梗？</Text>
+              <Text className="sec-title">现在赶这个梗？</Text>
               <Text className={`chip ${catchTone(data.lifecycle.catch_up.status).chip}`}>
                 {data.lifecycle.catch_up.label}
               </Text>
@@ -233,7 +233,7 @@ export default function Detail() {
           </View>
 
           <View className="card">
-            <Text className="sec-title">🎬 相关视频（按播放量）</Text>
+            <Text className="sec-title">相关视频（按播放量）</Text>
             {data.videos.length ? (
               <View>
                 {data.videos.map((video) => (
@@ -259,7 +259,7 @@ export default function Detail() {
           </View>
 
           <View className="card">
-            <Text className="sec-title">🧭 这条数据怎么来的</Text>
+            <Text className="sec-title">这条数据怎么来的</Text>
             <Text className="cert-line">
               准入（并集）：梗百科为主、梗指南补充，任一 UP 主在最近 {data.certification.cert_window_days} 天里
               真实介绍过就进梗库；两位都介绍过的标「双 UP 认证」。

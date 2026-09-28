@@ -1,7 +1,18 @@
 .sec-title {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 29px;
   font-weight: 800;
+
+  /* 视觉锚点换成一条品牌色短竖条：装饰性 emoji 是"AI 做的界面"最明显的味道 */
+  &::before {
+    content: "";
+    width: 5px;
+    height: 24px;
+    border-radius: 3px;
+    background: $brand;
+  }
 }
 
 /* 头部 */

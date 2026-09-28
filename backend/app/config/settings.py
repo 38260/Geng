@@ -9,8 +9,10 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
+from typing import Annotated
+
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 PROJECT_DIR = BACKEND_DIR.parent
@@ -29,7 +31,10 @@ class Settings(BaseSettings):
     app_name: str = "赶梗潮"
     app_version: str = "v1.0.0"
     environment: str = "Development"
-    cors_origins: list[str] = Field(
+    # NoDecode：告诉 pydantic-settings 别先把环境变量按 JSON 解析。
+    # 不加它，`CORS_ORIGINS=a,b` 会在 JSON 预解析阶段就抛
+    # SettingsError，下面那个"逗号分隔"的 validator 根本轮不到执行。
+    cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: [
             "http://localhost:5173",
             "http://127.0.0.1:5173",

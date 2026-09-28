@@ -58,11 +58,12 @@ def q(sql: str, params: tuple = ()) -> list:
         conn.close()
 
 
-def leaderboard() -> list[dict]:
-    """与后端榜单同一口径：入池 + 有快照 + 真实数据 + 至少一位 UP 有真实投稿证据。"""
+def ranked_library() -> list[dict]:
+    """梗库口径：入池 + 有快照 + 真实数据 + 至少一位 UP 有真实投稿证据。"""
     return q(
         """
-        SELECT m.name AS name, h.score AS score, l.stage_label AS stage, l.catch_label AS catch_label,
+        SELECT m.name AS name, h.score AS score, l.stage AS stage_key, l.stage_label AS stage,
+               l.catch_label AS catch_label, h.metrics AS metrics_raw,
                m.verification_state AS verification, m.encyclopedia_confirmed AS enc, m.guide_confirmed AS gui
         FROM memes m
         JOIN hotness_snapshots h ON h.meme_id = m.id
@@ -73,6 +74,26 @@ def leaderboard() -> list[dict]:
         ORDER BY h.score DESC
         """
     )
+
+
+def _recent_view(row: dict) -> int:
+    """近 7 天头部播放合计：门槛判据，存在快照的 metrics JSON 里。"""
+    try:
+        return int(json.loads(row.get("metrics_raw") or "{}").get("view") or 0)
+    except Exception:  # noqa: BLE001 - 指标是一段 JSON 文本，坏掉就当 0
+        return 0
+
+
+def leaderboard() -> list[dict]:
+    """热榜口径 = 梗库再过"活着"门槛：过气不上榜，且近 7 天头部播放 ≥ 1 万。
+
+    与后端 query.board_gate_reason 保持一致：PPT 上写"榜上有几个"必须是这个数，
+    否则现场一打开产品就对不上。
+    """
+    return [
+        row for row in ranked_library()
+        if row["stage_key"] != "obsolete" and _recent_view(row) >= 10_000
+    ]
 
 
 def cert_of(row: dict) -> str:
@@ -271,6 +292,7 @@ def real_covers(names: list[str]) -> dict[str, str]:
 
 
 def main() -> int:
+    library = ranked_library()
     board = leaderboard()
     counts = {
         "memes": q("SELECT COUNT(*) c FROM memes")[0]["c"],
@@ -284,6 +306,7 @@ def main() -> int:
         "views_total": q("SELECT SUM(view) v FROM meme_daily_stats")[0]["v"] or 0,
         "through": q("SELECT MAX(stat_date) d FROM meme_daily_stats")[0]["d"],
         "on_board": len(board),
+        "rankable": len(library),
         "no_series": q(
             """SELECT COUNT(*) c FROM memes m
                WHERE (m.encyclopedia_confirmed=1 OR m.guide_confirmed=1)
@@ -312,13 +335,13 @@ def main() -> int:
     }
     points = [
         (row["name"], float(play.get(row["name"], 0)), float(row["score"]))
-        for row in board
+        for row in library
         if play.get(row["name"])
     ]
     corr = chart_scatter(ASSETS / "scatter.png", points)
 
     # 榜单前十 + 稿子里会被贴成贴纸的几个名字（反例、脉冲型梗）
-    top_names = [row["name"] for row in board[:10]] + [
+    top_names = [row["name"] for row in board[:10]] + [row["name"] for row in library[:6]] + [
         "宗主第二招", "胆子真是肥嘟嘟的", "正太扭腰", "尴尬狗", "中国人能飞",
     ]
     covers = real_covers(top_names)

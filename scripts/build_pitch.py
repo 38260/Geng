@@ -47,6 +47,7 @@ DUSK = RGBColor(0x54, 0x6F, 0x98)
 BOARD = RGBColor(0x18, 0x22, 0x33)
 TAPE = RGBColor(0xFF, 0xE9, 0xA8)
 
+NL = chr(10)
 SANS = "Microsoft YaHei"
 BRUSH = "KaiTi"
 
@@ -158,7 +159,7 @@ def chart(slide, name, x, y, w):
     return slide.shapes.add_picture(str(ASSETS / name), Inches(x), Inches(y), width=Inches(w))
 
 
-def page_no(slide, n, total=13):
+def page_no(slide, n, total=14):
     text(slide, 11.5, 6.98, 1.2, 0.3, f"{n} / {total}", size=10.5, color=INK_FAINT,
          align=PP_ALIGN.RIGHT)
 
@@ -285,6 +286,52 @@ def p04_scope(prs):
     return s
 
 
+def p04b_lit(prs):
+    """研究现状与缺口：三条脉络各归各位，右边留本课题落点。"""
+    s = blank(prs)
+    title(s, "文献没缺，缺的是把它们接成一条链路")
+    text(s, 0.72, 1.42, 11.4, 0.4, "开题前把三条研究线各自的结论摆到一起对了一遍", size=13, color=INK_MUTE)
+    lanes = [
+        ("梗的文化研究",
+         "Dawkins 1976；Shifman 2012 / 2013；Bauckhage ICWSM 2011；" + NL + "谢朝群·何自然 2007；薛一飞 2024",
+         "定义、分类、生成机制讲清楚了，" + NL + "但几乎不给出可复算的时间度量", DUSK),
+        ("集体注意力与生命周期",
+         "Downs 1972 议题注意力周期；Crane & Sornette PNAS 2008；" + NL
+         + "Kleinberg KDD 2002；Yang & Leskovec WSDM 2011；" + NL
+         + "Lorenz-Spreen Nat. Commun. 2019；宋宁·刘婵君 2016",
+         "注意力形状可分类、半衰期在缩短都证明了，" + NL + "但对象是新闻与议题，不是梗", FLARE),
+        ("流行度量化与预测",
+         "Szabo & Huberman CACM 2010；Jenders WWW 2013；" + NL
+         + "Li CIKM 2013；Tan BMSB 2014（热度寿命）；" + NL
+         + "Zhou ACM CSUR 2021；Xu CIKM 2025",
+         "早期增速能预测最终热度，" + NL + "但落在单条内容上，没做梗级聚合", GO),
+    ]
+    for index, (head, refs, gap_note, color) in enumerate(lanes):
+        y = 1.94 + index * 1.42
+        card(s, 0.72, y, 7.5, 1.28, fill=WHITE)
+        shape(s, MSO_SHAPE.RECTANGLE, 0.72, y + 0.14, 0.055, 1.0, fill=color, line=None)
+        text(s, 0.98, y + 0.1, 4.3, 0.34, head, size=13.5, color=INK, bold=True)
+        text(s, 0.98, y + 0.46, 4.4, 0.78, refs, size=9.5, color=INK_MUTE, spacing=1.2)
+        text(s, 5.5, y + 0.46, 2.6, 0.78, gap_note, size=10, color=INK_SOFT, spacing=1.22)
+    card(s, 8.5, 1.94, 4.12, 4.12, fill=BOARD, line=None)
+    text(s, 8.78, 2.14, 3.6, 0.4, "本课题站在哪", size=13.5, color=RGBColor(0xFF, 0xC9, 0x4B), bold=True)
+    text(s, 8.78, 2.62, 3.6, 3.3, [
+        [("先证明这是个真梗", {"size": 12, "color": WHITE, "bold": True})],
+        [("两位解说 UP 主的真实投稿作证据：并集准入、90 天滚动窗口。",
+          {"size": 11, "color": RGBColor(0xC3, 0xCE, 0xE3)})],
+        [("再把它变成时间序列", {"size": 12, "color": WHITE, "bold": True})],
+        [("逐日头部内容抽样：2,010 条日统计、1,632 条采信样本，可抽查到每条 BV。",
+          {"size": 11, "color": RGBColor(0xC3, 0xCE, 0xE3)})],
+        [("最后输出可质疑的判断", {"size": 12, "color": WHITE, "bold": True})],
+        [("阶段与赶梗三态由规则给，带置信度与理由，口径直接显示在界面上。",
+          {"size": 11, "color": RGBColor(0xC3, 0xCE, 0xE3)})],
+        [("另：B 站弹幕研究（Zhang & Cassany 2020；Wang 2022；闫方洁 2017）说明弹幕就是梗的"
+          "载体，所以评论与弹幕计入互动因子。", {"size": 10.5, "color": RGBColor(0x9F, 0xB0, 0xCB)})],
+    ], spacing=1.24, space_after=4)
+    page_no(s, 5)
+    return s
+
+
 def p05_data(prs):
     counts = FACTS["counts"]
     s = blank(prs)
@@ -320,7 +367,7 @@ def p05_data(prs):
         [("③ 窗口不含今天", {"size": 12.5, "color": BRAND, "bold": True})],
         [("今天没过完就计入，头部偏低、增幅会假跌。", {"size": 11.5, "color": INK_SOFT})],
     ], spacing=1.22, space_after=3)
-    page_no(s, 5)
+    page_no(s, 6)
     return s
 
 
@@ -351,7 +398,7 @@ def p06_discovery(prs):
     ], spacing=1.3)
     text(s, 0.9, 5.9, 5.9, 0.6, "认证窗口和报告窗口是两件事，合成一个就会漏梗——"
          "这是我这轮最贵的一课。", size=12, color=INK_MUTE, spacing=1.26)
-    page_no(s, 6)
+    page_no(s, 7)
     return s
 
 
@@ -374,7 +421,7 @@ def p07_hotness(prs):
         card(s, 7.4, y, 5.22, 1.42, fill=WHITE)
         text(s, 7.68, y + 0.14, 4.7, 0.36, head, size=14.5, color=INK, bold=True)
         text(s, 7.68, y + 0.56, 4.7, 0.76, body, size=11.5, color=INK_SOFT, spacing=1.28)
-    page_no(s, 7)
+    page_no(s, 8)
     return s
 
 
@@ -405,7 +452,7 @@ def p08_lifecycle(prs):
         [("阶段和赶不赶都是算法先定，它再翻译。模型返回的状态跟算法不一致，以算法为准；"
           "文案里出现「预计」「未来 7 天」「一定会爆」这类话，直接丢掉。", {"size": 11.5, "color": INK_SOFT})],
     ], spacing=1.26)
-    page_no(s, 8)
+    page_no(s, 9)
     return s
 
 
@@ -441,7 +488,7 @@ def p09_pitfalls(prs):
             text(s, x0 + sum(widths[:index]) + 0.16, y + 0.14, widths[index] - 0.32, 0.9,
                  cell, size=size, color=color, bold=index in (0, 3), spacing=1.24)
     shape(s, MSO_SHAPE.RECTANGLE, x0, y0, sum(widths), 0.44 + 4 * 1.14, fill=None, line=LINE, weight=1.0)
-    page_no(s, 9)
+    page_no(s, 10)
     return s
 
 
@@ -472,14 +519,14 @@ def p10_falsify(prs):
     text(s, 0.72, 5.72, 7.0, 0.8, "结论：这个门槛会同时漏掉最热的、收进最凉的。播放量只适合当采集成本的预算筛，"
          "不能当准入判据——那个数字量的是 UP 主自己的粉丝盘，而且是发布那一刻的存量。",
          size=12, color=INK_SOFT, spacing=1.3)
-    page_no(s, 10)
+    page_no(s, 11)
     return s
 
 
 def p11_results(prs):
     counts, cov = FACTS["counts"], FACTS["coverage"]
     s = blank(prs)
-    title(s, "现在榜上长这样（明早刷新后可能就不一样了）")
+    title(s, f"现在榜上 {counts['on_board']} 个活梗（明早刷新后可能就不一样了）")
     rows = FACTS["top"][:7]
     x0, y0 = 0.72, 1.66
     widths = [0.5, 1.1, 2.4, 1.0, 1.3, 1.7, 1.9]
@@ -489,8 +536,8 @@ def p11_results(prs):
         text(s, x0 + sum(widths[:index]) + 0.12, y0 + 0.08, widths[index] - 0.2, 0.3, head,
              size=11.5, color=WHITE, bold=True)
     for row_index, row in enumerate(rows):
-        y = y0 + 0.4 + row_index * 0.62
-        shape(s, MSO_SHAPE.RECTANGLE, x0, y, sum(widths), 0.62,
+        y = y0 + 0.4 + row_index * 0.56
+        shape(s, MSO_SHAPE.RECTANGLE, x0, y, sum(widths), 0.56,
               fill=WHITE if row_index % 2 == 0 else CANVAS, line=None)
         cells = [str(row_index + 1), "", row["name"], f"{row['score']:.1f}", row["stage"],
                  row["catch"], row["cert"]]
@@ -499,12 +546,12 @@ def p11_results(prs):
                 cover = COVERS.get(row["name"])
                 if cover and (ROOT / cover).exists():
                     s.shapes.add_picture(str(ROOT / cover), Inches(x0 + widths[0] + 0.08),
-                                         Inches(y + 0.07), width=Inches(0.94), height=Inches(0.48))
+                                         Inches(y + 0.07), width=Inches(0.9), height=Inches(0.42))
                 continue
             color = BRAND if index == 3 else INK if index in (0, 2) else INK_SOFT
-            text(s, x0 + sum(widths[:index]) + 0.12, y + 0.16, widths[index] - 0.2, 0.3, cell,
+            text(s, x0 + sum(widths[:index]) + 0.12, y + 0.13, widths[index] - 0.2, 0.3, cell,
                  size=12, color=color, bold=index in (2, 3))
-    shape(s, MSO_SHAPE.RECTANGLE, x0, y0, sum(widths), 0.4 + 7 * 0.62, fill=None, line=LINE)
+    shape(s, MSO_SHAPE.RECTANGLE, x0, y0, sum(widths), 0.4 + 7 * 0.56, fill=None, line=LINE)
     card(s, 10.9, 1.66, 1.72, 4.74, fill=PAPER, line=LINE)
     stages = FACTS["stages"]
     text(s, 11.06, 1.82, 1.4, 4.4, [
@@ -516,14 +563,16 @@ def p11_results(prs):
         [(f"退潮 {stages.get('退潮期', 0)}", {"size": 11, "color": INK_SOFT})],
         [(f"过气 {stages.get('过气', 0)}", {"size": 11, "color": INK_MUTE})],
         [("", {"size": 4})],
-        [("过气那 17 个还占着位置，是下一步要摘掉的", {"size": 10, "color": INK_FAINT})],
+        [(f"过气与只剩残值的 {counts['rankable'] - counts['on_board']} 个不在榜上，梗库仍查得到",
+          {"size": 10, "color": INK_FAINT})],
     ], spacing=1.2, space_after=1)
     card(s, 0.72, 6.02, 10.0, 0.66, fill=WHITE)
     text(s, 0.98, 6.14, 9.6, 0.4, [
-        (f"只把准入从交集换成并集，其他什么都没动：可分析的梗 {cov['intersection']} → {cov['union']} 个，"
-         f"榜上 {counts['on_board']} 个真梗、演示数据 0 个。", {"size": 12.5, "color": BRAND, "bold": True}),
+        (f"两道口径叠加：准入并集让可分析的梗从 {cov['intersection']} 个变 {cov['union']} 个，"
+         f"上榜门槛再把 {counts['rankable']} 个有数据的梗收到 {counts['on_board']} 个——演示数据 0 个。",
+         {"size": 12.5, "color": BRAND, "bold": True}),
     ])
-    page_no(s, 11)
+    page_no(s, 12)
     return s
 
 
@@ -558,7 +607,7 @@ def p12_validation(prs):
         shape(s, MSO_SHAPE.RECTANGLE, 0.9, y + 0.1, 0.05, 0.18, fill=GO, line=None, angle=45)
         text(s, 1.24, y, 5.4, 0.34, head, size=13.5, color=INK, bold=True)
         text(s, 6.9, y, 5.7, 0.8, body, size=11.5, color=INK_MUTE, spacing=1.26)
-    page_no(s, 12)
+    page_no(s, 13)
     return s
 
 
@@ -611,6 +660,7 @@ NOTES = [
     "举手 30 秒。目的是让全场亲眼看到信息差存在，然后把痛点收到「还剩几天」这一句上。",
     "三个气泡各念一句就够，重点是右边黑板：分数、时间线、赶不赶，三样东西。",
     "40 秒。必答三题要念得出口也经得起追问；不做清单主动讲，比被老师问到再解释强。",
+    "45 秒。三条脉络各说一句它们缺什么，右边说我们接起来的那条链路；这页证明我读过文献，别逐个念人名。",
     "60 秒。先讲 2.08 亿是什么口径，再挑「不含今天」这一条细讲，其它一句话带过。",
     "60 秒，重点页。先讲漏掉老叟戏顽童这个事故，再讲并集怎么修——问题驱动方法比直接摆规则有说服力。",
     "60 秒。公式不用逐字念，讲两件事：为什么取对数，为什么增长敢给 1/4。",
@@ -625,7 +675,7 @@ NOTES = [
 
 def main() -> int:
     prs = new_deck()
-    builders = [p01_cover, p02_vote, p03_problem, p04_scope, p05_data, p06_discovery,
+    builders = [p01_cover, p02_vote, p03_problem, p04_scope, p04b_lit, p05_data, p06_discovery,
                 p07_hotness, p08_lifecycle, p09_pitfalls, p10_falsify, p11_results,
                 p12_validation, p13_next]
     for index, builder in enumerate(builders):

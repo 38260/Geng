@@ -22,6 +22,21 @@
     "spearman_p": 0.119,
     "n": 31
   },
+  "covers": {
+    "中国人能飞": "docs/pitch/assets/covers/中国人能飞.jpg",
+    "闪身步": "docs/pitch/assets/covers/闪身步.jpg",
+    "老叟戏顽童": "docs/pitch/assets/covers/老叟戏顽童.jpg",
+    "琵琶曲": "docs/pitch/assets/covers/琵琶曲.jpg",
+    "正太扭腰": "docs/pitch/assets/covers/正太扭腰.jpg",
+    "胆子真是肥嘟嘟的": "docs/pitch/assets/covers/胆子真是肥嘟嘟的.jpg",
+    "野生狗奶": "docs/pitch/assets/covers/野生狗奶.jpg",
+    "耍起": "docs/pitch/assets/covers/耍起.jpg",
+    "雨中霸王龙": "docs/pitch/assets/covers/雨中霸王龙.jpg",
+    "牛来": "docs/pitch/assets/covers/牛来.jpg",
+    "大狗叫": "docs/pitch/assets/covers/大狗叫.jpg",
+    "尴尬狗": "docs/pitch/assets/covers/尴尬狗.jpg",
+    "宗主第二招": "docs/pitch/assets/covers/宗主第二招.jpg"
+  },
   "coverage": {
     "encyclopedia_named": 37,
     "guide_named": 22,

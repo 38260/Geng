@@ -231,6 +231,45 @@ def chart_scatter(path: Path, points: list[tuple[str, float, float]]) -> None:
             "spearman": round(spear[0], 3), "spearman_p": round(spear[1], 4), "n": len(points)}
 
 
+def real_covers(names: list[str]) -> dict[str, str]:
+    """把榜单上前几个梗的真实封面拉下来当贴纸。
+
+    B 站图床带 Referer 会 403，不带才 200——前端里踩过，这里同理。
+    下不到就返回空，页面会退回纯色块，不影响数字。
+    """
+    import urllib.request
+
+    out: dict[str, str] = {}
+    rows = q(
+        """
+        SELECT m.name AS name, v.cover AS cover, v.bvid AS bvid FROM videos v
+        JOIN memes m ON m.id = v.meme_id
+        WHERE v.data_source = 'bilibili' AND v.cover <> ''
+        ORDER BY v.view DESC
+        """
+    )
+    wanted = {name for name in names}
+    picked: dict[str, str] = {}
+    for row in rows:
+        if row["name"] in wanted and row["name"] not in picked:
+            picked[row["name"]] = "https:" + row["cover"] if row["cover"].startswith("//") else row["cover"]
+        if len(picked) == len(wanted):
+            break
+    folder = ASSETS / "covers"
+    folder.mkdir(parents=True, exist_ok=True)
+    for name, url in picked.items():
+        slug = "".join(ch for ch in name if ch.isalnum()) or "meme"
+        target = folder / f"{slug}.jpg"
+        try:
+            request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(request, timeout=10) as response:
+                target.write_bytes(response.read())
+            out[name] = target.relative_to(ROOT).as_posix()
+        except Exception as exc:  # noqa: BLE001 - 封面只是装饰，拿不到就跳过
+            print(f"封面下载失败 {name}: {exc}")
+    return out
+
+
 def main() -> int:
     board = leaderboard()
     counts = {
@@ -278,10 +317,17 @@ def main() -> int:
     ]
     corr = chart_scatter(ASSETS / "scatter.png", points)
 
+    # 榜单前十 + 稿子里会被贴成贴纸的几个名字（反例、脉冲型梗）
+    top_names = [row["name"] for row in board[:10]] + [
+        "宗主第二招", "胆子真是肥嘟嘟的", "正太扭腰", "尴尬狗", "中国人能飞",
+    ]
+    covers = real_covers(top_names)
+
     facts = {
         "generated_at": date.today().isoformat(),
         "counts": counts,
         "correlation": corr,
+        "covers": covers,
         "coverage": {
             "encyclopedia_named": report["stats"]["梗百科"]["named"],
             "guide_named": report["stats"]["梗指南"]["named"],
@@ -304,6 +350,7 @@ def main() -> int:
     print("相关性：", corr)
     print("散点样本：", len(points), [p[0] for p in points][:8])
     print("前 5：", [(row["name"], round(row["score"], 1), cert_of(row)) for row in board[:5]])
+    print("封面：", len(facts["covers"]), sorted(facts["covers"]))
     print("曲线覆盖：", list(curves), days[0] if days else "-", "→", days[-1] if days else "-")
     return 0
 

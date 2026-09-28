@@ -1,11 +1,12 @@
-"""生成《赶梗潮》数据科学课程开题答辩 PPT（真·pptx，可课堂放映、可自己改）。
+"""《赶梗潮》数据科学课开题答辩 PPT 生成器（真·pptx）。
 
-    python scripts/build_pitch.py        # 产出 docs/pitch/赶梗潮-开题答辩.pptx
+    python scripts/pitch_assets.py && python scripts/build_pitch.py
 
-依赖 scripts/pitch_assets.py 先生成 facts.json 与四张图（数字全部从真实库现取）。
-版式刻意不用 PowerPoint 默认占位符：整页自己排版，配色取自产品前端的设计令牌，
-这样答辩稿看起来像这个产品自己的东西，而不是套模板。
-正文里的引用一律用「」，不用 ASCII 引号——既符合中文排版，也不会把 Python 字符串截断。
+刻意做成"人做的"样子：
+* 每页版式不一样（贴纸墙 / 黑板 / 病例单 / 时间线 / 巨大数字），而不是同一套卡片网格；
+* 用真实梗封面当贴纸与榜单缩略图——讲梗的稿子当然要有梗的图；
+* 标题说人话，不写「研究背景」「技术路线」，也不堆"不是A而是B"那种对仗句；
+* 数字全部来自 facts.json（现取自真实库），改数据重跑两个脚本就整份刷新。
 """
 
 from __future__ import annotations
@@ -23,32 +24,39 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = ROOT / "docs" / "pitch"
 ASSETS = OUT_DIR / "assets"
 FACTS = json.loads((OUT_DIR / "facts.json").read_text(encoding="utf-8"))
-TARGET = OUT_DIR / "赶梗潮-开题答辩.pptx"
+COVERS = FACTS.get("covers", {})
+TARGET = OUT_DIR / "赶梗潮-开题答辩-v2.pptx"
 
-# 设计令牌（与 frontend/tailwind.config.js 同一套）
 CANVAS = RGBColor(0xF7, 0xFA, 0xFD)
+PAPER = RGBColor(0xFF, 0xFD, 0xF7)
 WHITE = RGBColor(0xFF, 0xFF, 0xFF)
-INK = RGBColor(0x00, 0x02, 0x14)
+INK = RGBColor(0x14, 0x16, 0x1F)
 INK_SOFT = RGBColor(0x3C, 0x59, 0x89)
-INK_MUTE = RGBColor(0x5E, 0x73, 0x9F)
-INK_FAINT = RGBColor(0xB0, 0xBA, 0xD0)
-LINE = RGBColor(0xEC, 0xF0, 0xF6)
+INK_MUTE = RGBColor(0x6B, 0x7C, 0x9C)
+INK_FAINT = RGBColor(0xA8, 0xB2, 0xC6)
+LINE = RGBColor(0xE6, 0xEA, 0xF2)
 BRAND = RGBColor(0xFB, 0x3A, 0x5E)
 BRAND_SOFT = RGBColor(0xFD, 0xE9, 0xEE)
 FLARE = RGBColor(0x0D, 0x8A, 0xFE)
-GO = RGBColor(0x01, 0x96, 0x46)
-GO_SOFT = RGBColor(0xE5, 0xFC, 0xF2)
-GOLD = RGBColor(0xC8, 0x8A, 0x14)
-GOLD_SOFT = RGBColor(0xFF, 0xF3, 0xDC)
+FLARE_SOFT = RGBColor(0xEA, 0xF4, 0xFE)
+GO = RGBColor(0x0B, 0x8A, 0x46)
+GO_SOFT = RGBColor(0xE2, 0xF7, 0xEA)
+GOLD = RGBColor(0xB9, 0x7B, 0x0A)
+GOLD_SOFT = RGBColor(0xFF, 0xF0, 0xC7)
 DUSK = RGBColor(0x54, 0x6F, 0x98)
+BOARD = RGBColor(0x18, 0x22, 0x33)
+TAPE = RGBColor(0xFF, 0xE9, 0xA8)
 
 SANS = "Microsoft YaHei"
-BRUSH = "KaiTi"          # 封面标题用楷体，避开企业报表感；Windows 自带
+BRUSH = "KaiTi"
 
 SLIDE_W = Inches(13.333)
 SLIDE_H = Inches(7.5)
 
 
+# --------------------------------------------------------------------------- #
+# 基础件
+# --------------------------------------------------------------------------- #
 def new_deck() -> Presentation:
     prs = Presentation()
     prs.slide_width = SLIDE_W
@@ -56,36 +64,43 @@ def new_deck() -> Presentation:
     return prs
 
 
-def blank(prs: Presentation):
+def blank(prs, *, paper=CANVAS):
     slide = prs.slides.add_slide(prs.slide_layouts[6])
     bg = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, SLIDE_W, SLIDE_H)
     bg.fill.solid()
-    bg.fill.fore_color.rgb = CANVAS
+    bg.fill.fore_color.rgb = paper
     bg.line.fill.background()
     bg.shadow.inherit = False
     return slide
 
 
-def rect(slide, x, y, w, h, *, fill=WHITE, line=LINE, radius=0.09, weight=1.0):
-    shape = slide.shapes.add_shape(
-        MSO_SHAPE.ROUNDED_RECTANGLE if radius else MSO_SHAPE.RECTANGLE,
-        Inches(x), Inches(y), Inches(w), Inches(h),
-    )
-    if radius:
-        shape.adjustments[0] = radius
-    shape.fill.solid()
-    shape.fill.fore_color.rgb = fill
-    if line is None:
-        shape.line.fill.background()
+def shape(slide, kind, x, y, w, h, *, fill=WHITE, line=LINE, weight=1.0, angle=0.0, radius=None):
+    node = slide.shapes.add_shape(kind, Inches(x), Inches(y), Inches(w), Inches(h))
+    if radius is not None and kind == MSO_SHAPE.ROUNDED_RECTANGLE:
+        node.adjustments[0] = radius
+    if fill is None:
+        node.fill.background()
     else:
-        shape.line.color.rgb = line
-        shape.line.width = Pt(weight)
-    shape.shadow.inherit = False
-    return shape
+        node.fill.solid()
+        node.fill.fore_color.rgb = fill
+    if line is None:
+        node.line.fill.background()
+    else:
+        node.line.color.rgb = line
+        node.line.width = Pt(weight)
+    node.shadow.inherit = False
+    if angle:
+        node.rotation = angle
+    return node
+
+
+def card(slide, x, y, w, h, *, fill=WHITE, line=LINE, radius=0.06, angle=0.0, weight=1.0):
+    return shape(slide, MSO_SHAPE.ROUNDED_RECTANGLE, x, y, w, h,
+                 fill=fill, line=line, weight=weight, radius=radius, angle=angle)
 
 
 def text(slide, x, y, w, h, runs, *, size=14, color=INK, bold=False, font=SANS,
-         align=PP_ALIGN.LEFT, spacing=1.18, anchor=MSO_ANCHOR.TOP, space_after=4):
+         align=PP_ALIGN.LEFT, spacing=1.2, anchor=MSO_ANCHOR.TOP, space_after=4, angle=0.0):
     box = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
     tf = box.text_frame
     tf.word_wrap = True
@@ -106,484 +121,518 @@ def text(slide, x, y, w, h, runs, *, size=14, color=INK, bold=False, font=SANS,
             run.font.bold = style.get("bold", bold)
             run.font.name = style.get("font", font)
             run.font.color.rgb = style.get("color", color)
+    if angle:
+        box.rotation = angle
     return box
 
 
-def kicker(slide, label, *, page=None, color=BRAND):
-    rect(slide, 0.62, 0.52, 0.16, 0.16, fill=color, radius=0, line=None)
-    text(slide, 0.88, 0.42, 8.6, 0.36, label, size=12.5, color=color, bold=True)
-    if page is not None:
-        text(slide, 11.6, 0.42, 1.1, 0.36, f"{page:02d}", size=12.5,
-             color=INK_FAINT, bold=True, align=PP_ALIGN.RIGHT)
+def mark(slide, x, y, w, h=0.3, *, color=BRAND_SOFT):
+    """划重点：先铺一条色块，再把字压上去。"""
+    shape(slide, MSO_SHAPE.RECTANGLE, x, y, w, h, fill=color, line=None)
 
 
-def headline(slide, x, y, w, lines, *, size=30):
-    text(slide, x, y, w, 1.15, lines, size=size, color=INK, bold=True, spacing=1.06)
+def tape(slide, x, y, w=0.9, h=0.24, angle=-6):
+    shape(slide, MSO_SHAPE.RECTANGLE, x, y, w, h, fill=TAPE, line=None, angle=angle)
 
 
-def stat(slide, x, y, w, value, label, *, color=BRAND, sub=""):
-    rect(slide, x, y, w, 1.32, fill=WHITE)
-    text(slide, x + 0.22, y + 0.16, w - 0.44, 0.5, value, size=25, color=color, bold=True)
-    body = [[(label, {})]]
-    if sub:
-        body.append([(sub, {"size": 10.5, "color": INK_MUTE})])
-    text(slide, x + 0.22, y + 0.7, w - 0.44, 0.56, body, size=12, color=INK_MUTE, spacing=1.16,
-         space_after=1)
+def sticker(slide, name, x, y, w=1.9, *, angle=0.0, caption=None, show_cover=True):
+    """一张歪着贴的梗封面：白框 + 图 + 手写感标签。"""
+    h = w * 0.72
+    card(slide, x, y, w, h + 0.42, fill=WHITE, line=LINE, radius=0.04, angle=angle, weight=0.75)
+    cover = COVERS.get(name) if show_cover else None
+    if cover and (ROOT / cover).exists():
+        pic = slide.shapes.add_picture(str(ROOT / cover), Inches(x + 0.07), Inches(y + 0.07),
+                                       width=Inches(w - 0.14), height=Inches(h - 0.07))
+        pic.rotation = angle
+    else:
+        block = shape(slide, MSO_SHAPE.RECTANGLE, x + 0.07, y + 0.07, w - 0.14, h - 0.07,
+                      fill=BRAND_SOFT, line=None, angle=angle)
+        text(slide, x + 0.07, y + h / 2 - 0.1, w - 0.14, 0.3, "封面待补", size=10,
+             color=BRAND, align=PP_ALIGN.CENTER, angle=angle)
+        block.rotation = angle
+    text(slide, x, y + h + 0.02, w, 0.3, caption or name, size=11, color=INK_SOFT, bold=True,
+         align=PP_ALIGN.CENTER, angle=angle)
 
 
-def card(slide, x, y, w, h, title, body, *, accent=BRAND):
-    rect(slide, x, y, w, h, fill=WHITE)
-    rect(slide, x, y + 0.16, 0.055, h - 0.32, fill=accent, radius=0, line=None)
-    text(slide, x + 0.3, y + 0.18, w - 0.6, 0.4, title, size=14.5, color=INK, bold=True)
-    text(slide, x + 0.3, y + 0.62, w - 0.6, h - 0.8, body, size=12, color=INK_SOFT, spacing=1.28)
-
-
-def chip(slide, x, y, w, label, *, fill=CANVAS, color=INK_MUTE):
-    rect(slide, x, y, w, 0.32, fill=fill, radius=0.5, line=None)
-    text(slide, x, y + 0.05, w, 0.3, label, size=11, color=color, bold=True, align=PP_ALIGN.CENTER)
-
-
-def pic(slide, name, x, y, w):
+def chart(slide, name, x, y, w):
     return slide.shapes.add_picture(str(ASSETS / name), Inches(x), Inches(y), width=Inches(w))
 
 
-def footer(slide, note):
-    text(slide, 0.62, 6.94, 12.1, 0.34, note, size=10.5, color=INK_FAINT)
+def page_no(slide, n, total=13):
+    text(slide, 11.5, 6.98, 1.2, 0.3, f"{n} / {total}", size=10.5, color=INK_FAINT,
+         align=PP_ALIGN.RIGHT)
+
+
+def title(slide, lines, *, y=0.62, size=32, x=0.72, w=11.9, color=INK):
+    text(slide, x, y, w, 1.0, lines, size=size, color=color, bold=True, spacing=1.05)
 
 
 # --------------------------------------------------------------------------- #
-def slide_cover(prs):
-    counts = FACTS["counts"]
-    slide = blank(prs)
-    rect(slide, 0, 0, 13.333, 3.16, fill=RGBColor(0xFE, 0xF0, 0xF5), line=None)
-    rect(slide, 0.62, 3.66, 2.6, 0.13, fill=BRAND, radius=0, line=None)
-    text(slide, 0.62, 1.06, 9.0, 0.4, "数据科学课程 · 开题答辩", size=13.5, color=BRAND, bold=True)
-    text(slide, 0.56, 1.46, 11.8, 1.5, "今天，赶什么梗？", size=62, color=INK, bold=True, font=BRUSH)
-    text(slide, 0.62, 2.66, 11.0, 0.5, "B 站网络梗热度与生命周期分析系统", size=21, color=INK_SOFT, bold=True)
-    text(slide, 0.62, 4.06, 11.6, 0.9, [
-        [("热搜榜已经会告诉你什么在爆。它回答另外三件事：", {"size": 15, "color": INK_MUTE})],
-        [("有多火 · 现在什么阶段 · 现在赶还来得及吗", {"size": 20, "color": INK, "bold": True})],
-    ], spacing=1.4)
-    rect(slide, 0.62, 5.3, 6.6, 1.3, fill=WHITE)
-    text(slide, 0.92, 5.48, 6.1, 1.0, [
-        [("开场先问一句", {"size": 12, "color": INK_MUTE})],
-        [("「闪身步」9 月 21 日才被人解说，9 月 26 日热度 81 分居榜首。", {"size": 14, "color": INK, "bold": True})],
-        [("你现在才听说它，算早还是算晚？这套系统就是来给个准数的。", {"size": 12.5, "color": INK_SOFT})],
-    ], spacing=1.32, space_after=2)
-    text(slide, 7.62, 5.5, 5.1, 1.0, [
-        [("汇报人 ____________", {"size": 13.5, "color": INK, "bold": True})],
-        [("学号 ____________    指导教师 ________", {"size": 12.5, "color": INK_MUTE})],
-        [(f"数据截至 {counts['through']}，真实抓取，非样例数据", {"size": 11.5, "color": INK_FAINT})],
-    ], spacing=1.4)
-    return slide
+# 13 页
+# --------------------------------------------------------------------------- #
+def p01_cover(prs):
+    s = blank(prs)
+    shape(s, MSO_SHAPE.RECTANGLE, 0, 0, 13.333, 4.4, fill=RGBColor(0xFE, 0xF1, 0xF4), line=None)
+    for index, (name, angle) in enumerate((("闪身步", -7), ("耍起", 5), ("雨中霸王龙", -3))):
+        sticker(s, name, 8.35 + index * 1.5, 0.5 + (index % 2) * 0.35, w=1.55, angle=angle)
+    text(s, 0.72, 0.9, 7.0, 0.4, "数据科学课程 · 开题答辩", size=13, color=BRAND, bold=True)
+    text(s, 0.66, 1.34, 8.4, 1.6, "今天，赶什么梗？", size=66, color=INK, bold=True, font=BRUSH)
+    text(s, 0.72, 2.72, 7.6, 0.5, "B 站网络梗热度与生命周期分析系统", size=20, color=INK_SOFT, bold=True)
+    shape(s, MSO_SHAPE.RECTANGLE, 0.72, 3.42, 2.3, 0.1, fill=BRAND, line=None)
+    text(s, 0.72, 4.72, 7.4, 1.0, [
+        [("开场先问一句：", {"size": 12.5, "color": INK_MUTE})],
+        [("「闪身步」9 月 21 日才有人解说，9 月 26 日热度 81 分、榜上第一。",
+          {"size": 15, "color": INK, "bold": True})],
+        [("你现在才听说它，算早还是算晚？我想把这件事算成一个数。", {"size": 13, "color": INK_SOFT})],
+    ], spacing=1.34, space_after=2)
+    card(s, 8.5, 4.72, 4.1, 1.5, fill=WHITE)
+    text(s, 8.78, 4.9, 3.6, 1.2, [
+        [("汇报人  ____________", {"size": 13, "color": INK, "bold": True})],
+        [("学号  ____________", {"size": 12.5, "color": INK_SOFT})],
+        [("指导教师  ____________", {"size": 12.5, "color": INK_SOFT})],
+        [(f"数据截至 {FACTS['counts']['through']}，真实抓取", {"size": 11, "color": INK_FAINT})],
+    ], spacing=1.34, space_after=2)
+    tape(s, 8.36, 4.6, 0.8, 0.22, angle=-8)
+    return s
 
 
-def slide_hook(prs, page):
-    slide = blank(prs)
-    kicker(slide, "开场 · 现场测一下", page=page)
-    headline(slide, 0.62, 0.94, 11.8, "这五个梗，现场能认出三个以上的同学请举手")
-    text(slide, 0.62, 1.7, 11.6, 0.4, "它们都是最近 30 天 B 站真实热度榜上的前五名",
-         size=13.5, color=INK_MUTE)
+def p02_vote(prs):
+    s = blank(prs)
+    title(s, "先测一下：这五个梗，认识三个以上的举手")
+    text(s, 0.72, 1.42, 11.0, 0.4, "不是我编的题——它们就是此刻 B 站真实热度榜的前五名",
+         size=13, color=INK_MUTE)
     for index, row in enumerate(FACTS["top"][:5]):
-        x = 0.62 + index * 2.46
-        rect(slide, x, 2.28, 2.28, 2.5, fill=WHITE)
-        rect(slide, x + 0.16, 2.44, 0.5, 0.5, fill=BRAND if index == 0 else GOLD_SOFT, radius=0.3, line=None)
-        text(slide, x + 0.16, 2.52, 0.5, 0.4, str(index + 1), size=15,
-             color=WHITE if index == 0 else GOLD, bold=True, align=PP_ALIGN.CENTER)
-        text(slide, x + 0.18, 3.1, 1.98, 0.5, row["name"], size=17, color=INK, bold=True)
-        text(slide, x + 0.18, 3.66, 1.98, 0.4, f"热度 {row['score']}", size=15, color=BRAND, bold=True)
-        text(slide, x + 0.18, 4.1, 1.98, 0.6, [
-            [(row["stage"], {"size": 11.5, "color": INK_SOFT})],
-            [(row["cert"], {"size": 10.5, "color": INK_FAINT})],
-        ], spacing=1.2, space_after=1)
-    rect(slide, 0.62, 5.08, 12.1, 1.46, fill=WHITE)
-    text(slide, 0.94, 5.26, 11.5, 1.1, [
-        [("认不出来很正常——梗的活跃窗口通常只有两三周。", {"size": 14, "color": INK, "bold": True})],
-        [("真正难受的不是没听过，而是：你听说了、点进创作中心、写完脚本发出去，它已经不火了。"
-          "本课题要量化的正是这段还剩多少时间。", {"size": 13, "color": INK_SOFT})],
+        x = 0.72 + index * 2.44
+        angle = (-4, 3, -2, 4, -3)[index]
+        sticker(s, row["name"], x, 2.0, w=2.16, angle=angle)
+        mark(s, x + 0.16, 4.02, 1.5, 0.3, color=BRAND_SOFT if index == 0 else CANVAS)
+        text(s, x + 0.24, 4.04, 1.5, 0.3, f"热度 {row['score']}", size=13.5, color=BRAND, bold=True)
+        text(s, x + 0.24, 4.42, 1.9, 0.3, f"{row['stage']} · {row['cert']}", size=10.5, color=INK_MUTE)
+    card(s, 0.72, 5.2, 11.9, 1.32, fill=PAPER, line=LINE)
+    text(s, 1.06, 5.42, 11.2, 1.0, [
+        [("认不全太正常了，梗的活跃窗口一般就两三周。", {"size": 14.5, "color": INK, "bold": True})],
+        [("难受的地方不在这：你听说了、点开创作中心、脚本写完发出去，它已经不火了。"
+          "热搜榜只会告诉你谁在前面，不会告诉你它还剩几天——这就是我要做的东西。",
+          {"size": 13, "color": INK_SOFT})],
     ], spacing=1.34)
-    return slide
+    page_no(s, 2)
+    return s
 
 
-def slide_problem(prs, page):
-    slide = blank(prs)
-    kicker(slide, "问题定义", page=page)
-    headline(slide, 0.62, 0.94, 11.9, "现成工具都在报「现在什么在爆」，没人报「这个梗还剩几天」")
-    rows = [
-        ("微博热搜 / B 站热门", "存量快照", "只告诉你此刻谁在前面，不看趋势形状；一个梗崩盘当天照样能挂在榜上。", DUSK),
-        ("百度指数 / 巨量算数", "搜索词", "搜的是词不是梗，「松弛感」这类口语词混进大量无关搜索，也不分阶段。", FLARE),
-        ("UP 主凭手感", "个人经验", "选题靠刷，刷到往往已晚两天；同一个人判断「早晚」每次都不一样。", GOLD),
+def p03_problem(prs):
+    s = blank(prs)
+    title(s, "问来问去都是同一句话：现在做，还来得及吗")
+    people = [
+        ("一个 3 万粉的 UP 主", "「这个梗我上周就刷到了，现在拍是不是凉了？」",
+         "他有手感，但没有刻度。同一个梗他每次判断都不一样。", FLARE, 0.62),
+        ("品牌社媒运营", "「热搜上这个词，我们今晚要不要跟？」",
+         "跟的是词不是梗：词还在榜上，梗可能三天前就过气了。", GOLD, 0.62),
+        ("我室友（也是目标用户）", "「为什么我每次知道一个梗，它都已经不好玩了？」",
+         "因为他拿到的永远是排名，不是时间。", BRAND, 0.62),
     ]
-    text(slide, 0.62, 1.84, 6.6, 0.4, "三类现成做法各差在哪", size=14, color=INK_MUTE, bold=True)
-    for index, (name, kind, gap, color) in enumerate(rows):
-        y = 2.3 + index * 1.04
-        rect(slide, 0.62, y, 6.7, 0.92, fill=WHITE)
-        rect(slide, 0.62, y + 0.14, 0.055, 0.64, fill=color, radius=0, line=None)
-        text(slide, 0.86, y + 0.12, 4.4, 0.4, name, size=14.5, color=INK, bold=True)
-        chip(slide, 5.66, y + 0.16, 1.5, kind, color=color)
-        text(slide, 0.86, y + 0.5, 6.3, 0.42, gap, size=11.5, color=INK_SOFT)
-    rect(slide, 7.6, 1.84, 5.12, 3.5, fill=BRAND_SOFT, line=None)
-    text(slide, 7.94, 2.06, 4.5, 0.4, "本课题要补的那一格", size=13.5, color=BRAND, bold=True)
-    text(slide, 7.94, 2.56, 4.5, 2.6, [
-        [("把「梗」当成一个可测量的时间序列对象：", {"size": 14, "color": INK, "bold": True})],
-        [("", {"size": 5})],
-        [("· 有口径的热度值，不是排名，是可比的分数", {"size": 12.5, "color": INK_SOFT})],
-        [("· 有规则的阶段判定，萌芽到爆发再到过气", {"size": 12.5, "color": INK_SOFT})],
-        [("· 有置信度的赶梗结论：还来得及 / 慎赶 / 你来晚了", {"size": 12.5, "color": INK_SOFT})],
-    ], spacing=1.32, space_after=2)
-    footer(slide, "缺口不是数据不够多，而是没人把「还剩多久」当成一个可以被证伪的问题来定义。")
-    return slide
+    for index, (who, quote, note, color, y0) in enumerate(people):
+        y = 1.62 + index * 1.62
+        card(s, 0.72, y, 7.1, 1.42, fill=WHITE)
+        shape(s, MSO_SHAPE.ISOSCELES_TRIANGLE, 0.98, y + 1.4, 0.3, 0.2, fill=WHITE, line=LINE, angle=180)
+        text(s, 1.0, y + 0.14, 6.5, 0.3, who, size=12, color=color, bold=True)
+        text(s, 1.0, y + 0.46, 6.5, 0.4, quote, size=15, color=INK, bold=True, font=BRUSH)
+        text(s, 1.0, y + 0.98, 6.5, 0.36, note, size=11.5, color=INK_MUTE)
+    card(s, 8.16, 1.62, 4.46, 4.66, fill=BOARD, line=None)
+    text(s, 8.46, 1.86, 3.9, 0.4, "所以我要给出的是", size=12.5, color=RGBColor(0xFF, 0xC9, 0x4B), bold=True)
+    text(s, 8.46, 2.34, 3.9, 3.8, [
+        [("一个能比的分数", {"size": 16, "color": WHITE, "bold": True})],
+        [("0-100，跨梗可比，一条爆款吃不掉全榜。", {"size": 12, "color": RGBColor(0xC3, 0xCE, 0xE3)})],
+        [("", {"size": 8})],
+        [("一条有形状的时间线", {"size": 16, "color": WHITE, "bold": True})],
+        [("萌芽 / 上升 / 爆发 / 平稳 / 退潮 / 过气，规则判，不靠感觉。", {"size": 12, "color": RGBColor(0xC3, 0xCE, 0xE3)})],
+        [("", {"size": 8})],
+        [("一个明确的赶不赶", {"size": 16, "color": WHITE, "bold": True})],
+        [("还来得及 / 慎赶 / 你来晚了，附置信度和理由。", {"size": 12, "color": RGBColor(0xC3, 0xCE, 0xE3)})],
+    ], spacing=1.26, space_after=2)
+    page_no(s, 3)
+    return s
 
 
-def slide_rq(prs, page):
-    slide = blank(prs)
-    kicker(slide, "研究问题与边界", page=page)
-    headline(slide, 0.62, 0.94, 11.9, "三个能回答、也能被证伪的问题，以及三件明确不做的事")
+def p04_scope(prs):
+    s = blank(prs)
+    title(s, "开题总得说清楚：我答哪三题，不答哪三题")
     rqs = [
-        ("RQ1", "一个梗现在有多火？",
-         "构造 0-100 的自定义热度指数：播放 / 互动 / 内容量 / 创作者 / 增长五因子加权，绝对量先做对数区间归一。"),
-        ("RQ2", "它处在生命周期的哪一段？",
-         "用时间序列特征（增长率、距峰值差、连续下滑天数、活跃度）跑规则引擎，落到六个阶段之一。"),
-        ("RQ3", "现在赶这个梗，来得及吗？",
-         "把 RQ1/RQ2 的输出交给判定规则，给三态结论 + 置信度 + 一句人话理由。"),
+        ("必答 1", "一个梗现在有多火？", "五因子加权的热度指数，绝对量先做对数区间归一。"),
+        ("必答 2", "它走到哪一段了？", "增长率、距峰值差、连续下滑天数、活跃度 → 规则引擎判六个阶段。"),
+        ("必答 3", "现在赶还来得及吗？", "前两问的输出交给判定规则，给三态 + 置信度 + 一句理由。"),
     ]
-    for index, (tag, title, body) in enumerate(rqs):
-        y = 1.98 + index * 1.18
-        rect(slide, 0.62, y, 7.1, 1.04, fill=WHITE)
-        text(slide, 0.86, y + 0.14, 0.7, 0.4, tag, size=13, color=BRAND, bold=True)
-        text(slide, 1.5, y + 0.12, 6.0, 0.4, title, size=15, color=INK, bold=True)
-        text(slide, 1.5, y + 0.52, 6.0, 0.5, body, size=11.5, color=INK_SOFT, spacing=1.26)
-    rect(slide, 7.98, 1.98, 4.74, 3.52, fill=WHITE)
-    text(slide, 8.26, 2.16, 4.2, 0.4, "V1 刻意不做（做了必挨问）", size=13.5, color=INK, bold=True)
-    text(slide, 8.26, 2.62, 4.2, 2.8, [
-        [("不做未来数值预测", {"size": 12.5, "color": BRAND, "bold": True})],
-        [("只描述已经发生的数据，不宣称「下周会爆」。", {"size": 11.5, "color": INK_MUTE})],
-        [("不让大模型改任何事实", {"size": 12.5, "color": BRAND, "bold": True})],
-        [("LLM 只写解释文案；它给的状态与算法不一致时以算法为准，越界表述直接丢弃。", {"size": 11.5, "color": INK_MUTE})],
-        [("不做多平台、不做用户体系", {"size": 12.5, "color": BRAND, "bold": True})],
-        [("只测 B 站，先把一把尺子做准，不追覆盖面。", {"size": 11.5, "color": INK_MUTE})],
-    ], spacing=1.24, space_after=2)
-    footer(slide, "边界写清楚不是缩水，是让每个结论都能被检验：能算错，也算得出来谁对。")
-    return slide
+    for index, (tag, q_, body) in enumerate(rqs):
+        y = 1.62 + index * 1.5
+        card(s, 0.72, y, 6.9, 1.3, fill=PAPER, line=LINE, angle=(-1.2, 0.8, -0.6)[index])
+        shape(s, MSO_SHAPE.RECTANGLE, 0.94, y + 0.16, 0.86, 0.3, fill=BRAND, line=None)
+        text(s, 0.94, y + 0.19, 0.86, 0.28, tag, size=11, color=WHITE, bold=True, align=PP_ALIGN.CENTER)
+        text(s, 1.96, y + 0.14, 5.4, 0.4, q_, size=16, color=INK, bold=True)
+        text(s, 0.96, y + 0.66, 6.3, 0.5, body, size=12, color=INK_SOFT)
+    card(s, 7.9, 1.62, 4.72, 4.5, fill=WHITE)
+    text(s, 8.18, 1.8, 4.2, 0.4, "这三件我不做（做了必被问）", size=14, color=INK, bold=True)
+    rows = [
+        ("不预测未来数值", "只说已经发生的数据。任何「下周会爆」都不出现在产品里。"),
+        ("不让大模型改事实", "LLM 只写文案；它给的状态和算法不一致时以算法为准，越界句子直接丢。"),
+        ("不做多平台、不做账号体系", "先把 B 站这一把尺子做准，不铺覆盖面。"),
+    ]
+    for index, (head, body) in enumerate(rows):
+        y = 2.34 + index * 1.24
+        shape(s, MSO_SHAPE.RECTANGLE, 8.18, y + 0.04, 0.26, 0.26, fill=None, line=BRAND, weight=1.6)
+        shape(s, MSO_SHAPE.RECTANGLE, 8.23, y + 0.15, 0.16, 0.05, fill=BRAND, line=None, angle=45)
+        text(s, 8.6, y, 3.9, 0.36, head, size=13.5, color=INK, bold=True)
+        text(s, 8.6, y + 0.4, 3.9, 0.7, body, size=11.5, color=INK_MUTE, spacing=1.26)
+    page_no(s, 4)
+    return s
 
 
-def slide_data(prs, page):
+def p05_data(prs):
     counts = FACTS["counts"]
-    slide = blank(prs)
-    kicker(slide, "数据 · 从哪来，有多少", page=page, color=FLARE)
-    headline(slide, 0.62, 0.94, 11.9, "全部真实抓取：没有一条数据是我编的，也没有一条拿样例顶")
-    stat(slide, 0.62, 1.9, 2.9, f"{counts['memes']}", "梗库总量", color=FLARE,
-         sub=f"其中 {counts['admitted']} 个通过准入")
-    stat(slide, 3.7, 1.9, 2.9, f"{counts['stat_rows']:,}", "梗 × 天 日统计行", color=FLARE,
-         sub=f"{counts['stat_days_with_content']} 行真有内容")
-    stat(slide, 6.78, 1.9, 2.9, f"{counts['videos']:,}", "采信视频样本", color=FLARE,
-         sub="过相关性阈值才入库")
-    stat(slide, 9.86, 1.9, 2.86, f"{counts['views_total'] / 1e8:.2f} 亿", "头部样本累计播放", color=FLARE,
-         sub=f"统计截至 {counts['through']}")
-    rect(slide, 0.62, 3.5, 6.6, 3.06, fill=WHITE)
-    text(slide, 0.9, 3.68, 6.1, 0.4, "采集口径三条，都是踩坑换来的", size=14, color=INK, bold=True)
-    text(slide, 0.9, 4.16, 6.1, 2.3, [
-        [("① 按天带时间区间查询", {"size": 12.5, "color": FLARE, "bold": True})],
-        [("每天单独取 pubtime_begin / end；一次抓完再回填历史，算出过 +23616% 的假增长。", {"size": 12, "color": INK_SOFT})],
-        [("② 当日头部 20 条相关视频当样本", {"size": 12.5, "color": FLARE, "bold": True})],
-        [("所以「当日播放量」是头部内容的合计，跨日跨梗同一把尺子，不是全站绝对量。", {"size": 12, "color": INK_SOFT})],
-        [("③ 统计窗口不含今天", {"size": 12.5, "color": FLARE, "bold": True})],
-        [("今天还没过完，计入会让头部样本偏低、增幅出现假下跌。", {"size": 12, "color": INK_SOFT})],
-    ], spacing=1.22, space_after=2)
-    rect(slide, 7.48, 3.5, 5.24, 3.06, fill=WHITE)
-    text(slide, 7.76, 3.68, 4.7, 0.4, "梗的存在性证明：两位解说 UP 主", size=14, color=INK, bold=True)
-    text(slide, 7.76, 4.16, 4.7, 2.3, [
-        [("梗百科 ", {"size": 13, "color": INK, "bold": True}),
-         ("日更，90 天内 41 条投稿、识别出 37 个梗名", {"size": 12, "color": INK_SOFT})],
-        [("梗指南 ", {"size": 13, "color": INK, "bold": True}),
-         ("周更，22 条投稿、22 个梗名", {"size": 12, "color": INK_SOFT})],
-        [("", {"size": 5})],
-        [("为什么拿他们当入口：一个梗值不值得被记录，先要看有没有人把它讲明白过。"
-          "证据是真实 BV 号、标题与发布时间，页面上能直接点开验证。", {"size": 12, "color": INK_SOFT})],
-    ], spacing=1.26, space_after=2)
-    footer(slide, "接口：B 站 wbi 搜索 + 视频详情，匿名设备指纹 + WBI 签名；空间投稿接口按会话风控，深翻页会被 412 / -352 拦下。")
-    return slide
+    s = blank(prs)
+    title(s, "数据只有一个来源：B 站，逐日抓")
+    mark(s, 0.66, 2.5, 6.0, 1.2, color=BRAND_SOFT)
+    text(s, 0.72, 1.62, 8.0, 0.4, "这一年攒下来的量级", size=13, color=INK_MUTE, bold=True)
+    text(s, 0.72, 2.42, 8.2, 1.4, [
+        [(f"{counts['views_total'] / 1e8:.2f}", {"size": 74, "color": BRAND, "bold": True}),
+         (" 亿次播放", {"size": 26, "color": INK, "bold": True})],
+    ], spacing=1.0)
+    text(s, 0.74, 3.9, 8.2, 0.5, "不是全站播放量，是每天头部 20 条相关视频的合计——"
+         "同一把尺子量所有梗，才叫可比。", size=12.5, color=INK_SOFT)
+    tiles = [
+        (f"{counts['memes']}", "梗库总量", f"{counts['admitted']} 个通过准入"),
+        (f"{counts['stat_rows']:,}", "梗 × 天 日统计", f"{counts['stat_days_with_content']} 行真有内容"),
+        (f"{counts['videos']:,}", "采信视频样本", "过相关性阈值才入库"),
+        (counts["through"], "统计截至", "刻意不含今天"),
+    ]
+    for index, (value, label, sub) in enumerate(tiles):
+        x = 0.72 + index * 2.0
+        card(s, x, 4.62, 1.86, 1.3, fill=WHITE)
+        text(s, x + 0.16, 4.76, 1.6, 0.4, value, size=17, color=FLARE, bold=True)
+        text(s, x + 0.16, 5.18, 1.6, 0.3, label, size=11, color=INK)
+        text(s, x + 0.16, 5.46, 1.6, 0.4, sub, size=10, color=INK_MUTE, spacing=1.2)
+    card(s, 9.1, 1.62, 3.52, 4.3, fill=PAPER, line=LINE, angle=1.4)
+    tape(s, 10.4, 1.48, 1.0, 0.24, angle=3)
+    text(s, 9.4, 1.94, 3.0, 0.4, "我给自己立的三条规矩", size=13.5, color=INK, bold=True)
+    text(s, 9.4, 2.44, 3.0, 3.3, [
+        [("① 一天一次查询", {"size": 12.5, "color": BRAND, "bold": True})],
+        [("带 pubtime 区间。第一版想省事一次抓完再摊到每天，算出过 +23616% 的假增长。", {"size": 11.5, "color": INK_SOFT})],
+        [("② 只取当日头部 20 条", {"size": 12.5, "color": BRAND, "bold": True})],
+        [("order=click，再按相关性阈值筛掉无关内容。", {"size": 11.5, "color": INK_SOFT})],
+        [("③ 窗口不含今天", {"size": 12.5, "color": BRAND, "bold": True})],
+        [("今天没过完就计入，头部偏低、增幅会假跌。", {"size": 11.5, "color": INK_SOFT})],
+    ], spacing=1.22, space_after=3)
+    page_no(s, 5)
+    return s
 
 
-def slide_discovery(prs, page):
+def p06_discovery(prs):
     cov = FACTS["coverage"]
-    slide = blank(prs)
-    kicker(slide, "方法 · 发现层", page=page)
-    headline(slide, 0.62, 0.94, 11.9, "准入规则从「交集」改成「并集」，是被一个漏掉的梗逼出来的")
-    pic(slide, "coverage.png", 0.62, 1.94, 6.1)
-    rect(slide, 7.0, 1.94, 5.72, 1.6, fill=WHITE)
-    text(slide, 7.28, 2.12, 5.2, 1.3, [
-        [("旧口径：两位 UP 主都介绍过才算数。", {"size": 13, "color": INK, "bold": True})],
-        [(f"90 天实测：梗百科 37 个、梗指南 22 个，交集只剩 {cov['intersection']} 个。"
-          "等于让日更 UP 的选题被周更 UP 的排期一票否决。", {"size": 12.5, "color": INK_SOFT})],
-    ], spacing=1.28)
-    rect(slide, 7.0, 3.7, 5.72, 1.6, fill=GO_SOFT, line=None)
-    text(slide, 7.28, 3.88, 5.2, 1.3, [
-        [("新口径：任一 UP 主 90 天内介绍过即入池。", {"size": 13, "color": GO, "bold": True})],
-        [(f"同一批投稿，池子从 {cov['intersection']} 个变成 {cov['union']} 个；两位都做过的仍然单独标"
-          "「双 UP 认证」，只是降级成标签而不是闸门。", {"size": 12.5, "color": INK_SOFT})],
-    ], spacing=1.28)
-    rect(slide, 0.62, 5.52, 12.1, 1.06, fill=WHITE)
-    text(slide, 0.9, 5.68, 11.6, 0.8, [
-        [("两个窗口必须分开，这是最贵的一课：", {"size": 13, "color": BRAND, "bold": True}),
-         ("解说视频通常比梗的爆发期早 1~2 周。我一开始拿 30 天报告窗口同时当认证窗口用，"
-          "结果把 8 月 21 日解说的「老叟戏顽童」整条排除在外，还据此断言两位 UP 都没做过——被当场指出。",
-          {"size": 12.5, "color": INK_SOFT})],
+    s = blank(prs)
+    title(s, "我把当时热度最高的梗，挡在库外整整两个月")
+    steps = [
+        ("8 月 21 日", "梗百科发了「老叟戏顽童」的解说", FLARE),
+        ("8 月 23 日", "梗指南也跟了一期", FLARE),
+        ("我定的规则", "两位都介绍过才算数，而且只看最近 30 天", BRAND),
+        ("结果", "解说比爆发早 1~2 周，这条被我自己的窗口整条排除；同学当场问「这个你怎么没有」", BRAND),
+    ]
+    shape(s, MSO_SHAPE.RECTANGLE, 0.9, 1.94, 5.9, 0.03, fill=LINE, line=None)
+    for index, (when, what, color) in enumerate(steps):
+        y = 2.14 + index * 0.92
+        shape(s, MSO_SHAPE.OVAL, 0.86, y + 0.06, 0.16, 0.16, fill=color, line=None)
+        text(s, 1.16, y, 1.5, 0.3, when, size=12, color=color, bold=True)
+        text(s, 2.7, y, 4.2, 0.7, what, size=12.5, color=INK if index == 3 else INK_SOFT,
+             bold=index == 3, spacing=1.2)
+    chart(s, "coverage.png", 7.16, 1.86, 5.5)
+    card(s, 7.16, 4.5, 5.46, 1.9, fill=GO_SOFT, line=None)
+    text(s, 7.44, 4.66, 4.9, 1.6, [
+        [("改法：准入看并集，认证降级成标签", {"size": 14, "color": GO, "bold": True})],
+        [(f"任一 UP 主在 90 天滚动窗口内介绍过就入池。同一批投稿，池子从 {cov['intersection']} 个变成 "
+          f"{cov['union']} 个；两位都做过的仍然单独标「双 UP 认证」，但它不再是闸门。",
+          {"size": 12, "color": INK_SOFT})],
     ], spacing=1.3)
-    return slide
+    text(s, 0.9, 5.9, 5.9, 0.6, "认证窗口和报告窗口是两件事，合成一个就会漏梗——"
+         "这是我这轮最贵的一课。", size=12, color=INK_MUTE, spacing=1.26)
+    page_no(s, 6)
+    return s
 
 
-def slide_hotness(prs, page):
-    slide = blank(prs)
-    kicker(slide, "方法 · 度量层", page=page)
-    headline(slide, 0.62, 0.94, 11.9, "热度指数：一条爆款视频吃不掉整个榜")
-    pic(slide, "weights.png", 0.62, 1.96, 6.6)
-    rect(slide, 0.62, 4.56, 6.6, 2.0, fill=WHITE)
-    text(slide, 0.9, 4.74, 6.1, 1.7, [
-        [("Hotness = 0.25·增长 + 0.25·播放 + 0.20·互动 + 0.16·内容 + 0.14·创作者",
-          {"size": 12.5, "color": INK, "bold": True})],
-        [("每个因子先做对数区间归一化再加权：播放量差三个量级的梗要能同框比较，"
-          "线性归一会让亿级老梗永远压着新梗。", {"size": 12, "color": INK_SOFT})],
-    ], spacing=1.32)
-    rect(slide, 7.5, 1.96, 5.22, 4.6, fill=WHITE)
-    text(slide, 7.78, 2.14, 4.7, 0.4, "三个反直觉的设计决定", size=14, color=INK, bold=True)
+def p07_hotness(prs):
+    s = blank(prs)
+    title(s, "热度怎么算：五因子，但先取对数")
+    card(s, 0.72, 1.62, 6.4, 1.66, fill=BOARD, line=None)
+    text(s, 1.0, 1.86, 5.9, 0.5, "Hotness = 0.25·增长 + 0.25·播放 + 0.20·互动\n                 + 0.16·内容 + 0.14·创作者",
+         size=15.5, color=RGBColor(0xFF, 0xE9, 0xA8), bold=True, font=BRUSH, spacing=1.3)
+    text(s, 1.0, 2.82, 5.9, 0.3, "每个因子先做对数区间归一化，再加权", size=11.5,
+         color=RGBColor(0xC3, 0xCE, 0xE3))
+    chart(s, "weights.png", 0.72, 3.5, 6.4)
     items = [
-        ("增长权重给到 0.25", "只看最近 7 天对前 7 天。去年 1 亿播放、今天没人做的梗不会赖在榜首。"),
-        ("样本太小就不外推", "前一周讨论量 < 30 或样本视频 < 3 条时增长率直接置空——考古区冒出一条视频不算 +100%。"),
-        ("人工改不到分数", "封面、介绍、别名、关键词可以人工维护；热度、阶段、赶梗结论只由算法产出，接口层强制。"),
+        ("增长敢给到 1/4", "只看最近 7 天比前 7 天。去年 1 亿播放、今天没人做的梗，就不该继续霸榜。"),
+        ("样本小就不外推", "前一周讨论量不到 30、或样本不到 3 条，增长率直接留空。考古区冒出一条视频，不算 +100%。"),
+        ("人工碰不到分数", "封面、介绍、别名、关键词可以人改；热度、阶段、赶梗结论只能算法产出——接口层锁死，有测试盯着。"),
     ]
-    for index, (title, body) in enumerate(items):
-        y = 2.66 + index * 1.28
-        rect(slide, 7.78, y, 0.32, 0.32, fill=BRAND_SOFT, radius=0.5, line=None)
-        text(slide, 7.78, y + 0.04, 0.32, 0.3, str(index + 1), size=11, color=BRAND, bold=True,
-             align=PP_ALIGN.CENTER)
-        text(slide, 8.22, y - 0.02, 4.3, 0.4, title, size=13, color=INK, bold=True)
-        text(slide, 8.22, y + 0.38, 4.3, 0.84, body, size=11.5, color=INK_SOFT, spacing=1.26)
-    return slide
+    for index, (head, body) in enumerate(items):
+        y = 1.62 + index * 1.6
+        card(s, 7.4, y, 5.22, 1.42, fill=WHITE)
+        text(s, 7.68, y + 0.14, 4.7, 0.36, head, size=14.5, color=INK, bold=True)
+        text(s, 7.68, y + 0.56, 4.7, 0.76, body, size=11.5, color=INK_SOFT, spacing=1.28)
+    page_no(s, 7)
+    return s
 
 
-def slide_lifecycle(prs, page):
-    slide = blank(prs)
-    kicker(slide, "方法 · 生命周期与赶梗判断", page=page)
-    headline(slide, 0.62, 0.94, 11.9, "同样是 80 分，一个在冲、一个在崩，结论就不能一样")
-    pic(slide, "curves.png", 0.62, 1.9, 7.3)
-    text(slide, 0.62, 4.66, 7.3, 0.6,
-         "闪身步 09-13 起从零爬到 81（爆发期）；琵琶曲是脉冲型，冲高后 09-25 断崖；"
-         "老叟戏顽童从 84 一路退到 52（退潮期）。", size=11.5, color=INK_MUTE, spacing=1.26)
-    rect(slide, 8.2, 1.9, 4.52, 3.36, fill=WHITE)
-    text(slide, 8.46, 2.08, 4.0, 0.4, "六个阶段，规则自上而下匹配", size=13.5, color=INK, bold=True)
-    text(slide, 8.46, 2.54, 4.0, 1.6, [
-        [("萌芽 → 上升 → 爆发 → 平稳 → 退潮 → 过气", {"size": 12.5, "color": INK, "bold": True})],
-        [("判定只用四件事：增长率、距峰值差、连续下滑天数、活跃度。"
-          "阈值全部集中在一个配置文件里，可复算、可讨论。", {"size": 11.5, "color": INK_SOFT})],
-    ], spacing=1.3)
-    rect(slide, 8.46, 4.12, 3.94, 0.94, fill=GO_SOFT, line=None)
-    text(slide, 8.62, 4.22, 3.7, 0.8, [
-        [("赶梗三态由算法给：", {"size": 11.5, "color": GO, "bold": True})],
-        [("还来得及 / 慎赶 / 你来晚了，附置信度与理由", {"size": 11, "color": INK_SOFT})],
-    ], spacing=1.2)
-    rect(slide, 0.62, 5.4, 12.1, 1.18, fill=WHITE)
-    text(slide, 0.9, 5.56, 11.6, 1.0, [
-        [("LLM 在这里只干一件事：把算法已经定好的结论翻译成人话。", {"size": 13.5, "color": INK, "bold": True})],
-        [("它不许改状态、不许预测。模型返回的 status 与算法不一致时以算法为准；"
-          "文案里出现「预计」「未来 7 天」「一定会爆」这类预测口吻会被直接丢弃。", {"size": 12, "color": INK_SOFT})],
-    ], spacing=1.3)
-    return slide
-
-
-def slide_pitfalls(prs, page):
-    slide = blank(prs)
-    kicker(slide, "真实数据最好玩的部分：它脏得毫不讲理", page=page)
-    headline(slide, 0.62, 0.94, 11.9, "四个我亲自踩出来的坑，每个都改掉了口径")
-    cards = [
-        ("假增长 +23,616%", "第一版一次抓完再按天聚合，等于拿今天看到的播放量回填历史某一天。",
-         "改成逐日带时间区间查询，只统计当天发布的头部内容。", BRAND),
-        ("418 条样本里 343 条在讲黄豆", "「我不是黄豆」的别名写成黄豆，于是琵琶曲黄豆版、炒黄豆、树叶做豆腐全被灌进来，该梗还挂着榜首。",
-         "短于 4 字的别名只算弱证据，必须再有第二个词佐证才能过阈值。", FLARE),
-        ("真梗被闸门挡在库外", "交集口径 90 天只剩 8 个梗，热度实测最高的闪身步（81.0）根本进不来。",
-         "准入改并集，认证窗口独立 90 天滚动，双 UP 降级为标签。", GO),
-        ("刷新把数据刷薄了", "同一个词同一天两次返回的头部 20 条差很远：琵琶曲 4 天 / 3,976 万播放被刷成 1 天 / 18 条，热度 44.2 → 0.0。",
-         "同一天只保留更好的一次观测（比样本数与播放量，绝不相加），并从快照回填 53 天。", GOLD),
+def p08_lifecycle(prs):
+    s = blank(prs)
+    title(s, "80 分有两种：一种在冲，一种在崩")
+    chart(s, "curves.png", 0.72, 1.6, 7.5)
+    labels = [
+        ("闪身步", "09-13 起从零爬到 81，还在冲", BRAND, 1.62),
+        ("琵琶曲", "脉冲型：冲完 09-25 直接断", FLARE, 2.66),
+        ("老叟戏顽童", "从 84 一路退到 52，退潮期", DUSK, 3.7),
     ]
-    for index, (title, story, fix, color) in enumerate(cards):
-        x = 0.62 + (index % 2) * 6.22
-        y = 1.92 + (index // 2) * 2.2
-        rect(slide, x, y, 5.9, 2.02, fill=WHITE)
-        rect(slide, x, y + 0.14, 0.055, 1.74, fill=color, radius=0, line=None)
-        text(slide, x + 0.26, y + 0.14, 5.4, 0.4, title, size=14.5, color=INK, bold=True)
-        text(slide, x + 0.26, y + 0.58, 5.4, 0.8, story, size=11.5, color=INK_SOFT, spacing=1.26)
-        text(slide, x + 0.26, y + 1.46, 5.4, 0.5,
-             [("修法  ", {"size": 11, "color": color, "bold": True}), (fix, {"size": 11.5, "color": INK})],
-             spacing=1.2)
-    footer(slide, "这四个坑都不是会报错的那种，而是口径错了但每个数都算得出来——最难查的一类。")
-    return slide
+    for name, note, color, y in labels:
+        card(s, 8.5, y, 4.12, 0.9, fill=WHITE)
+        shape(s, MSO_SHAPE.RECTANGLE, 8.5, y + 0.12, 0.05, 0.66, fill=color, line=None)
+        text(s, 8.74, y + 0.1, 3.7, 0.34, name, size=14, color=INK, bold=True)
+        text(s, 8.74, y + 0.46, 3.7, 0.34, note, size=11.5, color=INK_MUTE)
+    card(s, 0.72, 4.98, 7.5, 1.5, fill=PAPER, line=LINE)
+    text(s, 1.0, 5.16, 7.0, 1.2, [
+        [("六个阶段，规则自上而下匹配", {"size": 13.5, "color": INK, "bold": True})],
+        [("萌芽 → 上升 → 爆发 → 平稳 → 退潮 → 过气。判定只用四件事：增长率、距峰值差、"
+          "连续下滑天数、活跃度。阈值全在一个配置文件里，别人可以复算，也可以跟我吵。",
+          {"size": 12, "color": INK_SOFT})],
+    ], spacing=1.3)
+    card(s, 8.5, 4.74, 4.12, 1.74, fill=WHITE)
+    text(s, 8.74, 4.9, 3.7, 1.5, [
+        [("LLM 只负责说人话", {"size": 13.5, "color": INK, "bold": True})],
+        [("阶段和赶不赶都是算法先定，它再翻译。模型返回的状态跟算法不一致，以算法为准；"
+          "文案里出现「预计」「未来 7 天」「一定会爆」这类话，直接丢掉。", {"size": 11.5, "color": INK_SOFT})],
+    ], spacing=1.26)
+    page_no(s, 8)
+    return s
 
 
-def slide_falsify(prs, page):
-    corr = FACTS["correlation"]
-    slide = blank(prs)
-    kicker(slide, "把直觉拿去跟数据对一遍", page=page, color=FLARE)
-    headline(slide, 0.62, 0.94, 11.9, "「解说破百万才值得做」？我拿 31 个样本验了一遍")
-    pic(slide, "scatter.png", 0.62, 2.14, 6.9)
-    rect(slide, 8.0, 1.92, 4.72, 2.26, fill=WHITE)
-    text(slide, 8.26, 2.1, 4.2, 2.0, [
-        [(f"Pearson r = {corr['pearson']:+.2f}（p = {corr['pearson_p']:.3f}）", {"size": 13, "color": INK, "bold": True})],
-        [(f"秩相关 ρ = {corr['spearman']:+.2f}（p = {corr['spearman_p']:.2f}，不显著）", {"size": 12.5, "color": INK_SOFT})],
-        [(f"播放量能解释的热度方差约 {corr['r2'] * 100:.0f}%。", {"size": 12.5, "color": INK_SOFT})],
-        [("那个数字量的是 UP 主自己的粉丝盘，还是发布时刻的存量；梗的生命周期在它之后才展开。",
-          {"size": 12, "color": INK_MUTE})],
-    ], spacing=1.26, space_after=2)
-    rect(slide, 8.0, 4.34, 4.72, 2.22, fill=BRAND_SOFT, line=None)
-    text(slide, 8.26, 4.5, 4.2, 2.0, [
-        [("两个致命反例", {"size": 13, "color": BRAND, "bold": True})],
-        [("闪身步：解说只有 64.6 万 → 该梗热度 81.0，当前榜首。", {"size": 12, "color": INK})],
-        [("宗主第二招：解说 160.7 万 → 该梗热度 0.0，30 天里只有 2 天有内容。", {"size": 12, "color": INK})],
-        [("结论：播放量门槛会同时漏掉最热的、收进最凉的。它只适合当采集成本的预算筛，不能当准入判据。",
-          {"size": 11.5, "color": INK_SOFT})],
-    ], spacing=1.24, space_after=2)
-    return slide
-
-
-def slide_results(prs, page):
-    counts, cov = FACTS["counts"], FACTS["coverage"]
-    slide = blank(prs)
-    kicker(slide, "当前结果", page=page, color=GO)
-    headline(slide, 0.62, 0.94, 11.9, f"{counts['on_board']} 个真梗在榜：热度接近的三个，赶梗结论完全不同")
-    rows = FACTS["top"][:8]
-    left, top = 0.62, 1.96
-    widths = [0.6, 2.5, 1.1, 1.4, 1.9, 1.9]
-    headers = ["#", "梗名", "热度", "阶段", "赶梗结论", "认证标签"]
-    rect(slide, left, top, sum(widths), 0.46, fill=INK, line=None)
+def p09_pitfalls(prs):
+    s = blank(prs)
+    title(s, "四个我亲手造出来的 bug")
+    text(s, 0.72, 1.4, 11.0, 0.36, "都不是会报错的那种——口径错了，每个数照样算得出来，最难查",
+         size=12.5, color=INK_MUTE)
+    headers = ["症状", "化验单", "病因", "处方"]
+    widths = [2.5, 3.1, 3.5, 3.4]
+    rows = [
+        ("假增长 +23,616%", "一次抓完再摊到每天", "拿今天看到的播放量回填历史某天",
+         "逐日带时间区间查询，只算当天发布的头部内容"),
+        ("榜首那个梗是假的", "418 条样本里 343 条在讲黄豆", "「我不是黄豆」的别名写成黄豆，炒黄豆、树叶做豆腐全灌进来",
+         "短于 4 字的别名只算弱证据，必须再有第二个词佐证"),
+        ("热度最高的梗不在榜上", "90 天交集只剩 8 个梗", "日更 UP 的选题被周更 UP 的排期一票否决",
+         "准入改并集，认证窗口独立 90 天滚动，双 UP 降级为标签"),
+        ("刷新把数据刷没了", "琵琶曲 4 天 / 3,976 万 → 1 天 / 18 条，44.2 分掉到 0.0", "同一词同一天两次返回的头部 20 条差很远",
+         "同一天只留更好的一次观测（比样本数与播放量，绝不相加），另从快照回填 53 天"),
+    ]
+    x0, y0 = 0.72, 1.98
+    shape(s, MSO_SHAPE.RECTANGLE, x0, y0, sum(widths), 0.44, fill=INK, line=None)
     for index, head in enumerate(headers):
-        text(slide, left + sum(widths[:index]) + 0.14, top + 0.1, widths[index] - 0.2, 0.3,
-             head, size=11.5, color=WHITE, bold=True)
+        text(s, x0 + sum(widths[:index]) + 0.16, y0 + 0.09, widths[index] - 0.3, 0.3,
+             head, size=12, color=WHITE, bold=True)
     for row_index, row in enumerate(rows):
-        y = top + 0.46 + row_index * 0.42
-        rect(slide, left, y, sum(widths), 0.42, fill=WHITE if row_index % 2 else CANVAS, line=None)
-        cells = [str(row_index + 1), row["name"], f"{row['score']:.1f}", row["stage"],
+        y = y0 + 0.44 + row_index * 1.14
+        shape(s, MSO_SHAPE.RECTANGLE, x0, y, sum(widths), 1.14,
+              fill=WHITE if row_index % 2 == 0 else CANVAS, line=None)
+        for index, cell in enumerate(row):
+            color = BRAND if index == 0 else INK if index == 1 else INK_SOFT if index == 2 else GO
+            size = 13.5 if index == 0 else 11.5
+            text(s, x0 + sum(widths[:index]) + 0.16, y + 0.14, widths[index] - 0.32, 0.9,
+                 cell, size=size, color=color, bold=index in (0, 3), spacing=1.24)
+    shape(s, MSO_SHAPE.RECTANGLE, x0, y0, sum(widths), 0.44 + 4 * 1.14, fill=None, line=LINE, weight=1.0)
+    page_no(s, 9)
+    return s
+
+
+def p10_falsify(prs):
+    corr = FACTS["correlation"]
+    s = blank(prs)
+    title(s, "我自己提的门槛，我自己先拿数据打了一遍")
+    text(s, 0.72, 1.4, 11.4, 0.36,
+         "提法：解说视频破百万才值得做。检验：把 31 个上榜梗的解说播放量和它自己的热度放一起看",
+         size=12.5, color=INK_MUTE)
+    chart(s, "scatter.png", 0.72, 1.92, 7.0)
+    card(s, 8.0, 1.92, 4.62, 1.6, fill=WHITE)
+    text(s, 8.26, 2.08, 4.1, 1.4, [
+        [(f"Pearson r = {corr['pearson']:+.2f}（p = {corr['pearson_p']:.3f}）", {"size": 13, "color": INK, "bold": True})],
+        [(f"秩相关 ρ = {corr['spearman']:+.2f}（p = {corr['spearman_p']:.2f}，不显著）", {"size": 12, "color": INK_SOFT})],
+        [(f"播放量只能解释热度方差的约 {corr['r2'] * 100:.0f}%。", {"size": 12, "color": INK_SOFT})],
+    ], spacing=1.26, space_after=2)
+    for index, (name, line1, line2) in enumerate((
+        ("闪身步", "解说只有 64.6 万", "热度 81.0，当前第一"),
+        ("宗主第二招", "解说 160.7 万", "热度 0.0，30 天里 2 天有内容"),
+    )):
+        y = 3.7 + index * 1.24
+        card(s, 8.0, y, 4.62, 1.1, fill=BRAND_SOFT if index == 0 else CANVAS, line=None)
+        sticker(s, name, 11.6, y + 0.06, w=0.9, angle=4)
+        text(s, 8.26, y + 0.12, 3.2, 0.34, name, size=14, color=INK, bold=True)
+        text(s, 8.26, y + 0.5, 3.3, 0.5, [(line1 + " → ", {"color": INK_MUTE}), (line2, {"color": BRAND, "bold": True})],
+             size=11.5, spacing=1.2)
+    text(s, 0.72, 5.72, 7.0, 0.8, "结论：这个门槛会同时漏掉最热的、收进最凉的。播放量只适合当采集成本的预算筛，"
+         "不能当准入判据——那个数字量的是 UP 主自己的粉丝盘，而且是发布那一刻的存量。",
+         size=12, color=INK_SOFT, spacing=1.3)
+    page_no(s, 10)
+    return s
+
+
+def p11_results(prs):
+    counts, cov = FACTS["counts"], FACTS["coverage"]
+    s = blank(prs)
+    title(s, "现在榜上长这样（明早刷新后可能就不一样了）")
+    rows = FACTS["top"][:7]
+    x0, y0 = 0.72, 1.66
+    widths = [0.5, 1.1, 2.4, 1.0, 1.3, 1.7, 1.9]
+    headers = ["#", "封面", "梗名", "热度", "阶段", "赶梗结论", "认证标签"]
+    shape(s, MSO_SHAPE.RECTANGLE, x0, y0, sum(widths), 0.4, fill=INK, line=None)
+    for index, head in enumerate(headers):
+        text(s, x0 + sum(widths[:index]) + 0.12, y0 + 0.08, widths[index] - 0.2, 0.3, head,
+             size=11.5, color=WHITE, bold=True)
+    for row_index, row in enumerate(rows):
+        y = y0 + 0.4 + row_index * 0.62
+        shape(s, MSO_SHAPE.RECTANGLE, x0, y, sum(widths), 0.62,
+              fill=WHITE if row_index % 2 == 0 else CANVAS, line=None)
+        cells = [str(row_index + 1), "", row["name"], f"{row['score']:.1f}", row["stage"],
                  row["catch"], row["cert"]]
         for index, cell in enumerate(cells):
-            color = BRAND if index == 2 else INK if index in (0, 1) else INK_SOFT
-            text(slide, left + sum(widths[:index]) + 0.14, y + 0.075, widths[index] - 0.2, 0.3,
-                 cell, size=11.5, color=color, bold=index in (1, 2))
-    rect(slide, 10.98, 1.96, 1.74, 3.82, fill=WHITE)
+            if index == 1:
+                cover = COVERS.get(row["name"])
+                if cover and (ROOT / cover).exists():
+                    s.shapes.add_picture(str(ROOT / cover), Inches(x0 + widths[0] + 0.08),
+                                         Inches(y + 0.07), width=Inches(0.94), height=Inches(0.48))
+                continue
+            color = BRAND if index == 3 else INK if index in (0, 2) else INK_SOFT
+            text(s, x0 + sum(widths[:index]) + 0.12, y + 0.16, widths[index] - 0.2, 0.3, cell,
+                 size=12, color=color, bold=index in (2, 3))
+    shape(s, MSO_SHAPE.RECTANGLE, x0, y0, sum(widths), 0.4 + 7 * 0.62, fill=None, line=LINE)
+    card(s, 10.9, 1.66, 1.72, 4.74, fill=PAPER, line=LINE)
     stages = FACTS["stages"]
-    text(slide, 11.14, 2.12, 1.5, 3.5, [
+    text(s, 11.06, 1.82, 1.4, 4.4, [
         [("阶段分布", {"size": 11.5, "color": INK, "bold": True})],
-        [(f"爆发 {stages.get('爆发期', 0)}", {"size": 11, "color": INK_SOFT})],
+        [(f"爆发 {stages.get('爆发期', 0)}", {"size": 11, "color": BRAND, "bold": True})],
         [(f"上升 {stages.get('上升期', 0)}", {"size": 11, "color": INK_SOFT})],
         [(f"平稳 {stages.get('平稳期', 0)}", {"size": 11, "color": INK_SOFT})],
         [(f"萌芽 {stages.get('萌芽期', 0)}", {"size": 11, "color": INK_SOFT})],
         [(f"退潮 {stages.get('退潮期', 0)}", {"size": 11, "color": INK_SOFT})],
-        [(f"过气 {stages.get('过气', 0)}", {"size": 11, "color": BRAND, "bold": True})],
+        [(f"过气 {stages.get('过气', 0)}", {"size": 11, "color": INK_MUTE})],
         [("", {"size": 4})],
-        [("过气仍占位，是下一步要解决的", {"size": 10, "color": INK_MUTE})],
+        [("过气那 17 个还占着位置，是下一步要摘掉的", {"size": 10, "color": INK_FAINT})],
     ], spacing=1.2, space_after=1)
-    rect(slide, 0.62, 5.94, 12.1, 0.7, fill=WHITE)
-    text(slide, 0.9, 6.06, 11.6, 0.5, [
-        [("同一批投稿、同一套算法，只把准入从交集换成并集：", {"size": 12, "color": INK_MUTE}),
-         (f"可分析的梗 {cov['intersection']} → {cov['union']} 个，榜单 {counts['on_board']} 个真梗，演示数据 0 个。",
-          {"size": 13.5, "color": BRAND, "bold": True})],
-    ], spacing=1.2)
-    return slide
+    card(s, 0.72, 6.02, 10.0, 0.66, fill=WHITE)
+    text(s, 0.98, 6.14, 9.6, 0.4, [
+        (f"只把准入从交集换成并集，其他什么都没动：可分析的梗 {cov['intersection']} → {cov['union']} 个，"
+         f"榜上 {counts['on_board']} 个真梗、演示数据 0 个。", {"size": 12.5, "color": BRAND, "bold": True}),
+    ])
+    page_no(s, 11)
+    return s
 
 
-def slide_validation(prs, page):
+def p12_validation(prs):
     counts = FACTS["counts"]
-    slide = blank(prs)
-    kicker(slide, "怎么知道结果可信", page=page, color=GO)
-    headline(slide, 0.62, 0.94, 11.9, "验证不是跑通了，是错了会被发现")
-    stat(slide, 0.62, 1.9, 2.9, "162", "单元与集成测试", color=GO, sub="算法、闸门、接口都覆盖")
-    stat(slide, 3.7, 1.9, 2.9, "70", "接口冒烟项", color=GO, sub="对着真实数据的后端逐项校")
-    stat(slide, 6.78, 1.9, 2.9, "0", "混进榜单的演示数据", color=GO, sub="真实模式闸门强制隔离")
-    stat(slide, 9.86, 1.9, 2.86, f"{counts['no_series']}", "入池但采空的梗", color=GOLD,
-         sub="如实显示暂无数据，不补零")
-    cards = [
-        ("口径写进界面，不写进说明书", "「当日播放量 = 该日头部 20 条相关视频合计」「统计截至 09-27，滞后 1 天」"
-         "这类话直接显示在产品上，用户不用先读文档才知道数字怎么来的。", GO),
-        ("演示数据必须自报家门", "系统留了一套演示梗库用来跑通全流程，但它永远带「演示数据」标记，"
-         "真实模式下不进榜——自记自认的认证位不算证据。", FLARE),
-        ("能抽查到每一条视频", "每个梗都列出采信了哪些样本、各自相关性得分多少、命中哪个词，"
-         "觉得数不对，可以直接点进去看 BV 号。", BRAND),
-        ("幂等与回归锁死", "重算不改变榜单（同输入同输出）；改封面改介绍不会改动任何指标——接口测试专门锁了这条。", DUSK),
+    s = blank(prs)
+    title(s, "我怎么确认自己没在骗自己")
+    tiles = [
+        ("162", "单元 + 集成测试", "算法、闸门、接口都有断言", GO),
+        ("70", "接口冒烟项", "对着真实数据的后端逐项校", GO),
+        ("0", "演示数据混进榜单", "真实模式下闸门强制隔离", GO),
+        (f"{counts['no_series']}", "入池但采到的梗是空的", "页面显示暂无数据，不补零", GOLD),
     ]
-    for index, (title, body, color) in enumerate(cards):
-        x = 0.62 + (index % 2) * 6.22
-        y = 3.52 + (index // 2) * 1.6
-        card(slide, x, y, 5.9, 1.44, title, body, accent=color)
-    return slide
+    for index, (value, label, sub, color) in enumerate(tiles):
+        x = 0.72 + index * 3.06
+        card(s, x, 1.62, 2.86, 1.42, fill=WHITE)
+        text(s, x + 0.2, 1.78, 2.5, 0.5, value, size=27, color=color, bold=True)
+        text(s, x + 0.2, 2.34, 2.5, 0.3, label, size=11.5, color=INK)
+        text(s, x + 0.2, 2.62, 2.5, 0.4, sub, size=10.5, color=INK_MUTE, spacing=1.2)
+    checks = [
+        ("口径写在界面上，不写在说明书里", "「当日播放量 = 该日头部 20 条相关视频合计」「统计截至 09-27，滞后 1 天」"
+         "这类话直接显示在产品上，用户不用先读文档才知道数怎么来的。"),
+        ("演示数据必须自报家门", "留了一套演示梗库用来跑通流程，但它永远带「演示数据」标记，真实模式下不进榜；"
+         "自记自认的认证位不算证据。"),
+        ("每一条样本都能抽查", "每个梗列出采信了哪些视频、各自相关性得分、命中哪个词，觉得数不对可以直接点进去看 BV 号。"),
+        ("改数据要能被发现", "重算幂等（同输入同输出）；改封面改介绍不动任何指标——这条有专门的回归测试盯着。"),
+    ]
+    for index, (head, body) in enumerate(checks):
+        y = 3.34 + index * 0.86
+        shape(s, MSO_SHAPE.RECTANGLE, 0.78, y + 0.06, 0.28, 0.28, fill=None, line=GO, weight=1.6)
+        shape(s, MSO_SHAPE.RECTANGLE, 0.83, y + 0.2, 0.2, 0.05, fill=GO, line=None, angle=45)
+        shape(s, MSO_SHAPE.RECTANGLE, 0.9, y + 0.1, 0.05, 0.18, fill=GO, line=None, angle=45)
+        text(s, 1.24, y, 5.4, 0.34, head, size=13.5, color=INK, bold=True)
+        text(s, 6.9, y, 5.7, 0.8, body, size=11.5, color=INK_MUTE, spacing=1.26)
+    page_no(s, 12)
+    return s
 
 
-def slide_next(prs, page):
-    slide = blank(prs)
-    kicker(slide, "局限 · 下一步 · 时间计划", page=page, color=DUSK)
-    headline(slide, 0.62, 0.94, 11.9, "我知道它现在哪里不准")
+def p13_next(prs):
+    s = blank(prs)
+    title(s, "它现在哪里不准，以及我打算怎么办")
     limits = [
-        ("脉冲型梗会误判", "琵琶曲 30 天只有 4 天有内容，那天却播了 3,976 万；只看天数的门槛会判死它。",
-         "上榜层改双条件"),
-        ("过气梗仍占榜单位置", f"榜上 {FACTS['stages'].get('过气', 0)} 个热度 0.0 的梗，占了「今天玩什么」的位置。",
-         "过气不出榜，另归考古区"),
-        ("深翻页受平台风控限制", "空间投稿接口匿名只稳定给最近约 50 条，更早的要 Cookie。",
-         "换指纹重试 + 索引缓存"),
-        ("刷新还是手动", f"全库一轮 {FACTS['coverage']['union']} 个梗约 30~45 分钟，没有调度器。",
-         "每日增量 + 单梗重采"),
+        ("脉冲型梗会被误判", "琵琶曲 30 天只有 4 天有内容，那天却播了 3,976 万。只看天数的门槛会判死它。",
+         "上榜改双条件：天数 或 头部播放量"),
+        ("过气梗还占着位置", f"榜上 {FACTS['stages'].get('过气', 0)} 个热度 0.0 的梗，把「今天玩什么」的地方占了。",
+         "过气不出榜，单独归到考古区"),
+        ("更早的投稿拿不全", "空间接口匿名只稳定给最近约 50 条，两位 UP 的更早投稿要 Cookie。",
+         "换指纹重试 + 索引缓存 + 缺口如实报告"),
+        ("刷新还得手动跑", f"全库一轮 {FACTS['coverage']['union']} 个梗要 30~45 分钟，目前没有调度。",
+         "每日增量刷新 + 单梗重采入口"),
     ]
-    for index, (title, body, plan) in enumerate(limits):
-        y = 1.92 + index * 1.02
-        rect(slide, 0.62, y, 7.5, 0.9, fill=WHITE)
-        text(slide, 0.88, y + 0.1, 6.9, 0.36, title, size=13.5, color=INK, bold=True)
-        text(slide, 0.88, y + 0.46, 4.55, 0.42, body, size=11, color=INK_MUTE, spacing=1.2)
-        text(slide, 5.6, y + 0.46, 2.36, 0.42, plan, size=11, color=GO, bold=True, spacing=1.2)
-    rect(slide, 8.4, 1.92, 4.32, 3.9, fill=WHITE)
-    text(slide, 8.66, 2.1, 3.8, 0.4, "剩余时间计划", size=14, color=INK, bold=True)
-    plan_rows = [
-        ("第 1-2 周", "上榜层口径重做：过气不出榜、脉冲型梗单独处理；补一组对照实验。"),
-        ("第 3 周", "增量刷新与调度；把采空的梗用别名兜底再跑一轮。"),
-        ("第 4 周", "用户实验：20 人对照看热搜与看本系统的选题准确率差异。"),
-        ("第 5 周", "写论文与图表：阶段判定混淆矩阵、热度与人工标注的一致性检验。"),
+    for index, (head, body, plan) in enumerate(limits):
+        y = 1.62 + index * 1.16
+        card(s, 0.72, y, 7.1, 1.04, fill=WHITE)
+        text(s, 0.98, y + 0.12, 6.6, 0.34, head, size=14, color=INK, bold=True)
+        text(s, 0.98, y + 0.5, 4.6, 0.5, body, size=11, color=INK_MUTE, spacing=1.22)
+        text(s, 5.72, y + 0.5, 2.0, 0.5, plan, size=11, color=GO, bold=True, spacing=1.22)
+    card(s, 8.1, 1.62, 4.52, 4.44, fill=PAPER, line=LINE)
+    tape(s, 10.1, 1.5, 1.0, 0.24, angle=2)
+    text(s, 8.4, 1.86, 4.0, 0.4, "剩下几周怎么排", size=13.5, color=INK, bold=True)
+    plans = [
+        ("第 1-2 周", "上榜层口径重做，补一组对照实验"),
+        ("第 3 周", "增量刷新与调度；采空的梗用别名兜底再跑"),
+        ("第 4 周", "20 人小实验：看热搜 vs 看本系统，谁的选题更准"),
+        ("第 5 周", "阶段判定混淆矩阵、热度与人工标注一致性检验"),
+        ("第 6 周", "写论文与图表"),
     ]
-    for index, (when, what) in enumerate(plan_rows):
-        y = 2.6 + index * 0.82
-        text(slide, 8.66, y, 1.2, 0.3, when, size=12, color=BRAND, bold=True)
-        text(slide, 9.86, y, 2.7, 0.7, what, size=11, color=INK_SOFT, spacing=1.24)
-    rect(slide, 0.62, 6.06, 12.1, 0.62, fill=INK, line=None)
-    text(slide, 0.94, 6.18, 11.6, 0.4, [
-        [("我想做的不是热搜的复读机，而是热点的倒计时器。", {"size": 14, "color": WHITE, "bold": True}),
-         ("    现场可演示：127.0.0.1:5173（真实数据，非样例）", {"size": 11.5, "color": INK_FAINT})],
-    ], spacing=1.2)
-    return slide
+    for index, (when, what) in enumerate(plans):
+        y = 2.4 + index * 0.72
+        shape(s, MSO_SHAPE.OVAL, 8.5, y + 0.06, 0.12, 0.12, fill=BRAND, line=None)
+        if index < len(plans) - 1:
+            shape(s, MSO_SHAPE.RECTANGLE, 8.55, y + 0.2, 0.02, 0.56, fill=LINE, line=None)
+        text(s, 8.76, y, 1.1, 0.3, when, size=12, color=BRAND, bold=True)
+        text(s, 9.9, y, 2.6, 0.6, what, size=11.5, color=INK_SOFT, spacing=1.22)
+    shape(s, MSO_SHAPE.RECTANGLE, 0, 6.4, 13.333, 1.1, fill=INK, line=None)
+    text(s, 0.72, 6.66, 11.9, 0.5, [
+        [("有问题现在问——明天榜单就不长这样了。", {"size": 17, "color": WHITE, "bold": True, "font": BRUSH}),
+         ("      现场可演示：127.0.0.1:5173，数据是昨晚真跑出来的", {"size": 11.5, "color": INK_FAINT})],
+    ])
+    return s
 
 
 NOTES = [
-    "开场 20 秒：别念标题，直接问「闪身步是什么？」——停顿两秒让场子安静，再宣布这是真实榜单第一名。",
-    "举手环节 30 秒。目的不是互动，是让所有人亲眼看到「信息差」确实存在，然后把痛点收到「还剩几天」上。",
-    "30 秒。三类工具各说一句话就够，重点落在右边那格：把梗当成时间序列对象来测，这是本课题的位置。",
-    "40 秒。RQ 要念得出口、也要能被证伪；右边「不做清单」是防追问的挡箭牌，主动讲比被问到再答好。",
-    "60 秒。四个数字讲清规模，然后只挑一条口径细讲：为什么统计窗口不含今天（今天没过完，会算出假下跌）。",
-    "60 秒，本稿重点之一。先讲漏掉老叟戏顽童这个事故，再讲并集怎么修——问题驱动方法，比直接摆规则有说服力。",
-    "60 秒。公式不用念完，讲两件事：为什么对数归一（亿级老梗会永远压着新梗），为什么增长权重给到 0.25。",
-    "60 秒。指着曲线说：闪身步和老叟戏顽童分数接近，但一个在冲一个在崩，所以必须判成不同结论。再补一句 LLM 只能写文案。",
-    "90 秒，最能证明我真做过的一页。每个坑讲「现象 → 原因 → 修法」，其中黄豆那条最直观，可以多说一句。",
-    "60 秒。先说这是我自己提的直觉，再拿数据把它推翻：r=+0.40 但只解释 16% 方差，两个反例足够判门槛不成立。",
-    "60 秒。指出前三名热度接近但赶梗结论不同，说明阶段判定不是热度的复读。顺带交代并集带来的覆盖提升。",
-    "45 秒。强调验证的目标不是跑通，而是错了会被发现：测试数、演示数据隔离、能抽查到每一条视频。",
-    "45 秒收尾。主动交代四个已知不准，再给时间表；最后一句留在屏幕上：不是热搜的复读机，是热点的倒计时器。",
+    "别念标题。直接问「闪身步是什么？」，停两秒，再宣布它是今天真实榜第一。",
+    "举手 30 秒。目的是让全场亲眼看到信息差存在，然后把痛点收到「还剩几天」这一句上。",
+    "三个气泡各念一句就够，重点是右边黑板：分数、时间线、赶不赶，三样东西。",
+    "40 秒。必答三题要念得出口也经得起追问；不做清单主动讲，比被老师问到再解释强。",
+    "60 秒。先讲 2.08 亿是什么口径，再挑「不含今天」这一条细讲，其它一句话带过。",
+    "60 秒，重点页。先讲漏掉老叟戏顽童这个事故，再讲并集怎么修——问题驱动方法比直接摆规则有说服力。",
+    "60 秒。公式不用逐字念，讲两件事：为什么取对数，为什么增长敢给 1/4。",
+    "60 秒。指着曲线说：闪身步和老叟戏顽童分数接近但形状相反，所以阶段判定不能只看分数。再补一句 LLM 只能写文案。",
+    "90 秒，最能证明我真做过的一页。每行按症状 → 化验单 → 病因 → 处方讲，黄豆那条可以多说一句。",
+    "60 秒。先承认这是我自己提的直觉，再拿数据打它：r=+0.40 只解释 16% 方差，两个反例足够判门槛不成立。",
+    "60 秒。指出前三名热度接近但赶梗结论不同，说明阶段不是热度的复读。顺带交代并集带来的覆盖提升。",
+    "45 秒。强调验证的目标不是跑通，是错了会被发现：测试数、演示数据隔离、能抽查到每条视频。",
+    "45 秒收尾。主动交代四个不准，再给时间表。最后一句留在屏幕上，等老师提问。",
 ]
 
 
 def main() -> int:
     prs = new_deck()
-    builders = [
-        slide_cover, slide_hook, slide_problem, slide_rq, slide_data, slide_discovery,
-        slide_hotness, slide_lifecycle, slide_pitfalls, slide_falsify, slide_results,
-        slide_validation, slide_next,
-    ]
+    builders = [p01_cover, p02_vote, p03_problem, p04_scope, p05_data, p06_discovery,
+                p07_hotness, p08_lifecycle, p09_pitfalls, p10_falsify, p11_results,
+                p12_validation, p13_next]
     for index, builder in enumerate(builders):
-        slide = builder(prs) if index == 0 else builder(prs, index)
-        if index < len(NOTES):
-            slide.notes_slide.notes_text_frame.text = NOTES[index]
+        slide = builder(prs) if index == 0 else builder(prs)
+        slide.notes_slide.notes_text_frame.text = NOTES[index]
     prs.save(TARGET)
-    print(f"已生成 {TARGET}（{len(builders)} 页，含逐页讲稿备注）")
+    print(f"已生成 {TARGET}（{len(builders)} 页）")
     return 0
 
 

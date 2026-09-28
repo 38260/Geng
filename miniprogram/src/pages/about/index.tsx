@@ -1,5 +1,5 @@
 import { Input, Text, View } from "@tarojs/components";
-import Taro, { usePullDownRefresh } from "@tarojs/taro";
+import Taro, { usePullDownRefresh, useShareAppMessage } from "@tarojs/taro";
 import { useState } from "react";
 
 import { apiBase, getMeta, setApiBase, DEFAULT_API_BASE } from "@/api/client";
@@ -21,6 +21,8 @@ function Row({ label, value }: { label: string; value: string }) {
 export default function About() {
   const meta = useLoad(() => getMeta(), []);
   const [base, setBase] = useState(apiBase());
+
+  useShareAppMessage(() => ({ title: "赶梗潮：这些数字是怎么算出来的", path: "/pages/about/index" }));
 
   usePullDownRefresh(async () => {
     await meta.reload();

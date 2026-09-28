@@ -52,7 +52,27 @@ npm run build:weapp         # 产出 dist/weapp
 两样都没有就明说「暂无介绍」，不留白。小程序打不开站外链接，所以出处做成
 "点一下复制视频地址"。
 
-## 四、响应式做法
+## 四、分享
+
+四个页面都接了 `useShareAppMessage`，转发路径带上下文：
+
+| 页面 | 分享标题 | 落点 |
+| --- | --- | --- |
+| 详情 | 「闪身步」现在赶还来得及吗？ | `/pages/detail/index?id=51` |
+| 热榜 | 今天赶什么梗？B 站热榜 12 个活梗 | `/pages/home/index` |
+| 梗库 | B 站梗库 31 个梗，热度与生命周期都能查 | `/pages/library/index` |
+| 口径 | 赶梗潮：这些数字是怎么算出来的 | `/pages/about/index` |
+
+标题刻意写成一句人话问句，不出现"AI 智能分析"这类词。详情页右上角还有一个
+「分享」按钮（`open-type="share"`）——小程序里没有"复制链接"这种原生入口，
+转发才是它的分发路径。
+
+两点没做，原因写在代码注释里：**不用自定义分享图**（B 站封面有防盗链，
+跨端引用不稳，宁可让微信截默认页面图）；**不开朋友圈单页模式**（`shareTimeline`
+打开的是受限的 singlePage 环境，本机没有开发者工具无法核验，宁可不给）。
+`open-type="share"` 只在微信里生效，H5 预览上那个按钮点了没反应，属正常。
+
+## 五、响应式做法
 
 - 样式里写小写 `px`，Taro 按 `designWidth: 750` 编译成 `rpx`，跟着屏宽缩放；
   不想跟着放大的（1 物理像素分割线、平板上给内容列封顶）写大写 `PX`。
@@ -60,7 +80,7 @@ npm run build:weapp         # 产出 dist/weapp
 - `@media (min-width: 500PX)` 把内容列封顶 480PX 居中，iPad/桌面大屏不会拉成横幅。
 - 数字统一 `font-variant-numeric: tabular-nums`，榜单右对齐不抖。
 
-## 五、测试
+## 六、测试
 
 ```bash
 npm test          # node --test，不引 jest/vitest
@@ -74,7 +94,7 @@ npm run build:weapp && npm run build:h5
   榜单与梗库的分母关系、卡片必填字段、详情介绍不许空白、趋势窗口只收 7/30、
   采信视频都过相关性阈值。后端没起时每条各自 skip 并说明原因，不会静默假通过。
 
-## 六、这一端刻意没做什么
+## 七、这一端刻意没做什么
 
 - 没有收藏/登录：V1 不做用户体系，Web 端的收藏是 localStorage，不跨端同步。
 - 趋势图用 CSS 柱子而不是 ECharts/canvas：canvas 在 weapp 与 h5 两套实现差异大，

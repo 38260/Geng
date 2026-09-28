@@ -1,5 +1,5 @@
 import { Input, Text, View } from "@tarojs/components";
-import Taro, { usePullDownRefresh, useReachBottom } from "@tarojs/taro";
+import Taro, { usePullDownRefresh, useReachBottom, useShareAppMessage } from "@tarojs/taro";
 import { useRef, useState } from "react";
 
 import { listMemes } from "@/api/client";
@@ -33,6 +33,10 @@ export default function Library() {
     (offset, limit) => listMemes({ scope: "all", search, sort, limit, offset }),
     [search, sort],
   );
+
+  const shareTitle = useRef("B 站梗库");
+  if (board.total) shareTitle.current = `B 站梗库 ${board.total} 个梗，热度与生命周期都能查`;
+  useShareAppMessage(() => ({ title: shareTitle.current, path: "/pages/library/index" }));
 
   usePullDownRefresh(async () => {
     await board.refresh();

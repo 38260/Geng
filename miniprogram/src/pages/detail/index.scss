@@ -60,9 +60,28 @@
   flex-wrap: wrap;
 }
 
-.head-score {
+.head-side {
   flex: none;
-  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+/* Taro 的 Button 自带白底边框，得先清成一行文字 */
+.head-share {
+  margin: 0;
+  padding: 6px 18px;
+  line-height: 1.4;
+  border-radius: $radius-pill;
+  background: $brand-soft;
+  color: $brand-deep;
+  font-size: 22px;
+  border: none;
+
+  &::after {
+    border: none;
+  }
 }
 
 .head-score-num {

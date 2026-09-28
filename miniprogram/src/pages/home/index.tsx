@@ -1,6 +1,6 @@
 import { Text, View } from "@tarojs/components";
-import Taro, { usePullDownRefresh, useReachBottom } from "@tarojs/taro";
-import { useState } from "react";
+import Taro, { usePullDownRefresh, useReachBottom, useShareAppMessage } from "@tarojs/taro";
+import { useRef, useState } from "react";
 
 import { getMeta, listMemes } from "@/api/client";
 import { MemeCardView } from "@/components/MemeCardView";
@@ -25,6 +25,13 @@ export default function Home() {
   useReachBottom(() => {
     board.loadMore();
   });
+
+  // 分享文案在点"转发"那一刻才取，所以用 ref 读最新值，不重新注册回调
+  const shareTitle = useRef("今天赶什么梗？B 站梗热度与生命周期");
+  if (meta.data) {
+    shareTitle.current = `今天赶什么梗？B 站热榜 ${meta.data.certified_count} 个活梗`;
+  }
+  useShareAppMessage(() => ({ title: shareTitle.current, path: "/pages/home/index" }));
 
   const filters = meta.data?.filters?.length ? meta.data.filters : FALLBACK_FILTERS;
   const stale = isStale(meta.data?.data_lag_days ?? null);

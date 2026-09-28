@@ -1,6 +1,6 @@
-import { Image, Text, View } from "@tarojs/components";
-import Taro, { useRouter, usePullDownRefresh } from "@tarojs/taro";
-import { useState } from "react";
+import { Button, Image, Text, View } from "@tarojs/components";
+import Taro, { useRouter, usePullDownRefresh, useShareAppMessage } from "@tarojs/taro";
+import { useRef, useState } from "react";
 
 import { getDetail, getTrend } from "@/api/client";
 import { TrendBars, type TrendMetric } from "@/components/TrendBars";
@@ -109,11 +109,15 @@ function HeadCard({ detail }: { detail: MemeDetail }) {
             {real ? null : <Text className="chip chip-gold">演示数据</Text>}
           </View>
         </View>
-        <View className="head-score">
+        <View className="head-side">
           <Text className="head-score-num" style={{ color: stage.color }}>
             {Math.round(detail.hotness.score)}
           </Text>
           <Text className="faint">热度</Text>
+          {/* 小程序没有"复制链接"这种入口，转发才是原生分发路径 */}
+          <Button className="head-share" openType="share">
+            分享
+          </Button>
         </View>
       </View>
       <Text className="head-note">
@@ -130,11 +134,17 @@ export default function Detail() {
   const [trend30, setTrend30] = useState<MemeDetail["trend"] | null>(null);
 
   const detail = useLoad(() => getDetail(id), [id]);
+  const data = detail.data;
 
   usePullDownRefresh(async () => {
     await detail.reload();
     Taro.stopPullDownRefresh();
   });
+
+  // 分享标题走"人话问句"，不写"AI 智能分析"这类词
+  const shareTitle = useRef("这个梗现在赶还来得及吗？");
+  if (data?.meme) shareTitle.current = `「${data.meme.name}」现在赶还来得及吗？`;
+  useShareAppMessage(() => ({ title: shareTitle.current, path: `/pages/detail/index?id=${id}` }));
 
   // 30 天曲线单独拉：详情接口只带 7 天，切到 30 天才补一次请求
   const switchMetric = (next: TrendMetric) => {
@@ -152,7 +162,6 @@ export default function Detail() {
     );
   }
 
-  const data = detail.data;
   const points = metric === "hotness" ? (data?.trend.points ?? []) : (trend30?.points ?? data?.trend.points ?? []);
 
   return (

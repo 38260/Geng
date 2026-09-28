@@ -83,6 +83,9 @@ class Settings(BaseSettings):
     # 认证记录也是自造的，让它跟真梗同榜混排等于用假数字压真热度。
     # 跑演示（DATA_SOURCE=mock）时这条不生效，否则演示产品会空掉。
     leaderboard_require_verified: bool = True
+    # 热榜还要过"活着"门槛（过气不出榜 + 有内容天数或近 7 天头部播放达标）。
+    # 关掉后首页会把考古区的梗也排进来，只建议在排查数据时临时打开。
+    leaderboard_gate: bool = True
     relevance_threshold: float = 0.5
 
     # ------------------------------- discovery -------------------------------- #

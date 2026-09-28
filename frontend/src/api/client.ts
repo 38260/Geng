@@ -112,7 +112,7 @@ const query = (params: Record<string, string | number | boolean | undefined>) =>
 export const api = {
   meta: () => request<Meta>("/api/meta"),
 
-  memes: (params: { filter?: string; search?: string; sort?: string; limit?: number; offset?: number } = {}) =>
+  memes: (params: { filter?: string; search?: string; sort?: string; limit?: number; offset?: number; scope?: "board" | "all" } = {}) =>
     request<MemeList>(`/api/memes${query(params)}`),
 
   memeDetail: (id: number) => request<MemeDetail>(`/api/memes/${id}`),

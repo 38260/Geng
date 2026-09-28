@@ -61,7 +61,11 @@ def test_health_and_meta(client):
     assert payload["app_name"] == "赶梗潮"
     assert payload["data_source"] == "mock"
     assert payload["is_demo"] is True, "演示数据必须被明确标记"
-    assert payload["certified_count"] >= 30
+    # 热榜还要过"活着"门槛，所以榜上数会比梗库总数小，两个都得报出来
+    assert payload["certified_count"] >= 25
+    assert payload["library_count"] >= 30
+    assert payload["gated_out"] >= 1
+    assert "过气" in payload["transparency"]["board_gate"]
     # 候选 = 两位 UP 都没介绍过的（并集准入之外）；只有一位做过的已经算入池
     assert payload["candidate_count"] == 1
     assert payload["transparency"]["cert_window_days"] == 90
@@ -401,11 +405,14 @@ def test_no_response_leaks_a_secret(client):
 
 
 def test_real_mode_does_not_rank_demo_memes(client, monkeypatch):
-    """配置成真实数据源时，手写演示梗不能和真梗同榜——假数字会压住真热度。"""
-    assert client.get("/api/memes?limit=100").json()["total"] >= 30
+    """配置成真实数据源时，手写演示梗不能和真梗同榜——假数字会压住真热度。
+
+    这里一律用 scope=all：本测要验的是"真实数据闸门"，不能被上榜门槛干扰。
+    """
+    assert client.get("/api/memes?limit=100&scope=all").json()["total"] >= 30
 
     monkeypatch.setattr(settings, "data_source", "bilibili")
-    assert client.get("/api/memes?limit=100").json()["total"] == 0, "演示梗该被请出榜单"
+    assert client.get("/api/memes?limit=100&scope=all").json()["total"] == 0, "演示梗该被请出榜单"
 
     monkeypatch.setattr(settings, "leaderboard_require_verified", False)
-    assert client.get("/api/memes?limit=100").json()["total"] >= 30, "关掉开关就回到旧行为"
+    assert client.get("/api/memes?limit=100&scope=all").json()["total"] >= 30, "关掉开关就回到旧行为"

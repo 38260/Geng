@@ -40,14 +40,18 @@ def list_memes(
     sort: str = Query("hotness"),
     limit: int | None = Query(None, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    scope: str = Query("board", description="board=热榜（过气与死梗不进）| all=完整梗库"),
 ):
     if filter not in HOME_FILTER_LABELS:
         raise HTTPException(status_code=400, detail=f"未知筛选：{filter}")
     if sort not in SORTS:
         raise HTTPException(status_code=400, detail=f"未知排序：{sort}")
+    if scope not in {"board", "all"}:
+        raise HTTPException(status_code=400, detail="scope 只支持 board | all")
 
     payload = q.list_memes(
-        session, filter_key=filter, search=search, sort=sort, limit=limit, offset=offset
+        session, filter_key=filter, search=search, sort=sort, limit=limit,
+        offset=offset, scope=scope,
     )
     return {
         **payload,

@@ -24,6 +24,9 @@ export interface Transparency {
   /** 准入规则原文（并集 / 认证窗口天数），设置页与详情页据此说明 */
   certification_rule?: string;
   cert_window_days?: number;
+  /** 热榜的"活着"门槛说明（过气不出榜 + 天数/近7天播放二选一） */
+  board_gate?: string;
+  board_gate_on?: boolean;
   hotness_algorithm: string;
   /** 真实采集的抽样口径说明 */
   sampling?: string;
@@ -43,6 +46,10 @@ export interface Meta {
   /** data_through 距今天几天；0 表示已含今天 */
   data_lag_days: number | null;
   certified_count: number;
+  /** 梗库总数（过了准入且有快照），热榜数 = certified_count ≤ 这个数 */
+  library_count?: number;
+  /** 因"活着"门槛没上热榜的梗数 */
+  gated_out?: number;
   /** 两位 UP 主都没介绍过的梗数（发现层并集之外，只能在梗管理里看到） */
   candidate_count: number;
   source_breakdown: Partial<Record<DataSource, number>>;
@@ -98,6 +105,12 @@ export interface MemeList {
   filter: HomeFilter;
   filter_label: string;
   total: number;
+  /** board=过了"活着"门槛的热榜；all=完整梗库 */
+  scope?: "board" | "all";
+  /** 梗库总数（未过门槛前）*/
+  library_total?: number;
+  /** 被上榜门槛挡掉的数量 */
+  gated_out?: number;
   items: MemeCard[];
   data_source: DataSource;
   is_demo: boolean;

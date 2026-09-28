@@ -14,7 +14,8 @@ import { useFavorites, useMeta } from "@/hooks/useAppData";
 export default function Favorites() {
   const { items, clear } = useFavorites();
   const { meta } = useMeta();
-  const { data, loading, error, reload } = useAsync(() => api.memes({ limit: 100 }), []);
+  // 收藏可能包含已经归档的梗，用 scope=all，否则用户会以为收藏丢了
+  const { data, loading, error, reload } = useAsync(() => api.memes({ limit: 100, scope: "all" }), []);
   const all = data?.items ?? [];
   const saved = items
     .map((favorite) => all.find((item) => item.id === favorite.id))

@@ -139,6 +139,10 @@ def compute_hotness(series: Series, *, end_index: int | None = None) -> HotnessR
     metrics = {
         "window_days": PRIMARY_WINDOW,
         "raw_score": round(raw, 2),
+        # 上榜门槛要的两个"还活着"的证据：整个分析窗口里有内容天数，
+        # 和近 7 天头部样本播放合计（PRIMARY_WINDOW=7，所以下面的 view 就是近 7 天）。
+        "active_days": sum(1 for point in sub.points if point.video_count > 0),
+        "series_days": len(sub.points),
         "view": cur.view,
         "interaction": cur.interaction,
         "video_count": cur.video_count,

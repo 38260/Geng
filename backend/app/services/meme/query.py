@@ -15,6 +15,8 @@ from sqlalchemy.orm import Session
 
 from app.analytics import MemeTerms, match_videos, nickname
 from app.config import (
+    BOARD_HIDE_OBSOLETE,
+    BOARD_MIN_RECENT_VIEW,
     CATCHUP_LABELS,
     HOME_FILTERS,
     HOME_FILTER_LABELS,
@@ -212,6 +214,29 @@ def card_payload(
     })
 
 
+def board_gate_reason(hotness: HotnessSnapshot, lifecycle: LifecycleSnapshot) -> str:
+    """为什么这个梗没进热榜。返回空串表示通过门槛。
+
+    准入（并集）只解决"这是不是个真梗"；热榜还要回答"今天玩什么"，
+    所以过气的、以及 30 天里几乎没内容的都要挡在外面——但脉冲型梗例外：
+    天数少不代表不火，近 7 天头部播放够大就照样上榜。
+    """
+    if not settings.leaderboard_gate:
+        return ""
+    if BOARD_HIDE_OBSOLETE and lifecycle.stage == "obsolete":
+        return "过气（已归入考古区）"
+    recent_view = int((hotness.metrics or {}).get("view") or 0)
+    if recent_view >= BOARD_MIN_RECENT_VIEW:
+        return ""
+    active_days = int((hotness.metrics or {}).get("active_days") or 0)
+    return (f"近 7 天头部播放 {recent_view:,}，低于上榜下限 {BOARD_MIN_RECENT_VIEW:,}"
+            f"（30 天内 {active_days} 天有内容）")
+
+
+def on_board(hotness: HotnessSnapshot, lifecycle: LifecycleSnapshot) -> bool:
+    return not board_gate_reason(hotness, lifecycle)
+
+
 def list_memes(
     session: Session,
     *,
@@ -220,8 +245,16 @@ def list_memes(
     sort: str = "hotness",
     limit: int | None = None,
     offset: int = 0,
+    scope: str = "board",
 ) -> dict[str, Any]:
+    """scope=board 是热榜口径（还要过"活着"门槛）；scope=all 是完整梗库。"""
     rows = _load_rows(session)
+    library_total = len(rows)
+    gated = 0
+    if scope != "all":
+        kept = [row for row in rows if on_board(row[1], row[2])]
+        gated = library_total - len(kept)
+        rows = kept
 
     stages = HOME_FILTERS.get(filter_key)
     if stages:
@@ -252,6 +285,10 @@ def list_memes(
         "filter": filter_key,
         "filter_label": HOME_FILTER_LABELS.get(filter_key, "全部"),
         "total": total,
+        "scope": "all" if scope == "all" else "board",
+        # 门槛挡掉了多少、库里总共有多少，接口要如实说，否则用户以为梗库就这么点
+        "library_total": library_total,
+        "gated_out": gated,
         "items": [
             card_payload(meme, hotness, lifecycle, real_cover=covers.get(meme.id, ""))
             for meme, hotness, lifecycle in page
@@ -476,7 +513,10 @@ def detail_payload(session: Session, meme: Meme) -> dict[str, Any] | None:
 
 def meta_payload(session: Session) -> dict[str, Any]:
     latest = session.scalar(select(Meme.data_updated_at).order_by(Meme.data_updated_at.desc()))
-    rows = _load_rows(session)
+    library_rows = _load_rows(session)
+    # 热榜口径 = 梗库再过滤一道"活着"门槛（过气不出榜、天数/近 7 天播放二选一达标）。
+    # 两个数都要给出去：只报热榜数会让人以为梗库就这么点。
+    rows = [row for row in library_rows if on_board(row[1], row[2])]
     # 统计截至日：只看"榜单里这些梗"的序列最后一天。采集窗口刻意不含今天
     # （今天没过完，头部样本会偏低、增幅会假跌），所以这里必须把"截至哪天"讲明白，
     # 否则用户看到的就是"数据是过去的"。取可见梗而不是全库，免得被演示数据顶高。
@@ -512,6 +552,8 @@ def meta_payload(session: Session) -> dict[str, Any]:
         "data_through": data_through.isoformat() if data_through else None,
         "data_lag_days": lag_days,
         "certified_count": total_certified,
+        "library_count": len(library_rows),
+        "gated_out": len(library_rows) - total_certified,
         "candidate_count": candidate_count,
         "window_days": settings.analysis_window_days,
         "source_breakdown": source_breakdown,
@@ -532,6 +574,12 @@ def meta_payload(session: Session) -> dict[str, Any]:
                 "两位都介绍过标记为「双 UP 认证」，只有一位则标明是哪一位"
             ),
             "cert_window_days": settings_cert_window_days(),
+            "board_gate": (
+                f"热榜另加「活着」门槛：过气（考古区）不上榜，且近 7 天头部播放须 ≥"
+                f"{BOARD_MIN_RECENT_VIEW:,}（不用有内容天数卡，避免误杀琵琶曲这种脉冲型梗）"
+                if settings.leaderboard_gate else "上榜门槛已关闭（LEADERBOARD_GATE=false）"
+            ),
+            "board_gate_on": bool(settings.leaderboard_gate),
             "hotness_algorithm": "赶梗潮自定义热度指数（0-100，五因子加权）",
             "lifecycle_algorithm": "时间序列 + 阈值规则，不由 LLM 决定",
             "llm_role": "仅负责趋势解释与赶梗建议的文案，不参与计算",

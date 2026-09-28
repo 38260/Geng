@@ -26,7 +26,8 @@ export default function MemeLibrary() {
   const { meta } = useMeta();
 
   const { data, loading, error, reload } = useAsync(
-    () => api.memes({ filter, search, sort, limit: 100 }),
+    // 梗库是完整数据库：过气与暂时没内容的梗也要能查到，只有首页热榜才收门槛
+    () => api.memes({ filter, search, sort, limit: 100, scope: "all" }),
     [filter, search, sort],
   );
 

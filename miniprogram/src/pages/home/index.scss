@@ -1,0 +1,51 @@
+/* 首页 */
+.hero {
+  background: linear-gradient(135deg, #fff 0%, $brand-soft 130%);
+  padding: 28px;
+}
+
+.hero-title {
+  display: block;
+  font-size: 46px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  color: $ink;
+}
+
+.hero-sub {
+  display: block;
+  margin-top: 6px;
+  font-size: 24px;
+  color: $ink-mute;
+}
+
+.hero-fresh {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1PX solid rgba(251, 58, 94, 0.14);
+}
+
+.hero-fresh-text {
+  font-size: 22px;
+  color: $dusk;
+}
+
+.hero-fresh-stale {
+  .hero-fresh-text {
+    color: $brand-deep;
+    font-weight: 700;
+  }
+}
+
+.hero-count {
+  font-size: 22px;
+  color: $ink-mute;
+}
+
+.hero-demo {
+  margin-top: 12px;
+}

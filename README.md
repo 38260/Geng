@@ -333,12 +333,19 @@ backend/
     config/       # settings(.env) / algorithms(阈值) / logging(带密钥脱敏)
     mock/         # 演示梗库与曲线
     scripts/      # seed_data / run_pipeline / collect_data
-  tests/          # 100 例
+  tests/          # 177 例
 frontend/src/
   api/  types/  hooks/  components/  pages/  utils/
+miniprogram/      # 微信小程序端（Taro 4 + React + TS）：一份源码出 weapp / h5
+  src/api/        # 只读接口封装（地址可按环境覆盖），不调没有鉴权的写接口
+  src/pages/      # 热榜 / 梗库 / 口径 三个 tab + 详情页
+  tests/          # 14 例：展示层纯函数 + 对着真实后端的接口契约
 docs/             # 产品与前端提示词、UI 参考图（前端按它 1:1 复刻）
 scripts/          # smoke_api.py / screenshot.sh / restart-backend.sh
 ```
+
+小程序端的启动、上线前置条件（HTTPS + 合法域名 + AppID + 给写接口加鉴权）与
+响应式做法见 [miniprogram/README.md](miniprogram/README.md)。
 
 ---
 

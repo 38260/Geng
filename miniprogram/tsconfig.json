@@ -1,0 +1,43 @@
+{
+  "compilerOptions": {
+    "target": "ES2018",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "removeComments": false,
+    "preserveConstEnums": true,
+    "strict": true,
+    "noImplicitAny": false,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "src/*"
+      ]
+    },
+    "typeRoots": [
+      "node_modules/@types",
+      "types"
+    ],
+    "types": [
+      "node"
+    ],
+    "skipLibCheck": true,
+    "lib": [
+      "ES2020",
+      "DOM"
+    ],
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "src",
+    "types",
+    "config",
+    "tests"
+  ],
+  "compileOnSave": false
+}

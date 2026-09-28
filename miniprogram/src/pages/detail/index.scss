@@ -1,0 +1,333 @@
+.sec-title {
+  display: block;
+  font-size: 29px;
+  font-weight: 800;
+}
+
+/* 头部 */
+.head-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.head-sticker {
+  position: relative;
+  overflow: hidden;
+  flex: none;
+  width: 132px;
+  height: 132px;
+  border-radius: $radius-tile;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 60px;
+}
+
+.head-img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 132px;
+  height: 132px;
+}
+
+.head-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.head-name {
+  display: block;
+  font-size: 38px;
+  font-weight: 900;
+  @include ellipsis(1);
+}
+
+.head-chips {
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.head-score {
+  flex: none;
+  text-align: right;
+}
+
+.head-score-num {
+  display: block;
+  font-size: 48px;
+  font-weight: 900;
+  line-height: 1.05;
+}
+
+.head-note {
+  display: block;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1PX solid $line;
+  font-size: 21px;
+  color: $ink-faint;
+}
+
+/* 介绍 */
+.intro-text {
+  display: block;
+  margin-top: 12px;
+  font-size: 27px;
+  line-height: 1.75;
+  color: $ink-soft;
+}
+
+.intro-empty {
+  margin-top: 12px;
+  padding: 20px;
+  border-radius: $radius-tile;
+  background: $gold-soft;
+  font-size: 24px;
+  color: #b2750a;
+  line-height: 1.6;
+}
+
+.intro-empty-link {
+  display: block;
+  margin-top: 8px;
+  font-size: 21px;
+  color: $ink-faint;
+}
+
+.excerpt {
+  margin-top: 14px;
+  padding: 16px 18px;
+  border: 1PX dashed $line;
+  border-radius: $radius-tile;
+  background: $canvas;
+}
+
+.excerpt-head {
+  display: block;
+  font-size: 21px;
+  color: $ink-faint;
+}
+
+.excerpt-body {
+  display: block;
+  margin-top: 6px;
+  font-size: 24px;
+  line-height: 1.65;
+  color: $ink-mute;
+}
+
+.evidence {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1PX solid $line;
+}
+
+.evidence-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+}
+
+.evidence-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 23px;
+  color: $ink-soft;
+  @include ellipsis(1);
+}
+
+.evidence-copy {
+  flex: none;
+  font-size: 21px;
+  color: $flare;
+}
+
+.evidence-tip {
+  display: block;
+  margin-top: 4px;
+}
+
+/* 指标四格 */
+.metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: $gap-card;
+}
+
+.metric {
+  flex: 1 1 44%;
+  min-width: 200px;
+  padding: 16px 18px;
+  background: $surface;
+  border-radius: $radius-tile;
+  box-shadow: 0 1px 2px rgba(24, 32, 48, 0.04);
+}
+
+.metric-label {
+  display: block;
+  font-size: 21px;
+  color: $ink-faint;
+}
+
+.metric-value {
+  display: block;
+  margin-top: 4px;
+  font-size: 34px;
+  font-weight: 900;
+}
+
+.metric-growth {
+  display: block;
+  font-size: 21px;
+  color: $ink-faint;
+}
+
+.metric-growth.up {
+  color: $go;
+  font-weight: 700;
+}
+
+/* 趋势切换 */
+.seg {
+  display: flex;
+  padding: 4px;
+  border-radius: $radius-pill;
+  background: $rail;
+}
+
+.seg-item {
+  padding: 6px 18px;
+  font-size: 22px;
+  color: $ink-mute;
+  border-radius: $radius-pill;
+}
+
+.seg-on {
+  background: $surface;
+  color: $nav;
+  font-weight: 700;
+  box-shadow: 0 1px 4px rgba(24, 32, 48, 0.1);
+}
+
+/* 生命周期 */
+.stages {
+  display: flex;
+  margin-top: 14px;
+}
+
+.stage {
+  flex: 1;
+  text-align: center;
+  opacity: 0.4;
+}
+
+.stage-on {
+  opacity: 1;
+}
+
+.stage-emoji {
+  display: block;
+  font-size: 34px;
+}
+
+.stage-label {
+  display: block;
+  margin-top: 2px;
+  font-size: 19px;
+  color: $ink-mute;
+}
+
+.stage-on .stage-label {
+  color: $brand;
+  font-weight: 700;
+}
+
+.reasons {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1PX solid $line;
+}
+
+.reason {
+  display: block;
+  font-size: 22px;
+  color: $ink-mute;
+  line-height: 1.7;
+}
+
+/* 赶梗 */
+.catch-reason {
+  display: block;
+  margin-top: 12px;
+  font-size: 26px;
+  line-height: 1.7;
+  color: $ink-soft;
+}
+
+.catch-note {
+  display: block;
+  margin-top: 8px;
+}
+
+/* 视频 */
+.video {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1PX solid $line;
+}
+
+.video-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.video-title {
+  display: block;
+  font-size: 25px;
+  font-weight: 600;
+  @include ellipsis(2);
+}
+
+.video-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 20px;
+  color: $ink-faint;
+}
+
+.video-num {
+  flex: none;
+  text-align: right;
+}
+
+.video-view {
+  display: block;
+  font-size: 26px;
+  font-weight: 800;
+  color: $brand;
+}
+
+.video-tip {
+  display: block;
+  margin-top: 10px;
+}
+
+/* 口径 */
+.cert-line {
+  display: block;
+  margin-top: 10px;
+  font-size: 23px;
+  line-height: 1.7;
+  color: $ink-mute;
+}
+
+.cert-foot {
+  display: block;
+  margin-top: 10px;
+}

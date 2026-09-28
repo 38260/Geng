@@ -1,0 +1,87 @@
+.sec {
+  display: block;
+  font-size: 29px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+
+.about-title {
+  display: block;
+  font-size: 40px;
+  font-weight: 900;
+}
+
+.about-sub {
+  display: block;
+  margin-top: 6px;
+  font-size: 23px;
+  color: $ink-mute;
+}
+
+.about-fresh {
+  display: block;
+  margin-top: 12px;
+  font-size: 22px;
+  color: $dusk;
+}
+
+.about-fresh-stale {
+  color: $brand-deep;
+  font-weight: 700;
+}
+
+.kv {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1PX solid $line;
+}
+
+.kv:last-child {
+  border-bottom: none;
+}
+
+.kv-label {
+  font-size: 24px;
+  color: $ink-mute;
+}
+
+.kv-value {
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.para {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 24px;
+  line-height: 1.75;
+  color: $ink-soft;
+}
+
+.base-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.base-input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 16px;
+  border-radius: $radius-tile;
+  background: $rail;
+  font-size: 24px;
+}
+
+.base-btn {
+  flex: none;
+  padding: 12px 26px;
+  border-radius: $radius-tile;
+  background: $nav;
+  color: #fff;
+  font-size: 24px;
+}

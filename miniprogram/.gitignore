@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.swc/
+.temp/
+.rn_temp/
+.DS_Store
+*.local
+project.private.config.json

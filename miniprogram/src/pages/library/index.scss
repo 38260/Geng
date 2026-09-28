@@ -1,0 +1,32 @@
+.search-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 27px;
+  color: $ink;
+}
+
+.search-clear {
+  flex: none;
+  font-size: 23px;
+  color: $ink-faint;
+  padding: 4px 10px;
+}
+
+.lib-note {
+  display: block;
+  margin: 14px 4px 16px;
+  font-size: 21px;
+  line-height: 1.6;
+  color: $ink-faint;
+}
+
+.lib-list {
+  margin-top: 4px;
+}

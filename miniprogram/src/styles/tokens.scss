@@ -1,0 +1,68 @@
+// 设计令牌 —— 与 frontend/tailwind.config.js 同源
+// 色值全部取自 docs/design/reference-ui.png 的逐元素采样，别在这里随手调色。
+// 单位约定：小写 px 会被 Taro 编译成 rpx（跟屏宽缩放）；
+// 不想跟着放大的（平板封顶、1 物理像素线）写成大写 PX。
+
+$canvas: #f7fafd;
+$surface: #ffffff;
+$rail: #f7fafd;
+$line: #ecf0f6;
+
+$ink: #000214;
+$ink-soft: #3c5989;
+$ink-mute: #5e739f;
+$ink-faint: #b0bad0;
+
+$brand: #fb3a5e;
+$brand-soft: #fde9ee;
+$brand-deep: #e2224a;
+$flare: #0d8afe;
+$flare-soft: #ecf6fe;
+$go: #019646;
+$go-soft: #e5fcf2;
+$gold: #fdc069;
+$gold-soft: #fff3dc;
+$dusk: #546f98;
+$dusk-soft: #eff4fb;
+$nav: #1152f3;
+$nav-soft: #e5eefd;
+
+$radius-card: 18px;
+$radius-tile: 12px;
+$radius-pill: 999px;
+
+$gap-page: 24px;
+$gap-card: 20px;
+
+$font-sans: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", system-ui, sans-serif;
+
+@mixin card {
+  background: $surface;
+  border-radius: $radius-card;
+  box-shadow: 0 1px 2px rgba(24, 32, 48, 0.04), 0 8px 24px -12px rgba(24, 32, 48, 0.1);
+}
+
+@mixin chip($bg, $fg) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: $radius-pill;
+  background: $bg;
+  color: $fg;
+  font-size: 20px;
+  line-height: 1.4;
+}
+
+@mixin ellipsis($lines: 1) {
+  @if $lines == 1 {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  } @else {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: $lines;
+    overflow: hidden;
+  }
+}

@@ -1,0 +1,402 @@
+page {
+  background: $canvas;
+  color: $ink;
+  font-family: $font-sans;
+  font-size: 28px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 页面外壳：手机上是 24rpx 边距；平板/桌面预览封顶成一列，避免被拉成一条横幅 */
+.shell {
+  box-sizing: border-box;
+  min-height: 100vh;
+  padding: 24px;
+  /* 底部留出自适应安全区 + tabBar 高度，否则最后一张卡会被 Home 指示条压住 */
+  padding-bottom: calc(env(safe-area-inset-bottom) + 140px);
+}
+
+@media (min-width: 500PX) {
+  .shell {
+    width: 480PX;
+    margin: 0 auto;
+    padding: 16PX 20PX calc(env(safe-area-inset-bottom) + 70PX);
+  }
+}
+
+.card {
+  @include card;
+  padding: $gap-card;
+}
+
+.card + .card {
+  margin-top: $gap-card;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.title {
+  font-size: 34px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.sub {
+  color: $ink-mute;
+  font-size: 24px;
+}
+
+.faint {
+  color: $ink-faint;
+  font-size: 22px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.chip {
+  @include chip($dusk-soft, $dusk);
+}
+
+.chip-brand {
+  @include chip($brand-soft, $brand-deep);
+}
+
+.chip-flare {
+  @include chip($flare-soft, $flare);
+}
+
+.chip-go {
+  @include chip($go-soft, $go);
+}
+
+.chip-gold {
+  @include chip($gold-soft, #b2750a);
+}
+
+.divider {
+  height: 1PX;
+  background: $line;
+  margin: 16px 0;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #f2f5fa 25%, #e9eef6 37%, #f2f5fa 63%);
+  border-radius: $radius-tile;
+}
+
+/* ---------------- 共享组件样式（app.wxss 全局生效） ---------------- */
+
+.chip-dusk {
+  @include chip($dusk-soft, $dusk);
+}
+
+.chip-mute {
+  @include chip($rail, $ink-mute);
+}
+
+/* 梗卡片 */
+.meme-card {
+  margin-top: $gap-card;
+}
+
+.meme-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.rank {
+  flex: none;
+  width: 40px;
+  text-align: center;
+  font-size: 26px;
+  font-weight: 800;
+  color: $ink-faint;
+  padding-top: 26px;
+}
+
+.rank-top {
+  color: $brand;
+}
+
+/* 封面盖在贴纸上面：加载失败时露出底下的表情，不留白框 */
+.thumb-sticker {
+  position: relative;
+  overflow: hidden;
+  flex: none;
+  width: 116px;
+  height: 116px;
+  border-radius: $radius-tile;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 52px;
+}
+
+.thumb-img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 116px;
+  height: 116px;
+}
+
+.meme-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.meme-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 32px;
+  font-weight: 800;
+  @include ellipsis(1);
+}
+
+.meme-score {
+  flex: none;
+  font-size: 40px;
+  font-weight: 900;
+  line-height: 1.1;
+}
+
+.meme-chips {
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.meme-desc {
+  display: block;
+  margin-top: 8px;
+  font-size: 24px;
+  color: $ink-mute;
+  @include ellipsis(2);
+}
+
+.meme-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1PX solid $line;
+}
+
+.meme-growth {
+  margin-left: auto;
+  font-size: 22px;
+  color: $ink-faint;
+}
+
+/* 紧凑行 */
+.meme-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  background: $surface;
+  border-radius: $radius-tile;
+  box-shadow: 0 1px 2px rgba(24, 32, 48, 0.04);
+}
+
+.meme-row + .meme-row {
+  margin-top: 12px;
+}
+
+.row-emoji {
+  position: relative;
+  flex: none;
+  width: 68px;
+  height: 68px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  overflow: hidden;
+}
+
+.row-img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 68px;
+  height: 68px;
+}
+
+.row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.row-name {
+  display: block;
+  font-size: 28px;
+  font-weight: 700;
+  @include ellipsis(1);
+}
+
+.row-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 21px;
+  color: $ink-faint;
+}
+
+.row-score {
+  flex: none;
+  font-size: 32px;
+  font-weight: 900;
+}
+
+/* 趋势柱 */
+.trend-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 180px;
+  margin-top: 12px;
+}
+
+.trend-col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.trend-bar {
+  width: 100%;
+  border-radius: 4px 4px 2px 2px;
+  min-height: 4px;
+}
+
+.trend-axis {
+  margin-top: 8px;
+  font-size: 20px;
+  color: $ink-faint;
+}
+
+.trend-caption {
+  display: block;
+  margin-top: 6px;
+}
+
+.trend-empty {
+  padding: 26px;
+  text-align: center;
+  color: $ink-faint;
+  font-size: 24px;
+}
+
+/* 状态块 */
+.state-card {
+  margin-top: $gap-card;
+  text-align: center;
+  padding: 46px 24px;
+}
+
+.state-emoji {
+  display: block;
+  font-size: 54px;
+}
+
+.state-title {
+  display: block;
+  margin-top: 10px;
+  font-size: 30px;
+  font-weight: 800;
+}
+
+.state-body {
+  display: block;
+  margin: 10px auto 0;
+  max-width: 560px;
+  font-size: 24px;
+  color: $ink-mute;
+  line-height: 1.6;
+}
+
+.state-btn {
+  display: inline-block;
+  margin-top: 20px;
+  padding: 12px 34px;
+  border-radius: $radius-pill;
+  background: $brand;
+  color: #fff;
+  font-size: 25px;
+}
+
+.more-tip {
+  margin-top: 22px;
+  text-align: center;
+  font-size: 22px;
+  color: $ink-faint;
+  line-height: 1.6;
+}
+
+/* 骨架 */
+.sk-card {
+  display: flex;
+  gap: 14px;
+  margin-top: $gap-card;
+}
+
+.sk-thumb {
+  width: 116px;
+  height: 116px;
+  flex: none;
+}
+
+.sk-lines {
+  flex: 1;
+}
+
+.sk-line {
+  height: 22px;
+  margin-bottom: 12px;
+}
+
+.w-40 { width: 40%; }
+.w-60 { width: 60%; }
+.w-80 { width: 80%; }
+
+/* 筛选/排序 pills：home 与 library 两页共用，必须放全局（weapp 页内样式不跨页） */
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 22px 0 6px;
+}
+
+.pill {
+  padding: 10px 24px;
+  border-radius: $radius-pill;
+  background: $surface;
+  color: $ink-mute;
+  font-size: 24px;
+  border: 1PX solid $line;
+}
+
+.pill-on {
+  background: $brand;
+  color: #fff;
+  border-color: $brand;
+  font-weight: 700;
+  box-shadow: 0 6px 16px -8px rgba(255, 107, 95, 0.55);
+}

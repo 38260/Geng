@@ -1,0 +1,101 @@
+import { Input, Text, View } from "@tarojs/components";
+import Taro, { usePullDownRefresh } from "@tarojs/taro";
+import { useState } from "react";
+
+import { apiBase, getMeta, setApiBase, DEFAULT_API_BASE } from "@/api/client";
+import { ErrorBlock, LoadingBlock } from "@/components/States";
+import { useLoad } from "@/hooks/useLoad";
+import { freshnessText, isStale } from "@/utils/format";
+
+import "./index.scss";
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <View className="kv">
+      <Text className="kv-label">{label}</Text>
+      <Text className="kv-value">{value}</Text>
+    </View>
+  );
+}
+
+export default function About() {
+  const meta = useLoad(() => getMeta(), []);
+  const [base, setBase] = useState(apiBase());
+
+  usePullDownRefresh(async () => {
+    await meta.reload();
+    Taro.stopPullDownRefresh();
+  });
+
+  const apply = () => {
+    setApiBase(base);
+    Taro.showToast({ title: "已保存，正在重新加载", icon: "none" });
+    meta.reload();
+  };
+
+  const t = meta.data?.transparency;
+  const stale = isStale(meta.data?.data_lag_days ?? null);
+
+  return (
+    <View className="shell">
+      <View className="card">
+        <Text className="about-title">{meta.data?.app_name || "赶梗潮"}</Text>
+        <Text className="about-sub">
+          只看 B 站 · 数据源 {meta.data?.data_source === "bilibili" ? "真实采集" : "演示数据"} · 版本{" "}
+          {meta.data?.version || "—"}
+        </Text>
+        <Text className={`about-fresh${stale ? " about-fresh-stale" : ""}`}>
+          {freshnessText(meta.data?.data_through ?? null, meta.data?.data_lag_days ?? null)}
+        </Text>
+      </View>
+
+      {meta.loading ? <LoadingBlock count={2} /> : null}
+      {meta.error ? <ErrorBlock message={meta.error} onRetry={meta.reload} /> : null}
+
+      {meta.data ? (
+        <View className="card">
+          <Text className="sec">现在有多少</Text>
+          <Row label="热榜（还在被做的）" value={`${meta.data.certified_count} 个`} />
+          <Row label="梗库（可分析的总数）" value={`${meta.data.library_count ?? 0} 个`} />
+          <Row label="被上榜门槛挡掉" value={`${meta.data.gated_out ?? 0} 个`} />
+          <Row label="候选池（两位 UP 都没做过）" value={`${meta.data.candidate_count} 个`} />
+          <Row label="统计窗口" value={`${meta.data.window_days} 天`} />
+        </View>
+      ) : null}
+
+      {t ? (
+        <View className="card">
+          <Text className="sec">口径怎么定的</Text>
+          <Text className="para">{t.certification_rule || "准入：任一 UP 主介绍过即入池。"}</Text>
+          <Text className="para">{t.board_gate || "热榜只收还在被做的梗。"}</Text>
+          <Text className="para">{t.hotness_algorithm}</Text>
+          <Text className="para">{t.lifecycle_algorithm}</Text>
+          <Text className="para">{t.sampling || "抽样口径见后台说明。"}</Text>
+          <Text className="para">{t.llm_role}</Text>
+        </View>
+      ) : null}
+
+      <View className="card">
+        <Text className="sec">后端地址（调试用）</Text>
+        <Text className="para faint">
+          默认 {DEFAULT_API_BASE}。真机调试要填电脑局域网 IP；正式上线必须是 https 且在小程序后台配合法域名。
+        </Text>
+        <View className="base-row">
+          <Input className="base-input" value={base} type="text" onInput={(e) => setBase(e.detail.value)} />
+          <Text className="base-btn" onClick={apply}>
+            保存
+          </Text>
+        </View>
+      </View>
+
+      <View className="card">
+        <Text className="sec">这个产品不做什么</Text>
+        <Text className="para">
+          V1 只做 B 站一个平台，不做多平台聚合；没有账号、登录、收藏同步；不做未来预测——
+          热度、生命周期、赶梗结论全部由算法从已发生的数据里算出来，AI 只负责把结论说成人话，
+          不能改任何一个数字。演示数据一律标「演示数据」，不冒充真实抓取结果。
+        </Text>
+      </View>
+    </View>
+  );
+}

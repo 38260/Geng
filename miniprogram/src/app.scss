@@ -433,3 +433,23 @@ page {
   font-size: 19px;
   padding: 2px 8px;
 }
+
+/* 返回入口：只在没有原生箭头时出现，所以做得很轻 */
+.page-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 12px;
+  padding: 8px 20px 8px 12px;
+  border-radius: $radius-pill;
+  background: $surface;
+  color: $ink-soft;
+  font-size: 25px;
+  box-shadow: 0 1px 2px rgba(24, 32, 48, 0.06);
+}
+
+.page-back-arrow {
+  font-size: 34px;
+  line-height: 1;
+  color: $ink-mute;
+}

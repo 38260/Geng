@@ -7,6 +7,7 @@ import { openLibrarySearch } from "@/utils/nav";
 import { describeError, getDetail, getTrend, getVideos } from "@/api/client";
 import { TrendBars, type TrendMetric } from "@/components/TrendBars";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "@/components/States";
+import { PageBack } from "@/components/PageBack";
 import { useFavorites } from "@/hooks/useFavorites";
 import { copyText, useLoad } from "@/hooks/useLoad";
 import type { MemeDetail, VideoItem } from "@/types/api";
@@ -252,6 +253,8 @@ export default function Detail() {
 
   return (
     <View className="shell">
+      {/* 分享卡片/扫码进来时页面栈只有一页，微信不给返回箭头；H5 预览压根没有导航栏 */}
+      <PageBack />
       {detail.loading ? <LoadingBlock count={4} /> : null}
       {detail.error ? <ErrorBlock message={detail.error} onRetry={detail.reload} /> : null}
 

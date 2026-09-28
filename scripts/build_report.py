@@ -3,8 +3,10 @@
     python scripts/build_report.py
 
 docx 走 pandoc（Markdown → docx，标题层级和表格都保留，可在 Word 里继续编辑）；
-pdf 走 LibreOffice 的 HTML→pdf（本机 LibreOffice 的 docx 导出组件是坏的，
-报 `impl_store ... 0x81a`，所以 docx 不要再交给它）。
+pdf 走 Chrome 无头的 HTML→pdf。LibreOffice 只留作兜底：它会和用户打开的
+Office 窗口抢同一份用户配置（%APPDATA%/LibreOffice/4），抢不过就报
+「配置文件 bootstrap.ini 已经损坏」，而且本机它的 docx 导出组件本来就是坏的
+（`impl_store ... 0x81a`）。
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "docs" / "research" / "开题报告.md"
 OUT_DIR = SRC.parent
 SOFFICE = Path("C:/Program Files/LibreOffice/program/soffice.exe")
+CHROME = Path("C:/Program Files/Google/Chrome/Application/chrome.exe")
 
 CSS = """
 @page { size: A4; margin: 2.2cm 2cm; }
@@ -57,6 +60,32 @@ def docx_via_pandoc() -> bool:
     return (OUT_DIR / "开题报告.docx").exists()
 
 
+def pdf_via_chrome(html: Path, target: Path) -> bool:
+    """Chrome 无头打印：不碰 LibreOffice 的用户配置，不会和用户窗口打架。"""
+    if not CHROME.exists():
+        return False
+    subprocess.run(
+        [str(CHROME), "--headless=new", "--disable-gpu", "--no-pdf-header-footer",
+         f"--print-to-pdf={target}", str(html)],
+        check=False, capture_output=True, timeout=180,
+    )
+    return target.exists()
+
+
+def pdf_via_soffice(html: Path, target: Path) -> bool:
+    """兜底：LibreOffice 的 HTML→pdf。用仓库内的独立用户配置目录，
+    避免和用户手动打开的 LibreOffice 抢 %APPDATA%/LibreOffice/4。"""
+    if not SOFFICE.exists():
+        return False
+    profile = (ROOT / ".shots" / "lo-profile").as_uri()
+    subprocess.run(
+        [str(SOFFICE), f"-env:UserInstallation={profile}", "--headless",
+         "--convert-to", "pdf:writer_pdf_Export", "--outdir", str(target.parent), str(html)],
+        check=False, capture_output=True, timeout=240,
+    )
+    return target.exists()
+
+
 def main() -> int:
     if not SRC.exists():
         raise SystemExit(f"找不到源文件：{SRC}")
@@ -76,20 +105,15 @@ def main() -> int:
         print(f"pandoc 不可用：用 Word/WPS 打开 {interim} → 另存为 .docx 即可，"
               f"样式（标题层级、表格边框、字体）都在。")
 
-    if not SOFFICE.exists():
-        print(f"未找到 LibreOffice（{SOFFICE}），pdf 未生成，可打印 {interim}")
-        return 1
-
-    # 过滤器要写死：只写 "pdf" 时 LibreOffice 会挑错导出组件而失败
-    # subprocess 不过 shell，引号要原样给 soffice，不要再转义
-    subprocess.run(
-        [str(SOFFICE), "--headless", "--convert-to", "pdf:writer_pdf_Export",
-         "--outdir", str(OUT_DIR), str(interim)],
-        check=False, capture_output=True, timeout=240,
-    )
     produced = OUT_DIR / "开题报告.pdf"
-    size = produced.stat().st_size if produced.exists() else 0
-    print(f"{'已生成' if size else '生成失败'} {produced}（{size // 1024} KB）")
+    if pdf_via_chrome(interim, produced):
+        route = "Chrome"
+    elif pdf_via_soffice(interim, produced):
+        route = "LibreOffice"
+    else:
+        print(f"pdf 未生成（Chrome/LibreOffice 都不可用），可打印 {interim}")
+        return 1
+    print(f"已生成 {produced}（{produced.stat().st_size // 1024} KB，走 {route}）")
     return 0
 
 

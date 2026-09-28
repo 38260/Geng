@@ -331,7 +331,8 @@ export default function Detail() {
                   ))}
               </View>
             )}
-            {data.lifecycle.reasons.length ? (
+            {data.lifecycle.reasons.length && data.meme.stage !== "insufficient" ? (
+              /* 数据不足时上面那块已经把原因说完了，再列一遍是复读 */
               <View className="reasons">
                 {data.lifecycle.reasons.map((reason) => (
                   <Text className="reason" key={reason}>· {reason}</Text>

@@ -83,7 +83,8 @@ export function LifecycleTrack({ lifecycle }: { lifecycle: Lifecycle }) {
       </div>
       )}
 
-      {lifecycle.reasons.length ? (
+      {lifecycle.reasons.length && !starved ? (
+        /* 数据不足时上面那块已经把原因说完了，再列一遍是复读 */
         <ul className="mt-5 space-y-1.5 border-t border-line pt-4 text-[13px] leading-relaxed text-ink-mute">
           {lifecycle.reasons.map((reason) => (
             <li key={reason} className="flex gap-1.5">

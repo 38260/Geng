@@ -358,7 +358,7 @@ def kept_videos(session: Session, meme: Meme, limit: int | None = None) -> list[
     return kept[:limit] if limit else kept
 
 
-def video_payloads(session: Session, meme: Meme, limit: int | None = 4) -> list[dict[str, Any]]:
+def video_items(videos: list[Video]) -> list[dict[str, Any]]:
     return [
         {
             **video.to_dict(include_meme=False),
@@ -367,8 +367,30 @@ def video_payloads(session: Session, meme: Meme, limit: int | None = 4) -> list[
             "view_text": _compact(video.view),
             "danmaku_text": _compact(video.danmaku),
         }
-        for video in kept_videos(session, meme, limit)
+        for video in videos
     ]
+
+
+def video_page(
+    session: Session, meme: Meme, *, limit: int = 20, offset: int = 0
+) -> dict[str, Any]:
+    """相关视频分页。
+
+    ``total`` 必须是"过完相关性筛之后还剩多少条"，不是本次请求的条数：
+    前端拿它决定"还有没有下一页"，之前把 limit 当 total 返回，
+    125 条的梗会被显示成 3 条，用户根本翻不到后面的内容。
+    """
+    kept = kept_videos(session, meme)
+    return {
+        "items": video_items(kept[offset : offset + limit]),
+        "total": len(kept),
+        "offset": offset,
+        "note": "已按相关性过滤（标题/简介/标签命中梗名或别名才算），再按播放量排序",
+    }
+
+
+def video_payloads(session: Session, meme: Meme, limit: int | None = 4) -> list[dict[str, Any]]:
+    return video_items(kept_videos(session, meme, limit))
 
 
 def _duration_text(seconds: int) -> str:

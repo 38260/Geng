@@ -83,9 +83,15 @@ def meme_trend(
 
 
 @router.get("/{meme_id}/videos")
-def meme_videos(meme_id: int, session: SessionDep, limit: int = Query(4, ge=1, le=20)):
+def meme_videos(
+    meme_id: int,
+    session: SessionDep,
+    limit: int = Query(20, ge=1, le=50),
+    offset: int = Query(0, ge=0),
+):
+    """相关视频（已过相关性筛、按播放量排序），支持翻页。"""
     meme = _require_certified(meme_id, session)
-    return {"items": q.video_payloads(session, meme, limit=limit), "total": limit}
+    return q.video_page(session, meme, limit=limit, offset=offset)
 
 
 @router.post("/{meme_id}/insight")

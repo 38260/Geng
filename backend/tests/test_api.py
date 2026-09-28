@@ -239,6 +239,38 @@ def test_detail_shape(client, top_meme_id):
         assert video["view_text"] and video["duration_text"]
 
 
+def test_videos_pagination_reports_real_total(client, top_meme_id):
+    """翻页接口不许把 limit 当 total 返回。
+
+    线上真实数据里有个梗采信了 125 条视频，接口却回 total=3（等于 limit），
+    前端据此判断"没有下一页"，用户永远只能看到前 3 条。
+    """
+    first = client.get(f"/api/memes/{top_meme_id}/videos?limit=2&offset=0").json()
+    assert first["offset"] == 0
+    assert len(first["items"]) <= 2
+    assert first["total"] >= len(first["items"])
+    assert first["note"], "要说明这些视频是过完相关性筛的"
+
+    # 一页页翻到底，拿到的条数必须等于 total，且不许重复
+    seen, offset, guard = [], 0, 0
+    while guard < 40:
+        page = client.get(f"/api/memes/{top_meme_id}/videos?limit=2&offset={offset}").json()
+        assert page["total"] == first["total"], "翻页过程中 total 不许变"
+        seen += [item["bvid"] for item in page["items"]]
+        if not page["items"]:
+            break
+        offset += len(page["items"])
+        guard += 1
+    assert len(seen) == first["total"], f"翻完应有 {first['total']} 条，实际 {len(seen)}"
+    assert len(set(seen)) == len(seen), "同一页之间不许重复"
+
+    # 播放量降序，且参数越界要拦住
+    views = [item["view"] for item in first["items"]]
+    assert views == sorted(views, reverse=True)
+    assert client.get(f"/api/memes/{top_meme_id}/videos?limit=99").status_code == 422
+    assert client.get(f"/api/memes/{top_meme_id}/videos?offset=-1").status_code == 422
+
+
 def test_no_meme_detail_is_blank(client):
     """整库扫一遍：点进任何一条详情都不该看到空白介绍。"""
     items = client.get("/api/memes?scope=all&limit=100").json()["items"]

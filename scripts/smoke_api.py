@@ -141,6 +141,16 @@ if items:
     call("GET", f"/api/memes/{meme_id}/trend?window=12", expect=(400,), note="非法窗口应 400")
     videos = call("GET", f"/api/memes/{meme_id}/videos?limit=3")
     check(videos and len(videos["items"]) <= 3, "相关视频数量受 limit 约束")
+    check(
+        videos and videos.get("total", 0) >= len(videos.get("items", [])) and bool(videos.get("note")),
+        f"视频接口报真实总数与口径说明（total={videos and videos.get('total')}）",
+    )
+    page2 = call("GET", f"/api/memes/{meme_id}/videos?limit=3&offset=3")
+    overlap = {v["bvid"] for v in videos["items"]} & {v["bvid"] for v in page2["items"]}
+    check(page2 and not overlap, f"offset 翻页不与首页重复（重叠 {len(overlap)} 条）")
+    tail = call("GET", f"/api/memes/{meme_id}/videos?limit=3&offset={videos['total']}")
+    check(tail and tail["items"] == [], "翻过末尾应返回空列表")
+    call("GET", f"/api/memes/{meme_id}/videos?limit=99", expect=(422,), note="limit 越界应 422")
 
     insight = call("POST", f"/api/memes/{meme_id}/insight", {"refresh": True})
     check(insight and insight["trend_explanation"]["status"] == "ok", "无 Key 时趋势解释走算法兜底而非报错")

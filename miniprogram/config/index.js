@@ -48,10 +48,15 @@ const base = {
 
 module.exports = function (merge) {
   if (process.env.TARO_ENV === "h5") {
-    return merge({}, base, { outputRoot: "dist/h5" });
+    return merge({}, base, {
+    outputRoot: "dist/h5",
+    // tabBar 图标是二进制资源，webpack 不会自动带，必须显式 copy
+    copy: { patterns: [{ from: "src/assets/", to: "dist/h5/assets/" }], options: {} },
+  });
   }
   return merge({}, base, {
     outputRoot: "dist/weapp",
+    copy: { patterns: [{ from: "src/assets/", to: "dist/weapp/assets/" }], options: {} },
     mini: {
       postcss: {
         pxtransform: { enable: true, config: {} },

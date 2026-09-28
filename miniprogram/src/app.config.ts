@@ -19,9 +19,24 @@ export default defineAppConfig({
     backgroundColor: "#FFFFFF",
     borderStyle: "white",
     list: [
-      { pagePath: "pages/home/index", text: "热榜" },
-      { pagePath: "pages/library/index", text: "梗库" },
-      { pagePath: "pages/about/index", text: "口径" },
+      {
+        pagePath: "pages/home/index",
+        text: "热榜",
+        iconPath: "assets/tabbar/hot.png",
+        selectedIconPath: "assets/tabbar/hot-on.png",
+      },
+      {
+        pagePath: "pages/library/index",
+        text: "梗库",
+        iconPath: "assets/tabbar/library.png",
+        selectedIconPath: "assets/tabbar/library-on.png",
+      },
+      {
+        pagePath: "pages/about/index",
+        text: "口径",
+        iconPath: "assets/tabbar/about.png",
+        selectedIconPath: "assets/tabbar/about-on.png",
+      },
     ],
   },
   style: "v2",

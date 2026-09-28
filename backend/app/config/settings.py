@@ -102,6 +102,9 @@ class Settings(BaseSettings):
     refresh_full_weekday: int = 0
     # 定时刷新要不要顺带翻两位 UP 主的投稿列表发现新梗（这一步最容易被风控）
     refresh_discovery: bool = True
+    # 启动时若"统计截至"已滞后超过一天，补跑一次增量。
+    # 00:00 那一刻笔记本多半在睡，不补就要等到第二天；只有开了 REFRESH_AT 才生效。
+    refresh_on_start: bool = True
 
     # ------------------------------- discovery -------------------------------- #
     # 发现层认证窗口（滚动天数）。解说视频通常比梗的爆发期早 1~2 周，

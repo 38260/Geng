@@ -109,6 +109,42 @@ def _next_run(at: str, now: datetime | None = None) -> datetime | None:
     return base if base > (now or datetime.now()) else base + timedelta(days=1)
 
 
+def data_lag_days() -> int | None:
+    """统计截至日距今几天；库里没数据返回 None。
+
+    真实模式下只看 B 站来源的序列——演示数据是按"今天"生成的，
+    混进来会把滞后算小，该补跑的那次就不补了。
+    """
+    from datetime import date
+
+    from sqlalchemy import func, select
+
+    from app.models import MemeDailyStats, SessionLocal
+
+    with SessionLocal() as session:
+        stmt = select(func.max(MemeDailyStats.stat_date)).where(MemeDailyStats.video_count > 0)
+        if settings.data_source == "bilibili":
+            stmt = stmt.where(MemeDailyStats.data_source == "bilibili")
+        through = session.scalar(stmt)
+    return (date.today() - through).days if through else None
+
+
+def catch_up_on_start() -> dict[str, object]:
+    """开机补跑：00:00 那一刻机器多半没开，错过就得等到第二天，数据一直旧着。
+
+    只在已经启用定时刷新（REFRESH_AT 非空）时才动——没开定时说明用户想手动控制。
+    """
+    if not schedule_info()["enabled"] or not settings.refresh_on_start:
+        return {"ok": False, "skipped": "未启用定时刷新或已关掉启动补跑"}
+    lag = data_lag_days()
+    if lag is None:
+        return run_now(full=True, trigger="首次建库")
+    if lag <= 1:
+        return {"ok": False, "skipped": f"数据只滞后 {lag} 天，不用补"}
+    log.info("启动补跑：统计截至已滞后 %s 天", lag)
+    return run_now(full=False, trigger="补跑")
+
+
 def scheduler_loop(stop: threading.Event) -> None:
     """到点跑一次增量；每周 ``REFRESH_FULL_WEEKDAY`` 那天改跑全窗口做校准。"""
     at = (settings.refresh_at or "").strip()

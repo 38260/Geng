@@ -45,7 +45,7 @@ def test_mock_mode_refuses(isolated, monkeypatch):
 def test_main_writes_state_and_report(isolated, monkeypatch):
     calls: list[str] = []
     monkeypatch.setattr(dr.settings, "data_source", "bilibili")
-    monkeypatch.setattr(dr, "run_discovery", lambda **_: {"ok": True, "pool_size": 51, "ingested": 3})
+    monkeypatch.setattr(dr, "run_discovery", lambda **_: {"ok": True, "pool_size": 51, "touched": 51, "new_memes": 3, "new_names": ["甲", "乙", "丙"]})
     monkeypatch.setattr(
         dr,
         "collect_all",
@@ -101,7 +101,7 @@ def test_full_mode_uses_the_whole_window(isolated, monkeypatch):
 
 def test_report_keeps_only_recent_runs(isolated, monkeypatch):
     monkeypatch.setattr(dr.settings, "data_source", "bilibili")
-    monkeypatch.setattr(dr, "run_discovery", lambda **_: {"ok": True, "pool_size": 1, "ingested": 0})
+    monkeypatch.setattr(dr, "run_discovery", lambda **_: {"ok": True, "pool_size": 1, "touched": 1, "new_memes": 0, "new_names": []})
     monkeypatch.setattr(
         dr, "collect_all", lambda *a, **k: {
             "ok": True, "reason": "ok", "source": "bilibili", "targets": 1, "collected": 1,

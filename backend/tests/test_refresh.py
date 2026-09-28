@@ -80,6 +80,36 @@ def test_scheduler_exits_when_disabled(monkeypatch):
     assert not stop.is_set()
 
 
+def test_catch_up_only_when_scheduled(monkeypatch):
+    """没开 REFRESH_AT 就不该在启动时自己打 B 站。"""
+    triggered: list = []
+    monkeypatch.setattr(svc.settings, "data_source", "bilibili")
+    monkeypatch.setattr(svc.settings, "refresh_at", "")
+    monkeypatch.setattr(svc, "run_now", lambda **kw: triggered.append(kw) or {"ok": True})
+    assert svc.catch_up_on_start().get("skipped")
+    assert triggered == []
+
+
+def test_catch_up_skips_fresh_data_and_runs_on_stale(monkeypatch):
+    triggered: list = []
+    monkeypatch.setattr(svc.settings, "data_source", "bilibili")
+    monkeypatch.setattr(svc.settings, "refresh_at", "00:00")
+    monkeypatch.setattr(svc, "run_now", lambda **kw: triggered.append(kw) or {"ok": True})
+
+    monkeypatch.setattr(svc, "data_lag_days", lambda: 1)
+    assert svc.catch_up_on_start().get("skipped"), "只滞后一天不该补跑"
+    assert triggered == []
+
+    monkeypatch.setattr(svc, "data_lag_days", lambda: 4)
+    assert svc.catch_up_on_start()["ok"] is True
+    assert triggered == [{"full": False, "trigger": "补跑"}]
+
+    triggered.clear()
+    monkeypatch.setattr(svc, "data_lag_days", lambda: None)
+    assert svc.catch_up_on_start()["ok"] is True
+    assert triggered == [{"full": True, "trigger": "首次建库"}], "库里没数据要跑全窗口"
+
+
 def test_refresh_endpoints(client, monkeypatch):
     """接口形状：POST 不阻塞、被拒要 409，GET 能说出定时配置。"""
     monkeypatch.setattr(svc.settings, "data_source", "mock")

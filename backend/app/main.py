@@ -69,6 +69,11 @@ async def lifespan(app: FastAPI):
                  settings.refresh_at, settings.refresh_full_weekday == 0)
     else:
         log.info("自动刷新未启用（REFRESH_AT 为空或数据源不是 bilibili），只能手动触发")
+    catch_up = refresh_service.catch_up_on_start()
+    if catch_up.get("ok"):
+        log.info("启动补跑已触发（滞后超过一天）")
+    elif catch_up.get("skipped"):
+        log.info("启动补跑跳过：%s", catch_up["skipped"])
     try:
         yield
     finally:

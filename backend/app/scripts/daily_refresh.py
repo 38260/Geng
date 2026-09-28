@@ -70,8 +70,11 @@ def run_discovery(*, pages: int, gap: float) -> dict:
     from app.collectors.bilibili import get_client
     from app.scripts.list_recent_certified import build, ingest
 
+    from app.models import Meme
+
     session = SessionLocal()
     try:
+        before = {row.id for row in session.scalars(select(Meme))}
         report = build(
             get_client(),
             days=settings.analysis_window_days,
@@ -81,12 +84,16 @@ def run_discovery(*, pages: int, gap: float) -> dict:
         )
         ids = ingest(session, report)
         session.commit()
-        pool = report.get("_pool") or report.get("pool") or []
+        pool = report.get("pool") or []
+        # ingest 返回的是"候选池里过了一遍的每一条"，不等于新增；
+        # 报告里把两个数分开写，否则"入库 46 个"会被读成"新发现 46 个梗"。
+        fresh = [meme for meme in session.scalars(select(Meme)) if meme.id not in before]
         return {
             "ok": True,
             "pool_size": len(pool),
-            "ingested": len(ids),
-            "new_titles": sorted({str(item.get("name")) for item in report.get("merged_writings", [])})[:20],
+            "touched": len(ids),
+            "new_memes": len(fresh),
+            "new_names": [meme.name for meme in fresh][:20],
         }
     except Exception as exc:  # noqa: BLE001 - 发现失败不该拖垮刷新
         session.rollback()
@@ -106,7 +113,8 @@ def write_markdown(state: dict) -> None:
     collect = state["collect"]
     discovery = state["discovery"]
     discovery_line = (
-        f"候选池 {discovery.get('pool_size')} 个，入库 {discovery.get('ingested')} 个"
+        f"候选池 {discovery.get('pool_size')} 条，新发现 {discovery.get('new_memes')} 个"
+        + (f"：{'、'.join(discovery.get('new_names') or [])}" if discovery.get("new_memes") else "")
         if discovery.get("ok")
         else f"失败（已跳过，不影响老梗更新）：{discovery.get('error')}"
     )

@@ -1,0 +1,40 @@
+{
+  "started_at": "2026-09-28T16:52:01",
+  "finished_at": "2026-09-28T16:54:57",
+  "seconds": 176.6,
+  "trigger": "手动",
+  "mode": "incremental",
+  "scope": "real",
+  "exit_code": 0,
+  "discovery": {
+    "ok": true,
+    "pool_size": 46,
+    "ingested": 46,
+    "new_titles": []
+  },
+  "collect": {
+    "ok": true,
+    "reason": "WBI 签名 + 设备指纹可用",
+    "source": "bilibili",
+    "targets": 76,
+    "collected": 26,
+    "empty": 50,
+    "failed": 0,
+    "videos": 186,
+    "skipped": 0,
+    "dropped": 260,
+    "kept_snapshots": 0,
+    "thinned": 0,
+    "kept_better_days": 0,
+    "skipped_demo": 9,
+    "scope": "real",
+    "scope_note": "跳过 9 个纯演示梗（B 站上不存在，搜了也只会拿到无关结果）"
+  },
+  "recompute": {
+    "computed": 68,
+    "skipped": 17,
+    "total": 85
+  },
+  "data_through": "2026-09-27",
+  "data_lag_days": 1
+}

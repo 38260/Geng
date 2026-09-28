@@ -51,8 +51,7 @@ def docx_via_pandoc() -> bool:
         return False
     subprocess.run(
         [pandoc, str(SRC), "-o", str(OUT_DIR / "开题报告.docx"),
-         "--from", "markdown", "--to", "docx",
-         "--metadata", "title=赶梗潮 开题报告"],
+         "--from", "markdown", "--to", "docx"],
         check=False, capture_output=True, timeout=240,
     )
     return (OUT_DIR / "开题报告.docx").exists()

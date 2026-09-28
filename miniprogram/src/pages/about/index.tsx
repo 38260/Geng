@@ -38,6 +38,18 @@ export default function About() {
   };
 
   const t = meta.data?.transparency;
+  const last = meta.data?.refresh?.last;
+  const schedule = meta.data?.refresh?.schedule;
+  const refreshLine = last
+    ? `${(last.at || '').replace("T", " ").slice(5, 16)} · ${last.trigger}${
+        last.mode === "full" ? "（全窗口）" : "（增量）"
+      } · ${last.collected ?? "—"}/${last.targets ?? "—"} 个梗`
+    : "还没有刷新记录";
+  const autoLine = schedule?.enabled
+    ? `每天 ${schedule.at} 自动跑${
+        schedule.full_weekday >= 0 ? `，${schedule.weekday_names?.[schedule.full_weekday] ?? "周一"}做全窗口校准` : ""
+      }`
+    : "未启用（只在后台手动触发）";
   const stale = isStale(meta.data?.data_lag_days ?? null);
 
   return (
@@ -66,6 +78,22 @@ export default function About() {
           <Row label="统计窗口" value={`${meta.data.window_days} 天`} />
         </View>
       ) : null}
+
+      <View className="card">
+        <Text className="sec">数据什么时候更新</Text>
+        <Row
+          label="统计截至"
+          value={meta.data ? `${meta.data.data_through ?? '未知'}（滞后 ${meta.data.data_lag_days ?? '—'} 天）` : "—"}
+        />
+        <Row label="上次刷新" value={refreshLine} />
+        <Row label="自动刷新" value={autoLine} />
+        <Text className="para faint">
+          刷新会翻两位 UP 主的近期投稿发现新梗、补采数据、重算热度与赶梗判断。
+          默认只补"昨天"那一天，每周做一次 30 天全窗口校准；同一天只保留更好的一次观测，
+          所以重复刷新不会把数据越刷越薄。小程序这一端是只读的，
+          手动刷新在后台的梗管理页触发。
+        </Text>
+      </View>
 
       {t ? (
         <View className="card">

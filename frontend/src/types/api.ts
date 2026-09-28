@@ -34,6 +34,39 @@ export interface Transparency {
   llm_role: string;
 }
 
+/** 上次刷新的摘要：这套数是几点、由谁、怎么刷出来的 */
+export interface RefreshLast {
+  at: string | null;
+  trigger: string;
+  mode: string;
+  exit_code: number;
+  collected: number | null;
+  targets: number | null;
+  failed: number | null;
+  skipped_demo: number | null;
+  data_through: string | null;
+}
+
+export interface RefreshSchedule {
+  enabled: boolean;
+  at: string;
+  full_weekday: number;
+  discovery: boolean;
+  weekday_names?: string[];
+}
+
+export interface RefreshInfo {
+  last: RefreshLast | null;
+  schedule: RefreshSchedule;
+}
+
+export interface RefreshStatus extends RefreshInfo {
+  running: boolean;
+  trigger?: string;
+  started_at?: string;
+  data_source?: string;
+}
+
 export interface Meta {
   app_name: string;
   version: string;
@@ -57,6 +90,8 @@ export interface Meta {
   filters: { key: HomeFilter; label: string }[];
   lifecycle_stages: { key: LifecycleStage; label: string; emoji: string }[];
   transparency: Transparency;
+  /** 自动/手动刷新的状态；老版本后端可能没有 */
+  refresh?: RefreshInfo;
 }
 
 export interface Thumbnail {

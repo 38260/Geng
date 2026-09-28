@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { api } from "@/api/client";
+import { RefreshPanel } from "@/components/RefreshPanel";
 import { SearchIcon } from "@/components/icons";
 import { SectionHeader } from "@/components/Sections";
 import { StickerThumb } from "@/components/StickerThumb";
@@ -270,6 +271,8 @@ export default function Manage() {
         人工只维护<span className="font-semibold text-ink">封面、介绍、别名、关键词</span>
         这四样；热度、生命周期与赶梗结论由算法算出，这里改不到。
       </p>
+
+      <RefreshPanel onDone={() => list.reload()} />
 
       <div className="flex flex-col gap-6 xl:flex-row">
         {/* ---------------- 左：梗列表 ---------------- */}

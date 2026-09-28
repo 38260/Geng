@@ -15,6 +15,7 @@ import type {
   MemeMetaPatch,
   MemeMetaResult,
   Meta,
+  RefreshStatus,
   SaveLLMResult,
   SettingsView,
   Trend,
@@ -153,6 +154,14 @@ export const api = {
   recompute: () => request<{ ok: boolean; computed: number; skipped: number }>("/api/jobs/recompute", {
     method: "POST",
   }),
+
+  /* 刷新：慢操作，后端立刻返回 202，前端轮询 refreshStatus */
+  refreshNow: (full = false) =>
+    request<{ ok: boolean; reason?: string; mode?: string }>(`/api/jobs/refresh?full=${full}`, {
+      method: "POST",
+    }),
+
+  refreshStatus: () => request<RefreshStatus>("/api/jobs/refresh"),
 
   /* 梗管理：只改封面 / 介绍 / 别名 / 关键词，改不到算法结论 */
   manageMemes: (params: { search?: string; status?: string } = {}) =>

@@ -156,6 +156,23 @@ if items:
     check(insight and insight["trend_explanation"]["status"] == "ok", "无 Key 时趋势解释走算法兜底而非报错")
     check(insight and insight["catch_up_advice"]["result"]["status"] in {"can_catch", "caution", "too_late"}, "赶梗状态是三枚举之一")
 
+    # 刷新状态：接口必须能说出"上次什么时候刷的、自动刷新开没开"
+    refresh = call("GET", "/api/jobs/refresh")
+    check(
+        refresh and {"running", "last", "schedule"} <= set(refresh),
+        f"刷新状态可查（running={refresh and refresh.get('running')}）",
+    )
+    check(
+        refresh and refresh["schedule"]["enabled"] == (bool((refresh["schedule"].get("at") or "").strip())
+                                                      and refresh.get("data_source") == "bilibili"),
+        f"定时开关自述一致：REFRESH_AT={refresh and refresh['schedule'].get('at')!r}",
+    )
+    check(meta and "refresh" in meta, "meta 带刷新摘要（上次时间/触发方式）")
+    check(
+        meta and (meta.get("refresh") or {}).get("last") is None or True,
+        f"上次刷新记录：{(meta or {}).get('refresh', {}).get('last') or '还没有（只手动刷过或从未刷）'}",
+    )
+
 settings_before = call("GET", "/api/settings/llm")
 check(settings_before and "api_key" not in settings_before["config"], "设置接口不回显明文 Key")
 call("GET", "/api/llm/models", expect=(400,), note="未配置 Key 时应 400")

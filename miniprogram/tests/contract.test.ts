@@ -48,6 +48,9 @@ test("meta：小程序首页/口径页要用的字段都在", async (t) => {
   }
   assert.equal(typeof meta.certified_count, "number");
   assert.ok(Array.isArray(meta.filters) && meta.filters.length >= 1);
+  // 口径页要显示"上次什么时候刷的、自动刷新开没开"
+  assert.ok(meta.refresh && "last" in meta.refresh && "schedule" in meta.refresh, "meta 少了 refresh");
+  assert.equal(typeof meta.refresh.schedule.enabled, "boolean");
 });
 
 test("榜单：scope=board 与 scope=all 的分母关系成立", async (t) => {

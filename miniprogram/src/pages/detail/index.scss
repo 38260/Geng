@@ -70,18 +70,26 @@
 
 .head-actions {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 4px;
+  align-items: stretch;
+  gap: 12px;
+  margin-top: 16px;
 }
 
-/* Taro 的 Button 自带白底边框，先清成和 Text 一样的一枚胶囊 */
-.head-btn,
-.head-btn:after {
+/* Taro 的 Button 在 H5 里是自定义元素、weapp 里带 ::after 边框，
+   两边都要清成同一枚胶囊；各占半行，拇指好点 */
+.head-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 64px;
   margin: 0;
-  padding: 6px 18px;
+  padding: 10px 16px;
+  font-size: 25px;
   line-height: 1.4;
-  font-size: 22px;
+  white-space: nowrap;
+  text-align: center;
   border: none;
   border-radius: $radius-pill;
   background: $brand-soft;
@@ -97,12 +105,6 @@
   color: #fff;
 }
 
-.head-score-num {
-  display: block;
-  font-size: 48px;
-  font-weight: 900;
-  line-height: 1.05;
-}
 
 .head-note {
   display: block;

@@ -147,24 +147,26 @@ function HeadCard({
             {Math.round(detail.hotness.score)}
           </Text>
           <Text className="faint">热度</Text>
-          <View className="head-actions">
-            {/* 收藏只写本机 storage：V1 没有账号体系，不跨端同步，界面也这么写 */}
-            <Text
-              className={`head-btn${favorited ? " head-btn-on" : ""}`}
-              onClick={onToggleFavorite}
-            >
-              {favorited ? "已收藏" : "收藏"}
-            </Text>
-            {/* 小程序没有"复制链接"这种入口，转发才是原生分发路径 */}
-            <Button className="head-btn head-btn-share" openType="share">
-              分享
-            </Button>
-          </View>
         </View>
       </View>
       <Text className="head-note">
         热度为 0-100 自定义指数（近 {detail.hotness.window_days} 天），不是 B 站官方排名
       </Text>
+
+      {/* 两个动作各占半行：挤在热度数字右边会被卡片裁掉，手机上也不好点 */}
+      <View className="head-actions">
+        {/* 收藏只写本机 storage：V1 没有账号体系，不跨端同步，界面也这么写 */}
+        <Text
+          className={`head-btn${favorited ? " head-btn-on" : ""}`}
+          onClick={onToggleFavorite}
+        >
+          {favorited ? "已收藏" : "收藏"}
+        </Text>
+        {/* 小程序没有"复制链接"这种入口，转发才是原生分发路径 */}
+        <Button className="head-btn head-btn-share" openType="share">
+          分享
+        </Button>
+      </View>
     </View>
   );
 }

@@ -8,6 +8,8 @@ const EMOJI: Record<LifecycleStage, string> = {
   plateau: "🌊",
   receding: "📉",
   obsolete: "🪦",
+  // 「数据不足」是闸门不是阶段，画在时间轴上会让人以为存在这么一站
+  insufficient: "",
 };
 
 /**
@@ -15,7 +17,9 @@ const EMOJI: Record<LifecycleStage, string> = {
  * 阶段由后端算法给出，这里只负责画出来。
  */
 export function LifecycleTrack({ lifecycle }: { lifecycle: Lifecycle }) {
-  const stages = lifecycle.stages;
+  // 时间轴上只画六个真阶段；"数据不足"是闸门，画成一站等于编造一个阶段
+  const stages = lifecycle.stages.filter((stage) => stage.key !== "insufficient");
+  const starved = lifecycle.stage === "insufficient";
 
   return (
     <div className="card p-5">
@@ -27,6 +31,16 @@ export function LifecycleTrack({ lifecycle }: { lifecycle: Lifecycle }) {
         </span>
       </div>
 
+      {/* 观测天数不够时宁可不画这条路径，也不把接口抖动画成"正在退潮" */}
+      {starved ? (
+        <div className="rounded-lg bg-ink-faint/10 px-4 py-3 text-[13px] leading-relaxed text-ink-mute">
+          {lifecycle.reasons[0] || "最近观测到的天数不够，暂时给不出阶段结论。"}
+          <span className="mt-1 block text-[12px] text-ink-faint">
+            热度分数照旧（那是存量水平，跨梗同一把尺子），只是"在涨还是在退"这个判断
+            要先等采集把洞补上才敢说。
+          </span>
+        </div>
+      ) : (
       <div className="relative">
         {/* 连接线 */}
         <span aria-hidden className="absolute left-[9%] right-[9%] top-[21px] h-[2px] rounded bg-line" />
@@ -67,6 +81,7 @@ export function LifecycleTrack({ lifecycle }: { lifecycle: Lifecycle }) {
           })}
         </div>
       </div>
+      )}
 
       {lifecycle.reasons.length ? (
         <ul className="mt-5 space-y-1.5 border-t border-line pt-4 text-[13px] leading-relaxed text-ink-mute">

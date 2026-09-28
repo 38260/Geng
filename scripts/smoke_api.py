@@ -71,7 +71,10 @@ check(
     meta and meta.get("is_demo") == (meta.get("data_source") == "mock"),
     "meta.is_demo 与 data_source 一致（真实数据不得标演示、演示数据必须标演示）",
 )
-check(meta and len(meta.get("lifecycle_stages", [])) == 6, "六个生命周期阶段")
+check(
+    meta and len(meta.get("lifecycle_stages", [])) == 7,
+    "六个生命周期阶段 + 一个「数据不足」闸门态",
+)
 check(
     meta and meta.get("data_through") and isinstance(meta.get("data_lag_days"), int),
     f"meta 说明统计截至哪天（{meta.get('data_through')}，滞后 {meta.get('data_lag_days')} 天）",
@@ -134,6 +137,27 @@ if items:
     )
     check(detail and all(v["relevance_score"] >= 0.5 for v in detail["videos"]), "相关视频都过相关性阈值")
     check(detail and len(detail["trend"]["points"]) == (detail["metrics"]["window_days"]), "趋势点数等于统计窗口")
+    # 观测覆盖度：界面必须查得到"这些数是几天观测出来的"，没观测的日子不许当零活动
+    check(
+        detail and "observed_days" in detail["meme"] and "coverage" in detail["meme"],
+        f"卡片带覆盖度（近 {detail['meme'].get('observed_window_days')} 天观测到 "
+        f"{detail['meme'].get('observed_days')} 天）",
+    )
+    points = detail["trend"]["points"]
+    holes = [p for p in points if p.get("observed") is False]
+    check(
+        all("observed" in p for p in points) and all(p["video_count"] == 0 for p in holes),
+        f"趋势点都带 observed 标记（{len(holes)}/{len(points)} 天是接口的洞，未被当成零活动）",
+    )
+    starved = [row for row in items if row["stage"] == "insufficient"]
+    check(
+        all(r["catch_status"] == "insufficient" and r["catch_confidence"] == 0 for r in starved),
+        f"数据不足的 {len(starved)} 个榜单梗都不给赶梗结论（置信 0）",
+    )
+    check(
+        bool((meta or {}).get("transparency", {}).get("coverage_rule")),
+        "口径面板写明观测闸门（空返回怎么记、何时拒绝给结论）",
+    )
     check("NaN" not in json.dumps(detail), "详情响应里没有 NaN")
 
     call("GET", f"/api/memes/{meme_id}/trend?window=7")

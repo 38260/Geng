@@ -23,6 +23,7 @@ from app.config import (
     LIFECYCLE_EMOJI,
     LIFECYCLE_LABELS,
     LIFECYCLE_STAGES,
+    LIFECYCLE_THRESHOLDS,
     HOTNESS_WEIGHTS,
     get_logger,
     settings,
@@ -674,6 +675,14 @@ def meta_payload(session: Session) -> dict[str, Any]:
             "board_gate_on": bool(settings.leaderboard_gate),
             "hotness_algorithm": "赶梗潮自定义热度指数（0-100，五因子加权）",
             "lifecycle_algorithm": "时间序列 + 阈值规则，不由 LLM 决定",
+            # 观测闸门也要界面自解释：用户看得见"什么时候我们拒绝给结论"
+            "coverage_rule": (
+                f"B 站匿名搜索对同一个词、同一天会随机返回空结果（实测单次命中率约四成，"
+                f"每天重试两次可到 87%）。这类日子记成「未观测」，不当成「当天没人做这个梗」；"
+                f"近 7 天真正观测到不足 {LIFECYCLE_THRESHOLDS.min_observed_days} 天时，"
+                "算法拒绝给生命周期与赶梗结论，只报「数据不足」。热度分数照给——"
+                "那是存量水平，跨梗同一把尺子；被洞影响的是「在涨还是在退」这种时间轴比较。"
+            ) if site_source == "bilibili" else "演示数据不涉及接口抖动，无观测闸门。",
             "llm_role": "仅负责趋势解释与赶梗建议的文案，不参与计算",
             "sampling": (
                 "真实采集口径：每日取 B 站该关键词下播放量最高的前 20 条相关视频作为样本，"

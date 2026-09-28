@@ -304,6 +304,29 @@
   line-height: 1.7;
 }
 
+/* 数据不足闸门态：不给阶段路径，只把"为什么不说"讲清楚 */
+.starved {
+  padding: 18px;
+  border-radius: $radius-tile;
+  background: rgba(94, 115, 159, 0.09);
+}
+
+.starved-main {
+  display: block;
+  font-size: 25px;
+  font-weight: 700;
+  line-height: 1.6;
+  color: $dusk;
+}
+
+.starved-sub {
+  display: block;
+  margin-top: 8px;
+  font-size: 21px;
+  line-height: 1.7;
+  color: $ink-mute;
+}
+
 /* 赶梗 */
 .catch-reason {
   display: block;

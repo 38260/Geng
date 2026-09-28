@@ -70,11 +70,31 @@ test("卡片：界面直接渲染的字段不可为空", async (t) => {
     for (const key of ["id", "name", "hotness", "stage", "stage_label", "nickname", "catch_status", "catch_label", "cert_label", "verification_state", "meme_data_source"]) {
       assert.ok(row[key] !== undefined && row[key] !== null && row[key] !== "", `${row.name} 少了 ${key}`);
     }
-    assert.ok(["can_catch", "caution", "too_late"].includes(row.catch_status));
+    // insufficient 不是结论而是闸门：观测天数不够时算法拒绝判"来不来得及"
+    assert.ok(["can_catch", "caution", "too_late", "insufficient"].includes(row.catch_status));
     assert.ok(["双 UP 认证", "梗百科认证", "梗指南认证", "未认证"].includes(row.cert_label));
     assert.ok(row.hotness >= 0 && row.hotness <= 100);
     assert.ok(row.thumbnail && typeof row.thumbnail.emoji === "string");
+    // 增长百分比是几天观测出来的，界面必须能查到——不然分不清真跌和接口抖动
+    assert.ok("observed_days" in row && "coverage" in row, `${row.name} 少了覆盖度字段`);
+    if (row.stage === "insufficient") {
+      assert.equal(row.catch_status, "insufficient", "数据不足时不许给赶梗结论");
+      assert.equal(row.catch_confidence, 0, "闸门态的置信度必须是 0（算法没给）");
+    }
   }
+});
+
+test("趋势点要分得清「没观测到」和「真的是 0」", async (t) => {
+  if (!(await guard(t))) return;
+  const list = await get<any>("/api/memes?scope=board&limit=1");
+  const detail = await get<any>(`/api/memes/${list.items[0].id}`);
+  for (const point of detail.trend.points) {
+    assert.ok(typeof point.observed === "boolean", `${point.date} 少了 observed`);
+    if (point.observed === false) {
+      assert.equal(point.video_count, 0, "没观测到的日子不该有样本");
+    }
+  }
+  assert.ok("observed_days" in detail.trend && "coverage" in detail.trend, "趋势块少了覆盖度");
 });
 
 test("详情：介绍块必须有 text + source，且不许空白", async (t) => {
@@ -89,7 +109,8 @@ test("详情：介绍块必须有 text + source，且不许空白", async (t) =>
   assert.ok(Array.isArray(detail.intro.evidence));
   assert.equal(Object.keys(detail.hotness.weights).length, 5, "热度五因子");
   assert.ok(Math.abs(Object.values<number>(detail.hotness.weights).reduce((a, b) => a + b, 0) - 1) < 1e-6);
-  assert.equal(detail.lifecycle.stages.length, 6);
+  // 六个真阶段 + 一个「数据不足」闸门态，且当前只有一个
+  assert.equal(detail.lifecycle.stages.length, 7);
   assert.equal(detail.lifecycle.stages.filter((s: any) => s.active).length, 1);
 });
 

@@ -307,14 +307,30 @@ export default function Detail() {
 
           <View className="card">
             <Text className="sec-title">生命周期</Text>
-            <View className="stages">
-              {data.lifecycle.stages.map((step) => (
-                <View key={step.key} className={`stage${step.active ? " stage-on" : ""}`}>
-                  <Text className="stage-emoji">{step.emoji}</Text>
-                  <Text className="stage-label">{step.label}</Text>
-                </View>
-              ))}
-            </View>
+            {data.meme.stage === "insufficient" ? (
+              /* 观测天数不够时不画这条路径：把抖动画成"正在退潮"是这套产品最不该犯的错 */
+              <View className="starved">
+                <Text className="starved-main">
+                  最近 7 天只观测到 {data.meme.observed_days ?? 0} 天数据，
+                  暂时说不准它在涨还是在退。
+                </Text>
+                <Text className="starved-sub">
+                  热度分数照旧（那是存量水平，跨梗同一把尺子）；B 站搜索对同一天会随机返回空
+                  结果，观测不够时算法拒绝给趋势结论，补够天数才会判阶段。
+                </Text>
+              </View>
+            ) : (
+              <View className="stages">
+                {data.lifecycle.stages
+                  .filter((step) => step.key !== "insufficient")
+                  .map((step) => (
+                    <View key={step.key} className={`stage${step.active ? " stage-on" : ""}`}>
+                      <Text className="stage-emoji">{step.emoji}</Text>
+                      <Text className="stage-label">{step.label}</Text>
+                    </View>
+                  ))}
+              </View>
+            )}
             {data.lifecycle.reasons.length ? (
               <View className="reasons">
                 {data.lifecycle.reasons.map((reason) => (

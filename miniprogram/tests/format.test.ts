@@ -56,10 +56,11 @@ test("freshnessText：滞后超过一天要标出来", () => {
 });
 
 test("配色映射不能漏阶段，否则界面会拿到 undefined", () => {
-  for (const stage of ["sprouting", "rising", "explosive", "plateau", "receding", "obsolete"]) {
+  // insufficient 是闸门态，界面同样要拿到配色，不能漏
+  for (const stage of ["sprouting", "rising", "explosive", "plateau", "receding", "obsolete", "insufficient"]) {
     assert.ok(stageTone(stage as never).chip, stage);
   }
-  for (const status of ["can_catch", "caution", "too_late"]) {
+  for (const status of ["can_catch", "caution", "too_late", "insufficient"]) {
     assert.ok(catchTone(status as never).chip, status);
   }
   assert.ok(introTone("evidence"));

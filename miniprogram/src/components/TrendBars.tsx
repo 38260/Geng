@@ -32,19 +32,26 @@ export function TrendBars({
   const last = points[points.length - 1];
   const first = points[0];
   const peak = Math.max(...points.map((point) => Number(point[metric] || 0)));
+  // 空壳日不当 0 画：B 站搜索会把有内容的日子随机返回成空，
+  // 画成一根根贴地的柱子就等于把接口抖动讲成"这个梗在退潮"。
+  const holes = points.filter((point) => point.observed === false).length;
 
   return (
     <View>
       <View className="trend-bars">
         {points.map((point, index) => (
           <View className="trend-col" key={point.date}>
-            <View
-              className="trend-bar"
-              style={{
-                height: `${Math.round(heights[index] * 100)}%`,
-                background: index === points.length - 1 ? color : `${color}55`,
-              }}
-            />
+            {point.observed === false ? (
+              <View className="trend-bar-hole" />
+            ) : (
+              <View
+                className="trend-bar"
+                style={{
+                  height: `${Math.round(heights[index] * 100)}%`,
+                  background: index === points.length - 1 ? color : `${color}55`,
+                }}
+              />
+            )}
           </View>
         ))}
       </View>
@@ -55,6 +62,7 @@ export function TrendBars({
       </View>
       <Text className="faint trend-caption">
         {METRIC_LABEL[metric]} · 共 {points.length} 天
+        {holes ? ` · 其中 ${holes} 天接口没返回（虚线柱），不代表当天没人做这个梗` : ""}
       </Text>
     </View>
   );

@@ -12,8 +12,10 @@ export type LifecycleStage =
   | "explosive"
   | "plateau"
   | "receding"
-  | "obsolete";
-export type CatchUpStatus = "can_catch" | "caution" | "too_late";
+  | "obsolete"
+  /** 闸门态，不是阶段：近 7 天真正观测到的天数不够，算法拒绝给趋势结论 */
+  | "insufficient";
+export type CatchUpStatus = "can_catch" | "caution" | "too_late" | "insufficient";
 export type HomeFilter = "all" | "hot" | "taking_off" | "receding";
 /** 认证强度标签：准入是并集（任一 UP 介绍过就入池），标签仍区分谁做过 */
 export type CertLabel = "双 UP 认证" | "梗百科认证" | "梗指南认证" | "未认证";
@@ -30,6 +32,8 @@ export interface Transparency {
   hotness_algorithm: string;
   /** 真实采集的抽样口径说明 */
   sampling?: string;
+  /** 观测闸门：接口空返回怎么记、观测不足时为什么拒绝给趋势结论 */
+  coverage_rule?: string;
   lifecycle_algorithm: string;
   llm_role: string;
 }
@@ -123,6 +127,12 @@ export interface MemeCard {
   catch_label: string;
   catch_reason: string;
   catch_confidence: number;
+  /** 近 N 天里真正观测到几天。B 站搜索会随机把有内容的日子返回成空壳，
+   *  所以那几个增长百分比必须先说清是几天算出来的，否则没法分辨真跌和抖动。 */
+  observed_days: number | null;
+  observed_window_days: number | null;
+  coverage: number | null;
+  prev_observed_days: number | null;
   thumbnail: Thumbnail;
   /** 这个梗自己的数据来源（真实采集和演示数据可能混在同一个库里） */
   meme_data_source: DataSource;
@@ -265,10 +275,15 @@ export interface TrendPoint {
   discussion: number;
   video_count: number;
   creator_count: number;
+  /** false = 这天接口给了个空壳，画图上必须跟"真的是 0"分开 */
+  observed?: boolean;
 }
 
 export interface Trend {
   window: number;
+  /** 窗口里真正观测到的天数与覆盖度 */
+  observed_days?: number;
+  coverage?: number;
   points: TrendPoint[];
 }
 

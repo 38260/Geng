@@ -70,12 +70,15 @@ const STAGE_TONE: Record<LifecycleStage, Tone> = {
   plateau: { chip: "chip-gold", color: "#B2750A" },
   receding: { chip: "chip-dusk", color: "#546F98" },
   obsolete: { chip: "chip-mute", color: "#B0BAD0" },
+  // 闸门态：刻意不给阶段色，免得看起来像一个正常结论
+  insufficient: { chip: "chip-mute", color: "#5E739F" },
 };
 
 const CATCH_TONE: Record<CatchUpStatus, Tone> = {
   can_catch: { chip: "chip-go", color: "#019646" },
   caution: { chip: "chip-gold", color: "#B2750A" },
   too_late: { chip: "chip-mute", color: "#5E739F" },
+  insufficient: { chip: "chip-mute", color: "#5E739F" },
 };
 
 const CERT_TONE: Record<CertLabel, string> = {

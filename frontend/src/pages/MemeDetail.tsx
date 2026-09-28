@@ -363,6 +363,9 @@ export default function MemeDetail() {
     return trendWindow === 7 ? source.slice(-7) : source;
   }, [trend30, detail.data, trendWindow]);
 
+  // 断口要如实说明：B站搜索会随机把有内容的日子返回成空壳，那不是"当天没人做"
+  const holes = points.filter((point) => point.observed === false).length;
+
   const shownVideos = videos ?? detail.data?.videos ?? [];
   const memeThumbnail = detail.data?.meme.thumbnail ?? { emoji: "🎬", color: "#FFE9E4" };
 
@@ -426,6 +429,12 @@ export default function MemeDetail() {
                   <p className="mt-2 text-[11px] text-ink-faint">
                     热度为 0-100 自定义指数（滚动 7 天窗口），不是 B 站官方指数。
                   </p>
+                  {holes > 0 ? (
+                    <p className="mt-1 text-[11px] leading-relaxed text-brand">
+                      这 {points.length} 天里有 {holes} 天接口没返回结果（图上画成断口，不当成 0）——
+                      B 站搜索对同一天会随机给空结果，观测不足时算法拒绝给"在涨还是在退"的结论。
+                    </p>
+                  ) : null}
                 </section>
 
                 <LifecycleTrack lifecycle={detail.data.lifecycle} />

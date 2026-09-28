@@ -71,6 +71,8 @@ export const STAGE_STYLE: Record<LifecycleStage, { chip: string; dot: string; te
   plateau: { chip: "bg-dusk-soft text-dusk", dot: "bg-dusk", text: "text-dusk" },
   receding: { chip: "bg-dusk-soft text-dusk", dot: "bg-dusk", text: "text-dusk" },
   obsolete: { chip: "bg-dusk-soft text-ink-mute", dot: "bg-ink-faint", text: "text-ink-mute" },
+  // 数据不足是闸门态：刻意不给它任何"阶段色"，免得看起来像一个正常结论
+  insufficient: { chip: "bg-ink-faint/15 text-ink-mute", dot: "bg-ink-faint", text: "text-ink-mute" },
 };
 
 /** 「快起飞」这类上升中的梗用绿色徽章，与参考图一致 */
@@ -83,6 +85,7 @@ export const CATCH_STYLE: Record<CatchUpStatus, { chip: string; text: string; do
   can_catch: { chip: "bg-go-soft text-go", text: "text-go", dot: "bg-go" },
   caution: { chip: "bg-gold/20 text-[#B2750A]", text: "text-[#B2750A]", dot: "bg-gold" },
   too_late: { chip: "bg-brand/10 text-brand", text: "text-brand", dot: "bg-brand" },
+  insufficient: { chip: "bg-ink-faint/15 text-ink-mute", text: "text-ink-mute", dot: "bg-ink-faint" },
 };
 
 export const STAGE_ORDER: LifecycleStage[] = [
@@ -92,6 +95,7 @@ export const STAGE_ORDER: LifecycleStage[] = [
   "plateau",
   "receding",
   "obsolete",
+  "insufficient",
 ];
 
 export function safeNumber(value: number | null | undefined, fallback = 0): number {

@@ -13,8 +13,10 @@ export type LifecycleStage =
   | "explosive"
   | "plateau"
   | "receding"
-  | "obsolete";
-export type CatchUpStatus = "can_catch" | "caution" | "too_late";
+  | "obsolete"
+  /** 闸门态，不是阶段：近 7 天真正观测到的天数不够，算法拒绝给趋势结论 */
+  | "insufficient";
+export type CatchUpStatus = "can_catch" | "caution" | "too_late" | "insufficient";
 export type HomeFilter = "all" | "hot" | "taking_off" | "receding";
 export type CertLabel = "双 UP 认证" | "梗百科认证" | "梗指南认证" | "未认证";
 export type IntroSource = "manual" | "evidence" | "none";
@@ -28,6 +30,8 @@ export interface Transparency {
   board_gate_on?: boolean;
   hotness_algorithm: string;
   sampling?: string;
+  /** 观测闸门：接口空返回怎么记、观测不足时为什么拒绝给趋势结论 */
+  coverage_rule?: string;
   lifecycle_algorithm: string;
   llm_role: string;
 }
@@ -108,6 +112,12 @@ export interface MemeCard {
   catch_label: string;
   catch_reason: string;
   catch_confidence: number;
+  /** 近 N 天里真正观测到几天。B 站搜索会随机把有内容的日子返回成空壳，
+   *  增长百分比必须先说清是几天算出来的，否则分不清真跌和接口抖动。 */
+  observed_days?: number | null;
+  observed_window_days?: number | null;
+  coverage?: number | null;
+  prev_observed_days?: number | null;
   thumbnail: Thumbnail;
   meme_data_source: DataSource;
   verification_state: "verified_both" | "partially_verified" | "unverified";
@@ -266,10 +276,14 @@ export interface TrendPoint {
   discussion: number;
   video_count: number;
   creator_count: number;
+  /** false = 这天接口给了个空壳，柱子上必须跟"真的是 0"分开画 */
+  observed?: boolean;
 }
 
 export interface Trend {
   window: number;
+  observed_days?: number;
+  coverage?: number;
   points: TrendPoint[];
 }
 

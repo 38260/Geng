@@ -43,8 +43,11 @@ export function TrendChart({
     if (!chart) return;
 
     const dates = points.map((point) => shortDate(point.date));
-    const values = points.map((point) => point.hotness);
-    const peakIndex = values.length ? values.indexOf(Math.max(...values)) : -1;
+    // 没观测到的日子画成断口，不画成 0：B站搜索会随机把有内容的日子返回成空壳，
+    // 连成一条下滑的线就会把接口抖动讲成"这个梗在退潮"。
+    const values = points.map((point) => (point.observed === false ? null : point.hotness));
+    const seen = values.filter((value): value is number => value !== null);
+    const peakIndex = seen.length ? values.indexOf(Math.max(...seen)) : -1;
 
     chart.setOption(
       {
@@ -61,6 +64,12 @@ export function TrendChart({
             const index = list[0]?.dataIndex ?? 0;
             const point = points[index];
             if (!point) return "";
+            if (point.observed === false) {
+              return [
+                `<b>${point.date.slice(5)}</b>`,
+                "这天接口没返回结果（不是当天没人做这个梗）",
+              ].join("<br/>");
+            }
             return [
               `<b>${point.date.slice(5)}</b>`,
               `热度 ${point.hotness.toFixed(1)}`,
@@ -104,13 +113,13 @@ export function TrendChart({
               ]),
             },
             markPoint:
-              peakIndex >= 0 && values[peakIndex] > 0
+              peakIndex >= 0 && (values[peakIndex] ?? 0) > 0
                 ? {
                     symbol: "circle",
                     symbolSize: 9,
                     itemStyle: { color: "#FF6B5F", borderColor: "#fff", borderWidth: 2 },
                     label: { show: false },
-                    data: [{ name: "peak", coord: [dates[peakIndex], values[peakIndex]] }],
+                    data: [{ name: "peak", coord: [dates[peakIndex], values[peakIndex] as number] }],
                   }
                 : undefined,
           },

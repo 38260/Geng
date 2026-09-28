@@ -7,6 +7,8 @@ const CHIP: Record<Status, string> = {
   can_catch: "bg-go-soft text-go",
   caution: "bg-gold/20 text-[#B2750A]",
   too_late: "bg-brand-soft text-brand",
+  // 闸门态：不给绿也不给红，免得看起来像一个正常结论
+  insufficient: "bg-ink-faint/15 text-ink-mute",
 };
 
 /**

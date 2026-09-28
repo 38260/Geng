@@ -597,9 +597,29 @@ def meta_payload(session: Session) -> dict[str, Any]:
             )
         )
     )
+    # 上次刷新的摘要：界面要能说"这套数是几点、由谁、怎么刷出来的"。
+    # 只读一个 json 文件，不碰 B 站；没自动刷过时给 null 而不是假装刚刷过。
+    from app.services.refresh import last_report, schedule_info
+
+    report = last_report()
+    refresh_summary = None
+    if report:
+        refresh_summary = {
+            "at": report.get("finished_at"),
+            "trigger": report.get("trigger"),
+            "mode": report.get("mode"),
+            "exit_code": report.get("exit_code"),
+            "collected": (report.get("collect") or {}).get("collected"),
+            "targets": (report.get("collect") or {}).get("targets"),
+            "failed": (report.get("collect") or {}).get("failed"),
+            "skipped_demo": (report.get("collect") or {}).get("skipped_demo"),
+            "data_through": report.get("data_through"),
+        }
+
     return {
         "app_name": settings.app_name,
         "version": settings.app_version,
+        "refresh": {"last": refresh_summary, "schedule": schedule_info()},
         "environment": settings.environment,
         "data_source": site_source,
         "is_demo": site_is_demo,

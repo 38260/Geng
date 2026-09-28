@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import threading
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +17,7 @@ from sqlalchemy import select
 from app.api import api_router
 from app.config import configure_logging, get_logger, settings
 from app.models import Meme, SessionLocal, ensure_schema
+from app.services import refresh as refresh_service
 
 log = get_logger(__name__)
 
@@ -54,7 +56,23 @@ async def lifespan(app: FastAPI):
         settings.app_name, VERSION, settings.data_source,
         "已配置" if settings.llm_configured else "未配置(降级为算法文案)",
     )
-    yield
+
+    # 自动刷新：REFRESH_AT 留空就不起后台线程（不默认往机器上塞定时任务）
+    stop = threading.Event()
+    scheduler = threading.Thread(
+        target=refresh_service.scheduler_loop, args=(stop,), name="gengchao-refresh-scheduler",
+        daemon=True,
+    )
+    if refresh_service.schedule_info()["enabled"]:
+        scheduler.start()
+        log.info("自动刷新已启动：每天 %s（周一做全窗口校准=%s）",
+                 settings.refresh_at, settings.refresh_full_weekday == 0)
+    else:
+        log.info("自动刷新未启用（REFRESH_AT 为空或数据源不是 bilibili），只能手动触发")
+    try:
+        yield
+    finally:
+        stop.set()
 
 
 def create_app() -> FastAPI:

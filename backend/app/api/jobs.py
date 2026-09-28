@@ -6,11 +6,11 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
-
-from fastapi import Query
+from fastapi import APIRouter, Query
+from fastapi.responses import JSONResponse
 
 from app.config import settings
+from app.services import refresh as refresh_service
 from app.services.pipeline import collect_all, recompute_all
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
@@ -33,6 +33,23 @@ def collect(
         source, meme_ids=meme_id or None, limit=limit, window_days=window_days, scope=scope
     )
     return result
+
+
+@router.post("/refresh")
+def refresh(full: bool = Query(False, description="true=重采整个报告窗口；默认只补昨天")):
+    """手动触发一次刷新（发现新梗 + 刷新老梗 + 重算），后台跑、立刻返回。
+
+    慢操作不占请求：前端拿 202 之后轮询 ``GET /api/jobs/refresh``。
+    已经在跑就 409，不排队——两次刷新同时打 B 站只会一起被风控。
+    """
+    result = refresh_service.run_now(full=full, trigger="手动")
+    return JSONResponse(result, status_code=202 if result["ok"] else 409)
+
+
+@router.get("/refresh")
+def refresh_status():
+    """刷新状态：在不在跑、上次什么时候跑的、结果如何、定时配置。"""
+    return refresh_service.status()
 
 
 @router.post("/recompute")

@@ -33,6 +33,7 @@ from app.models import (
     HotnessSnapshot,
     LifecycleSnapshot,
     Meme,
+    MemeCertification,
     MemeDailyStats,
     MemeStatus,
     SessionLocal,
@@ -266,6 +267,34 @@ def _count_rows(
     return query.count()
 
 
+def _demo_only_ids(session: Session) -> set[int]:
+    """纯演示梗：``data_source=mock``、状态不是 candidate、且在 B 站没有任何真实证据/视频。
+
+    这类梗去搜 B 站只会拿到一堆无关结果（相关性筛全砍掉），白白吃几百个请求；
+    真实模式下刷新应该跳过它们。两个例外：只要有一条真实证据就不算演示数据；
+    手动投稿进来的 candidate 也不算——那是有人明确要求"去量它"，闸门不该管。
+    """
+    evidence = {
+        row[0]
+        for row in session.execute(
+            select(MemeCertification.meme_id).where(MemeCertification.data_source == "bilibili")
+        )
+    }
+    videos = {
+        row[0]
+        for row in session.execute(
+            select(Video.meme_id).where(Video.data_source == "bilibili")
+        )
+    }
+    return {
+        meme.id
+        for meme in session.scalars(
+            select(Meme).where(Meme.data_source == "mock", Meme.status != MemeStatus.CANDIDATE)
+        )
+        if meme.id not in evidence and meme.id not in videos
+    }
+
+
 def collect_all(
     source: str | None = None,
     *,
@@ -275,6 +304,7 @@ def collect_all(
     commit: bool = True,
     purge_when_empty: bool = False,
     include_candidates: bool = True,
+    scope: str = "real",
 ) -> dict[str, object]:
     """跑一遍采集 → 清洗 → 匹配 → 聚合 → 指标计算。
 
@@ -283,6 +313,9 @@ def collect_all(
 
     采集范围默认含候选梗：闸门管的是"能不能上榜单"，不该管"能不能被度量"——
     否则手动加进来的真热梗连数据都拿不到。指标计算那一步仍然逐条过闸门。
+
+    ``scope``：``real``（默认，真实模式下跳过纯演示梗）| ``all`` | ``library``
+    （已有指标快照的）| ``board``（还在热榜上的，最省请求）。
     """
     from app.collectors import make_collector
     from app.collectors.bilibili import BilibiliBlocked
@@ -318,8 +351,39 @@ def collect_all(
         if meme_ids:
             stmt = stmt.where(Meme.id.in_(meme_ids))
         memes = list(session.scalars(stmt.order_by(Meme.id)))
+        summary["scope"] = scope
+        # 显式点名了梗就别再套 scope：调用方已经选好了目标，
+        # 比如"只刷新这一个梗"，不该被"它是演示梗"挡掉。
+        if meme_ids:
+            summary["scope_note"] = f"按 ids 指定 {len(meme_ids)} 个梗，不套 scope"
+        elif scope == "real" and collector.source == "bilibili":
+            demo = _demo_only_ids(session)
+            picked = [meme for meme in memes if meme.id in demo]
+            memes = [meme for meme in memes if meme.id not in demo]
+            summary["skipped_demo"] = len(picked)
+            summary["scope_note"] = (
+                f"跳过 {len(picked)} 个纯演示梗（B 站上不存在，搜了也只会拿到无关结果）"
+                if picked else "库里没有纯演示梗需要跳过"
+            )
+        elif scope == "real":
+            summary["scope_note"] = "演示数据源不区分真实/演示，scope=real 等同 all"
+        elif scope in {"library", "board"}:
+            from app.services.meme.query import on_board
+
+            rows = list(session.execute(
+                select(HotnessSnapshot, LifecycleSnapshot).join(
+                    Meme, Meme.id == HotnessSnapshot.meme_id
+                )
+            ))
+            have = {hot.meme_id for hot, _ in rows}
+            if scope == "board":
+                have &= {hot.meme_id for hot, life in rows if on_board(hot, life)}
+            before = len(memes)
+            memes = [meme for meme in memes if meme.id in have]
+            summary["scope_note"] = f"{scope} 口径：{before} 个候选里留下 {len(memes)} 个"
         if limit:
             memes = memes[:limit]
+        summary["targets"] = len(memes)
 
         for meme in memes:
             try:

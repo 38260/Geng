@@ -300,11 +300,53 @@ def test_collect_covers_candidates_so_manual_memes_get_measured(monkeypatch):
 
     monkeypatch.setattr("app.collectors.make_collector", lambda _source: Recorder())
 
-    collect_all("bilibili", window_days=30, include_candidates=True)
+    # scope="all"：这条测的是 include_candidates 闸门，不是"演示梗要不要跳过"的 scope
+    collect_all("bilibili", window_days=30, include_candidates=True, scope="all")
     with_candidates = {status for _, status in seen}
     seen.clear()
-    collect_all("bilibili", window_days=30, include_candidates=False)
+    collect_all("bilibili", window_days=30, include_candidates=False, scope="all")
     only_certified = {status for _, status in seen}
 
     assert "candidate" in with_candidates
     assert only_certified == {"certified"}
+
+
+_SCOPE_SEQ = 0
+
+
+def test_scope_real_still_collects_candidates(session, monkeypatch):
+    """scope=real 跳过的是"库里造出来的演示梗"，不是有人手动投稿等着被量的候选梗。"""
+    from app.collectors.base import CollectedBundle
+    from app.models import Meme, MemeStatus
+    from app.services.pipeline import collect_all
+
+    global _SCOPE_SEQ
+    _SCOPE_SEQ += 1
+    meme = Meme(
+        name=f"候选梗探针{_SCOPE_SEQ}",
+        slug=f"scope-candidate-{_SCOPE_SEQ}",
+        aliases=["候选梗探针"],
+        keywords=["探针"],
+        data_source="mock",          # 演示模式下建出来的
+        status=MemeStatus.CANDIDATE,  # 但有人点名要量它
+    )
+    session.add(meme)
+    session.commit()
+
+    seen: list[int] = []
+
+    class Recorder:
+        source = "bilibili"
+
+        def is_available(self):
+            return True, "ok"
+
+        def collect(self, target, *, window_days=30):
+            seen.append(target.id)
+            return CollectedBundle(daily_stats=[], videos=[])
+
+    monkeypatch.setattr("app.collectors.make_collector", lambda _source: Recorder())
+    result = collect_all("bilibili", window_days=1, scope="real")
+
+    assert meme.id in seen, "候选梗被 scope=real 跳过了"
+    assert result["targets"] == len(seen)

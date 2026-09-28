@@ -22,12 +22,16 @@ def collect(
     limit: int | None = Query(None, ge=1, le=50, description="只采前 N 个梗"),
     meme_id: list[int] | None = Query(None, description="只采指定梗，可重复传"),
     window_days: int | None = Query(None, ge=7, le=90),
+    scope: str = Query("real", pattern="^(real|all|library|board)$",
+                       description="real=跳过纯演示梗（默认）| all | library | board"),
 ):
     """真实采集是慢操作（要逐条查 B 站），所以不进首页链路，只在这里显式触发。
 
     被风控挡住时返回 ok=false + 原因，并保留原有数据，不会伪造。
     """
-    result = collect_all(source, meme_ids=meme_id or None, limit=limit, window_days=window_days)
+    result = collect_all(
+        source, meme_ids=meme_id or None, limit=limit, window_days=window_days, scope=scope
+    )
     return result
 
 

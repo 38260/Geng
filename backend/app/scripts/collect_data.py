@@ -24,6 +24,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--days", type=int, default=settings.analysis_window_days)
     parser.add_argument("--limit", type=int, default=None, help="只采前 N 个梗，避免一次打太多请求")
     parser.add_argument("--meme-id", type=int, action="append", help="只采指定梗，可重复")
+    parser.add_argument(
+        "--scope", choices=["real", "all", "library", "board"], default="real",
+        help="real=跳过纯演示梗（默认）| all=全部 | library=已有指标快照 | board=还在热榜上的",
+    )
     args = parser.parse_args(argv)
 
     result = collect_all(
@@ -31,6 +35,7 @@ def main(argv: list[str] | None = None) -> int:
         meme_ids=args.meme_id,
         limit=args.limit,
         window_days=args.days,
+        scope=args.scope,
     )
 
     print(f"数据源：{result['source']}  可用：{'是' if result['ok'] else '否'}")
@@ -39,6 +44,7 @@ def main(argv: list[str] | None = None) -> int:
         print("已保留原有数据，未做任何修改。")
         return 2
 
+    print(f"采集范围：{result.get('targets', '?')} 个梗（{result.get('scope')}）— {result.get('scope_note', '')}")
     print(
         f"采集完成：成功 {result['collected']} 个梗 / 窗口内无结果 {result['empty']} 个 / "
         f"被拒 {result['failed']} 个，共写入视频 {result['videos']} 条"

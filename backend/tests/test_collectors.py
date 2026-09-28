@@ -8,8 +8,8 @@ import pytest
 
 from app.collectors import BilibiliCollector, MockCollector, make_collector
 from app.collectors.bilibili import parse_search_row, sign_params
-from app.models import Meme, MemeDailyStats, Video
-from app.services.pipeline import collect_all
+from app.models import Meme, MemeCertification, MemeDailyStats, Video
+from app.services.pipeline import _demo_only_ids, collect_all
 
 # 真实的 img_key/sub_key 是 64 位文件名，签名表要索引到第 63 位
 IMG_KEY = "7cd0849413384173a0436703415832c9"
@@ -394,3 +394,55 @@ def test_incremental_run_still_prefers_better_old_observation(certified_meme, se
         MemeDailyStats.meme_id == certified_meme.id, MemeDailyStats.stat_date == yesterday
     ).one()
     assert (row.video_count, row.view) == (9, 900_000), "更好的那次观测不能被覆盖"
+
+
+def test_demo_only_ids_only_flags_pure_demo_memes(session, meme_factory):
+    """纯演示 = mock 来源且没有任何 B 站真实证据；挂过真实证据的就不算。"""
+    _counter["n"] += 1
+    # 库里造出来的演示梗是"已认证 + mock 来源"，不是候选
+    pure = meme_factory(name=f"纯演示梗{_counter['n']}", data_source="mock", status="certified")
+    _counter["n"] += 1
+    candidate = meme_factory(
+        name=f"手动投稿候选梗{_counter['n']}", data_source="mock", status="candidate"
+    )
+    _counter["n"] += 1
+    with_evidence = meme_factory(
+        name=f"有证据的梗{_counter['n']}", data_source="mock", status="certified"
+    )
+    session.add(
+        MemeCertification(
+            meme_id=with_evidence.id, role="encyclopedia", up_name="梗百科", up_mid=1,
+            bvid="BV1real", confirmed=True, data_source="bilibili",
+        )
+    )
+    _counter["n"] += 1
+    real = meme_factory(name=f"真实梗{_counter['n']}", data_source="bilibili")
+    session.commit()
+
+    demo = _demo_only_ids(session)
+    assert pure.id in demo
+    assert candidate.id not in demo, "有人点名要量的候选梗不能当成演示数据跳过"
+    assert with_evidence.id not in demo, "有一条真实证据就不该被当成演示数据跳过"
+    assert real.id not in demo
+
+
+def test_scope_real_collects_fewer_than_all(session, monkeypatch):
+    """真实模式下 scope=real 要真的少打接口，否则定时刷新会白烧请求。"""
+    _patch_client(monkeypatch, FakeClient(rows=[]))
+    real = collect_all("bilibili", window_days=1, scope="real")
+    everything = collect_all("bilibili", window_days=1, scope="all")
+
+    assert real["targets"] < everything["targets"]
+    assert real["skipped_demo"] == everything["targets"] - real["targets"]
+    assert "纯演示" in str(real["scope_note"])
+    assert "不套 scope" not in str(real["scope_note"])
+
+
+def test_explicit_ids_bypass_scope(session, monkeypatch, certified_meme):
+    """点名要刷的梗不许被 scope 挡掉——certified_meme 本身就是 mock 来源。"""
+    _patch_client(monkeypatch, FakeClient(rows=[_row(0, days_ago=1, title=f"{certified_meme.name}名场面")]))
+    result = collect_all("bilibili", meme_ids=[certified_meme.id], window_days=1, scope="real")
+
+    assert result["targets"] == 1
+    assert "不套 scope" in str(result["scope_note"])
+    assert result["collected"] == 1

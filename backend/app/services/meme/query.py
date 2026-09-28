@@ -38,6 +38,7 @@ from app.models import (
 from app.mock.catalogue import spec_for
 
 from ..llm.service import generate_catch_up_advice, generate_trend_explanation
+from .intro import compose_intro
 from .certification import (
     ENCYCLOPEDIA,
     GUIDE,
@@ -345,7 +346,8 @@ def trend_payload(session: Session, meme_id: int, window: int) -> dict[str, Any]
     }
 
 
-def video_payloads(session: Session, meme: Meme, limit: int | None = 4) -> list[dict[str, Any]]:
+def kept_videos(session: Session, meme: Meme, limit: int | None = None) -> list[Video]:
+    """按播放量降序取"确实还在讲这个梗"的视频（过相关性筛，不拿错片简介拼介绍）。"""
     videos = list(
         session.scalars(
             select(Video).where(Video.meme_id == meme.id).order_by(Video.view.desc())
@@ -353,7 +355,10 @@ def video_payloads(session: Session, meme: Meme, limit: int | None = 4) -> list[
     )
     kept, _ = match_videos(MemeTerms.from_meme(meme), videos)
     kept.sort(key=lambda video: video.view, reverse=True)
-    selected = kept[:limit] if limit else kept
+    return kept[:limit] if limit else kept
+
+
+def video_payloads(session: Session, meme: Meme, limit: int | None = 4) -> list[dict[str, Any]]:
     return [
         {
             **video.to_dict(include_meme=False),
@@ -362,7 +367,7 @@ def video_payloads(session: Session, meme: Meme, limit: int | None = 4) -> list[
             "view_text": _compact(video.view),
             "danmaku_text": _compact(video.danmaku),
         }
-        for video in selected
+        for video in kept_videos(session, meme, limit)
     ]
 
 
@@ -458,6 +463,11 @@ def get_meme_or_none(session: Session, meme_id: int) -> Meme | None:
     return session.get(Meme, meme_id)
 
 
+def intro_payload(session: Session, meme: Meme) -> dict[str, Any]:
+    """详情页的「这个梗是什么」：人工介绍 > 真实证据原文 > 显式空态。"""
+    return compose_intro(meme, meme.certifications, kept_videos(session, meme, 6))
+
+
 def detail_payload(session: Session, meme: Meme) -> dict[str, Any] | None:
     hotness = session.get(HotnessSnapshot, meme.id)
     lifecycle = session.get(LifecycleSnapshot, meme.id)
@@ -494,6 +504,7 @@ def detail_payload(session: Session, meme: Meme) -> dict[str, Any] | None:
         },
         "metrics": _metric_block(session, meme, hotness),
         "certification": certification_progress(meme),
+        "intro": intro_payload(session, meme),
         "videos": video_payloads(session, meme, limit=4),
         "trend": trend_payload(session, meme.id, settings.analysis_window_days),
     }

@@ -110,7 +110,21 @@ call("GET", "/api/memes/999999", expect=(404,), note="不存在的梗应 404")
 if items:
     meme_id = items[0]["id"]
     detail = call("GET", f"/api/memes/{meme_id}")
-    check(detail and set(detail) >= {"meme", "hotness", "lifecycle", "metrics", "certification", "videos", "trend", "insight"}, "详情结构完整")
+    check(detail and set(detail) >= {"meme", "hotness", "lifecycle", "metrics", "certification", "intro", "videos", "trend", "insight"}, "详情结构完整")
+    check(detail and bool(detail["intro"]["text"].strip()), f"详情有介绍（来源 {detail['intro']['source']}）")
+    check(
+        detail and detail["intro"]["source"] in {"manual", "evidence"},
+        f"介绍标了来源：{detail['intro']['source_label']}",
+    )
+    # 整库扫一遍：点进任何一条详情都不该看到空白介绍
+    library = call("GET", "/api/memes?scope=all&limit=100") or {}
+    blank, sources = [], {}
+    for row in library.get("items", []):
+        intro = call("GET", f"/api/memes/{row['id']}")["intro"]
+        sources[intro["source"]] = sources.get(intro["source"], 0) + 1
+        if not intro["text"].strip():
+            blank.append(row["name"])
+    check(not blank, f"梗库 {len(library.get('items', []))} 条详情都有介绍（来源分布 {sources}）")
     check(detail and sum(detail["hotness"]["weights"].values()) == 1.0, "热度权重合计为 1")
     check(detail and sum(1 for s in detail["lifecycle"]["stages"] if s["active"]) == 1, "生命周期只有一个当前阶段")
     check(detail and detail["certification"]["admitted"] is True, "详情梗已通过发现层准入（任一 UP 介绍过）")

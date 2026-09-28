@@ -189,8 +189,18 @@ def test_detail_shape(client, top_meme_id):
     _forbid_nan(response)
     payload = response.json()
 
-    assert set(payload) >= {"meme", "hotness", "lifecycle", "metrics", "certification", "videos", "trend", "insight"}
+    assert set(payload) >= {"meme", "hotness", "lifecycle", "metrics", "certification", "intro", "videos", "trend", "insight"}
     assert payload["meme"]["hotness"] == payload["hotness"]["score"]
+
+    # 详情页的「这个梗是什么」：必须有来源标注，且不许是空白
+    intro = payload["intro"]
+    assert intro["source"] in {"manual", "evidence", "none"}
+    assert intro["source_label"]
+    assert intro["text"], "点进详情不能看到一片空白"
+    if intro["source"] == "evidence":
+        # 证据拼出来的介绍，每个字都要能回指到一条真实解说视频
+        assert intro["evidence"]
+        assert all(item["video_title"] for item in intro["evidence"])
 
     # 热度分量 + 权重，且权重合计 1
     weights = payload["hotness"]["weights"]
@@ -227,6 +237,18 @@ def test_detail_shape(client, top_meme_id):
         assert video["relevance_score"] >= settings.relevance_threshold
         assert video["url"].startswith("https://www.bilibili.com/video/BV")
         assert video["view_text"] and video["duration_text"]
+
+
+def test_no_meme_detail_is_blank(client):
+    """整库扫一遍：点进任何一条详情都不该看到空白介绍。"""
+    items = client.get("/api/memes?scope=all&limit=100").json()["items"]
+    assert items
+    blanks = []
+    for item in items:
+        intro = client.get(f"/api/memes/{item['id']}").json()["intro"]
+        if not intro["text"].strip():
+            blanks.append((item["name"], intro["source"]))
+    assert not blanks, f"这些梗的详情页没有介绍：{blanks}"
 
 
 def test_detail_trend_and_windows(client, top_meme_id):

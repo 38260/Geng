@@ -262,12 +262,45 @@ export interface InsightBundle {
   catch_up: CatchUp;
 }
 
+/** 介绍来源：人工撰写 / 由真实证据原文拼出 / 什么都没有 */
+export type IntroSource = "manual" | "evidence" | "none";
+
+export interface IntroEvidence {
+  role: string;
+  up_label: string;
+  up_name: string;
+  video_title: string;
+  bvid: string;
+  video_url: string;
+  published_at: string;
+  verified: boolean;
+}
+
+export interface IntroExcerpt {
+  text: string;
+  video_title: string;
+  author: string;
+  bvid: string;
+  url: string;
+  data_source: DataSource;
+}
+
+export interface MemeIntro {
+  text: string;
+  source: IntroSource;
+  source_label: string;
+  note: string;
+  evidence: IntroEvidence[];
+  excerpt: IntroExcerpt | null;
+}
+
 export interface MemeDetail {
   meme: MemeCard;
   hotness: Hotness;
   lifecycle: Lifecycle;
   metrics: Metrics;
   certification: Certification;
+  intro: MemeIntro;
   videos: VideoItem[];
   trend: Trend;
   insight: InsightBundle;

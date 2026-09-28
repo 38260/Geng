@@ -12,7 +12,7 @@ import { ErrorState, LoadingCards } from "@/components/States";
 import { TransparencyFooter } from "@/components/Sections";
 import { useAsync } from "@/hooks/useAsync";
 import { useFavorites, useMeta } from "@/hooks/useAppData";
-import type { Certification, InsightBundle, MemeCard, Trend as TrendData, VideoItem } from "@/types/api";
+import type { Certification, InsightBundle, IntroSource, MemeCard, MemeIntro, Trend as TrendData, VideoItem } from "@/types/api";
 import { CATCH_STYLE, STAGE_STYLE } from "@/utils/format";
 
 const EMPTY_BUNDLE: InsightBundle = {
@@ -88,8 +88,87 @@ function HeadCard({
           <span className="mr-1">🌟</span>
           {explanation || meme.catch_reason || "最近这个梗的数据还在积累中。"}
         </p>
-        <p className="mt-2 line-clamp-2 text-[12px] leading-relaxed text-ink-faint">{meme.description}</p>
       </div>
+    </section>
+  );
+}
+
+/** 介绍来源决定这句话说得多硬：人工写的可以直接信，证据拼出的只是原文摘录，没内容就明说。 */
+const INTRO_STYLE: Record<IntroSource, { chip: string; hint: string }> = {
+  manual: { chip: "bg-go/10 text-go", hint: "这条介绍是人工在梗管理里维护的" },
+  evidence: {
+    chip: "bg-flare/10 text-flare",
+    hint: "还没有人工介绍，这段由抓取到的解说视频标题与简介原文拼出，系统没有改写",
+  },
+  none: { chip: "bg-gold/20 text-[#B2750A]", hint: "既没有人工介绍，也没有可用的原文证据" },
+};
+
+function IntroCard({ intro }: { intro: MemeIntro }) {
+  const style = INTRO_STYLE[intro.source];
+  return (
+    <section id="intro" className="card p-5">
+      <div className="mb-2 flex flex-wrap items-center gap-2.5">
+        <span className="text-[20px]">📖</span>
+        <h3 className="text-[18px] font-bold">这个梗是什么</h3>
+        <span className={`chip px-2.5 py-1 text-[11px] ${style.chip}`} title={style.hint}>
+          {intro.source_label}
+        </span>
+        {intro.evidence.length ? (
+          <span className="ml-auto text-[12px] text-ink-faint">
+            {intro.evidence.length} 位 UP 主介绍过
+          </span>
+        ) : null}
+      </div>
+
+      {intro.text ? (
+        <p className="text-[15px] leading-relaxed text-ink-mute">{intro.text}</p>
+      ) : (
+        <p className="rounded-xl bg-rail px-4 py-3 text-[13px] leading-relaxed text-ink-faint">
+          {intro.note}
+          <Link to="/manage" className="ml-1 font-bold text-brand hover:underline">
+            去梗管理补一条 →
+          </Link>
+        </p>
+      )}
+
+      {intro.excerpt ? (
+        <div className="mt-3 rounded-xl border border-dashed border-line bg-canvas px-4 py-3">
+          <div className="text-[12px] font-bold text-ink-faint">
+            简介原文摘录 · 来自《{intro.excerpt.video_title}》（UP：{intro.excerpt.author}）
+            {intro.excerpt.data_source !== "bilibili" ? "（演示数据）" : ""}
+          </div>
+          <p className="mt-1 text-[13px] leading-relaxed text-ink-mute">{intro.excerpt.text}</p>
+        </div>
+      ) : null}
+
+      {intro.evidence.length ? (
+        <ul className="mt-3 space-y-1.5">
+          {intro.evidence.map((item) => (
+            <li key={`${item.role}-${item.bvid}`} className="flex items-start gap-2 text-[12px]">
+              <span className="chip shrink-0 bg-rail px-2 py-0.5 text-ink-mute">{item.up_label}</span>
+              <span className="min-w-0 flex-1 text-ink-mute">
+                {item.published_at ? `${item.published_at} · ` : ""}
+                {item.video_url ? (
+                  <a
+                    href={item.video_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-flare hover:underline"
+                  >
+                    <LinkIcon className="h-3 w-3" />
+                    <span className="truncate">{item.video_title}</span>
+                  </a>
+                ) : (
+                  // 演示/未核验的证据不给链接，点进去会是 404
+                  <span className="text-ink-faint" title="这条证据不是真实抓取到的投稿，没有可点开的链接">
+                    {item.video_title}
+                  </span>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </section>
   );
 }
@@ -312,6 +391,8 @@ export default function MemeDetail() {
           {detail.data ? (
             <>
               <HeadCard meme={detail.data.meme} bundle={bundle} explanation={explanationText} />
+
+              <IntroCard intro={detail.data.intro} />
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <MetricCard kind="videos" label="视频数" metric={detail.data.metrics.videos} />

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 
 import { DemoBadge } from "@/components/States";
-import { CalendarIcon, SearchIcon } from "@/components/icons";
+import { CalendarIcon, HomeIcon, SearchIcon } from "@/components/icons";
 import { useMeta } from "@/hooks/useAppData";
 import { formatDateTime } from "@/utils/format";
 
@@ -68,16 +68,28 @@ export function TopBar({
     <header className="sticky top-0 z-30 bg-canvas/92 backdrop-blur-sm">
       <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center gap-4 px-5 lg:px-6">
         {variant === "back" ? (
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="flex shrink-0 items-center gap-2 text-[15px] font-semibold text-ink-soft transition hover:text-nav"
-          >
-            <span aria-hidden className="text-[17px] leading-none">
-              ←
-            </span>
-            返回
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="flex shrink-0 items-center gap-2 text-[15px] font-semibold text-ink-soft transition hover:text-nav"
+            >
+              <span aria-hidden className="text-[17px] leading-none">
+                ←
+              </span>
+              返回
+            </button>
+            <span aria-hidden className="h-5 w-px shrink-0 bg-line" />
+            {/* 返回只退一步；从分享链接落进详情页时根本没有"上一步"，所以首页入口必须一直在 */}
+            <Link
+              to="/"
+              className="flex shrink-0 items-center gap-1.5 text-[15px] font-medium text-ink-mute transition hover:text-nav"
+              title="直接回热榜首页，不走浏览器历史"
+            >
+              <HomeIcon size={16} />
+              首页
+            </Link>
+          </>
         ) : (
           <>
             <Link to="/" className="flex shrink-0 items-center gap-2">

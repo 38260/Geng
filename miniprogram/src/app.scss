@@ -457,6 +457,17 @@ page {
 }
 
 /* 返回入口：只在没有原生箭头时出现，所以做得很轻 */
+.page-back-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+
+  .page-back {
+    margin-bottom: 0;
+  }
+}
+
 .page-back {
   display: inline-flex;
   align-items: center;

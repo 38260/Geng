@@ -188,8 +188,24 @@ class CatchUpThresholds:
     can_catch_max_peak_gap: float = 0.15
     can_catch_stages: tuple[str, ...] = ("sprouting", "rising", "explosive")
 
-    # Heat already very high + close to peak => the window is shrinking.
-    caution_min_heat: float = 85.0
+    # 窗口在收窄：拿"已经离开峰值多少"来判，而不是拿"热度多高"。
+    #
+    # 历史教训（两次）：
+    #   ① 这条规则原来写成 ``heat >= 85``，而全库最高热度只有 80.4，
+    #      `score >= 85` 的记录数为 0 —— 规则一次都没执行过，
+    #      所有「慎赶」都由兜底分支产出，而兜底文案写的是「没有明显往上走的迹象」，
+    #      最后贴在 growth +82% 的上升期梗上，自相矛盾。
+    #   ② 把 85 改成 70 也只是"技术上可达"：热度 ≥70 的梗全库只有 1 个，
+    #      而它的 peak_gap 是 0.018，照样不触发。这是在重复同一个错误——
+    #      用真实数据的分位数挑一个好看的数，但规则本身没有信息量。
+    #
+    # 所以真正的判据换成 peak_gap：**离开峰值多少**才是"窗口还剩多大"的直接度量，
+    # 热度高低由上升/爆发/退潮那几条规则去管。当前数据里 peak_gap 落在
+    # 0.10~0.35 的梗有 9 个，规则真在干活，而且不会跟任何一条自相矛盾。
+    caution_min_peak_gap: float = 0.10
+    # 超过这条线说明已经明确离开峰值：仍在涨也要说"窗口在收窄"，
+    # 不能说成"增速放缓"（那是数字上的谎话）。
+    caution_strong_peak_gap: float = 0.20
 
 
 CATCHUP_THRESHOLDS = CatchUpThresholds()

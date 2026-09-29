@@ -52,9 +52,25 @@ def test_still_spreading_is_can_catch():
     assert "来得及" in result.reason
 
 
-def test_at_peak_but_decelerating_is_caution():
-    result = run(stage="explosive", heat=96.0, growth=1.4, peak_heat=112.0)
-    assert result.status == "caution"
+def test_off_peak_while_still_growing_is_caution():
+    """已离开峰值一段的梗，即使还在涨也要判「慎赶」，且不能说「增速放缓」。
+
+    这个用例原来叫 ``test_at_peak_but_decelerating_is_caution``，传的是
+    ``heat=96.0, growth=1.4``：96 分在真实数据里不存在（全库最高 76.8），
+    而 growth=+140% 恰恰是"在加速"、不是"在放缓"——名字与输入不符。
+    正因为这个用例绕过了真实分数区间，``caution_min_heat=85`` 那条死规则
+    才藏了那么久。现在用真实可达的分数，并分别覆盖"仍在增长"和"确实放缓"两种措辞。
+    """
+    # 仍在增长但要慎赶：peak_gap 超过 can_catch 的上限
+    growing = run(stage="rising", heat=60.0, growth=0.60, peak_heat=60.0 / (1 - 0.25))
+    assert growing.status == "caution"
+    assert "收窄" in growing.reason
+    assert "放缓" not in growing.reason, f"+60% 却写成「{growing.reason}」"
+
+    # 增长确实停了：这时才可以提"放缓"
+    stalled = run(stage="rising", heat=60.0, growth=0.02, peak_heat=60.0 / (1 - 0.25))
+    assert stalled.status == "caution"
+    assert "收窄" in stalled.reason
 
 
 def test_reason_never_pretends_to_predict_the_future():

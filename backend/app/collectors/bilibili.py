@@ -27,6 +27,8 @@ NAV_URL = "https://api.bilibili.com/x/web-interface/nav"
 SPI_URL = "https://api.bilibili.com/x/frontend/finger/spi"
 SEARCH_URL = "https://api.bilibili.com/x/web-interface/wbi/search/type"
 SPACE_ARCHIVE_URL = "https://api.bilibili.com/x/space/wbi/arc/search"
+VIEW_URL = "https://api.bilibili.com/x/web-interface/view"
+PLAYER_URL = "https://api.bilibili.com/x/player/wbi/v2"
 
 MIXIN_KEY_ENC_TAB = [
     46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5, 49,
@@ -67,6 +69,25 @@ def sign_params(params: dict[str, str | int], img_key: str, sub_key: str) -> dic
     w_rid = hashlib.md5((query + mixin).encode("utf-8")).hexdigest()
     prepared["w_rid"] = w_rid
     return prepared
+
+
+@dataclass
+class SubtitleResult:
+    """一条视频的字幕抓取结果。拿不到时 reason 说人话，不返回半截内容。"""
+
+    bvid: str = ""
+    cid: int = 0
+    text: str = ""
+    kind: str = ""          # cc | ai
+    lang: str = ""
+    title: str = ""         # view 接口下发的真实标题，脚本入库时用它
+    tracks: int = 0
+    logged_in: bool = False
+    reason: str = ""        # no-cid / no-track-anonymous / no-track / download-failed
+
+    @property
+    def ok(self) -> bool:
+        return bool(self.text.strip())
 
 
 @dataclass
@@ -245,6 +266,76 @@ class BiliClient:
         except (TypeError, ValueError):
             total = len(rows)
         return rows, total
+
+    def subtitle_of(self, bvid: str) -> SubtitleResult:
+        """抓一条视频的字幕逐字稿。
+
+        实测口径（2026-09-29）：匿名请求 `player/wbi/v2` 会返回 code=0 但
+        `subtitles` 是空数组，B 站自己的 AI 视频总结端点直接 -101 未登录 ——
+        也就是**没有 BILI_COOKIE 就没有字幕**，这不是解析能绕过去的。
+        所以"拿不到"要分开写清楚：没登录 / 这条视频真没字幕 / 字幕文件下载失败，
+        三者对用户的解释完全不同，混成一句"失败"就等于让人瞎猜。
+        """
+        out = SubtitleResult(bvid=bvid, logged_in=bool(self.cookie))
+        try:
+            view = self._get_payload(VIEW_URL, {"bvid": bvid})
+        except BilibiliBlocked as exc:
+            out.reason = f"view 失败：{exc}"
+            return out
+        data = view.get("data") or {}
+        out.cid = int(data.get("cid") or 0)
+        out.title = str(data.get("title") or "")
+        if not out.cid:
+            out.reason = "拿不到 cid（视频可能已删除或审核中）"
+            return out
+
+        try:
+            player = self.signed_get(PLAYER_URL, {"bvid": bvid, "cid": str(out.cid)})
+        except BilibiliBlocked as exc:
+            out.reason = f"播放器信息失败：{exc}"
+            return out
+
+        # signed_get 已经剥过一层，返回的就是 data 本身（和搜索接口同一个口径）
+        tracks = ((player.get("subtitle") or {}).get("subtitles")) or []
+        out.tracks = len(tracks)
+        if not tracks:
+            out.reason = (
+                "这条视频没有字幕轨（解说区很多是把字烧在画面里的）"
+                if self.cookie else "匿名请求拿不到字幕轨，需要在 .env 配 BILI_COOKIE"
+            )
+            return out
+
+        # 人工字幕优先（AI 识别的错字与断句明显更多），同档里再优先中文
+        def sort_key(track: dict) -> tuple[int, int]:
+            ai_last = 1 if int(track.get("ai_type") or 0) else 0
+            zh_first = 0 if str(track.get("lan") or "").lower().startswith("zh") else 1
+            return (ai_last, zh_first)
+
+        chosen = sorted(tracks, key=sort_key)[0]
+        out.kind = "ai" if int(chosen.get("ai_type") or 0) else "cc"
+        out.lang = str(chosen.get("lan") or "")
+        url = str(chosen.get("subtitle_url") or "")
+        if url.startswith("//"):
+            url = "https:" + url
+        if not url:
+            out.reason = "字幕轨里没有下载地址"
+            return out
+
+        try:
+            response = httpx.get(
+                url, headers=self.headers(), timeout=self.timeout, follow_redirects=True
+            )
+            response.raise_for_status()
+            body = response.json().get("body") or []
+        except Exception as exc:  # noqa: BLE001 - 字幕文件是另一个域，失败原因五花八门
+            out.reason = f"字幕文件下载失败：{exc.__class__.__name__}"
+            return out
+
+        lines = [str(item.get("content") or "").strip() for item in body]
+        out.text = "\n".join(line for line in lines if line)
+        if not out.text:
+            out.reason = "字幕文件是空的"
+        return out
 
     def space_videos(self, mid: int, *, page_size: int = 50, page: int = 1) -> list[dict]:
         """某个 UP 主的投稿列表（按发布时间倒序）。"""

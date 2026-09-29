@@ -14,6 +14,7 @@ from .insight import AIInsight, InsightKind, InsightSource, InsightStatus
 from .meme import CertRole, Meme, MemeCertification, MemeStatus
 from .metrics import HotnessSnapshot, LifecycleSnapshot
 from .stats import MemeDailyStats
+from .transcript import TranscriptKind, VideoTranscript
 from .video import Video
 
 __all__ = [
@@ -31,6 +32,8 @@ __all__ = [
     "CertRole",
     "Video",
     "MemeDailyStats",
+    "VideoTranscript",
+    "TranscriptKind",
     "HotnessSnapshot",
     "LifecycleSnapshot",
     "AIInsight",

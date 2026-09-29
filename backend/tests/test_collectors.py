@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
+from types import SimpleNamespace
 
+import httpx
 import pytest
 
 from app.collectors import BilibiliCollector, MockCollector, make_collector
-from app.collectors.bilibili import parse_search_row, sign_params
+from app.collectors.bilibili import BilibiliBlocked, BiliClient, parse_search_row, sign_params
 from app.models import Meme, MemeCertification, MemeDailyStats, Video
 from app.services.pipeline import _demo_only_ids, collect_all
 
@@ -586,3 +588,123 @@ def test_totalrank_asks_for_default_order(certified_meme):
     client = RankClient([_row(0, days_ago=2, title=f"{certified_meme.name}名场面")])
     BilibiliCollector(client=client, request_gap=0, enrich_limit=2)._totalrank(certified_meme)
     assert client.ordered and set(client.ordered) == {""}
+
+
+# --------------------------------------------------------------------------- #
+# 字幕抓取：view → player 字幕轨 → 字幕文件三段链路，每一种「拿不到」都要说人话
+
+
+def _subtitle_client(monkeypatch, *, cookie="SESSDATA=x", view=None, tracks=None, body=None, fail=None):
+    """把 BiliClient 的三个网络出口换成假响应，并记录调用顺序。
+
+    ``fail`` 用来模拟 view/player 直接风控；``body`` 是字幕文件里的逐句。
+    """
+    client = BiliClient(cookie=cookie)
+    calls: list[str] = []
+    client.downloaded_urls = []
+
+    def _get_payload(url, params=None):
+        calls.append("view")
+        if fail == "view":
+            raise BilibiliBlocked("B 站返回 HTTP 412")
+        return {"code": 0, "data": view if view is not None else {"cid": 9001, "title": "《琵琶曲》这梗哪来的"}}
+
+    def signed_get(url, params):
+        calls.append("player")
+        if fail == "player":
+            raise BilibiliBlocked("B 站安全校验未通过（code=-352）")
+        return {"subtitle": {"subtitles": tracks if tracks is not None else []}}
+
+    def download(url, **kwargs):
+        calls.append("file")
+        client.downloaded_urls.append(url)
+        if fail == "file":
+            raise httpx.ReadTimeout("字幕文件超时")
+        return SimpleNamespace(
+            json=lambda: {"body": body if body is not None else []},
+            raise_for_status=lambda: None,
+        )
+
+    monkeypatch.setattr(client, "_get_payload", _get_payload)
+    monkeypatch.setattr(client, "signed_get", signed_get)
+    monkeypatch.setattr("app.collectors.bilibili.httpx.get", download)
+    return client, calls
+
+
+def test_subtitle_prefers_human_cc_over_ai(monkeypatch):
+    """人工 CC 优先，同档里中文优先：AI 识别的错字会把「琵琶曲」听成「枇杷去」。"""
+    tracks = [
+        {"ai_type": 1, "lan": "zh-CN", "subtitle_url": "//bunches/ai.json"},
+        {"ai_type": 0, "lan": "zh-CN", "subtitle_url": "//bunches/cc.json"},
+        {"ai_type": 0, "lan": "en-US", "subtitle_url": "//bunches/en.json"},
+    ]
+    client, calls = _subtitle_client(
+        monkeypatch,
+        tracks=tracks,
+        body=[{"content": "这个梗出自一场直播"}, {"content": ""}, {"content": "UP 主把它做成了 BGM"}],
+    )
+    result = client.subtitle_of("BV1cc")
+
+    assert calls == ["view", "player", "file"]
+    assert result.ok and result.kind == "cc" and result.lang == "zh-CN"
+    assert result.text == "这个梗出自一场直播\nUP 主把它做成了 BGM", "空行要丢掉，其余原样保留"
+    assert result.tracks == 3 and result.cid == 9001
+    assert result.title == "《琵琶曲》这梗哪来的"
+    assert client.downloaded_urls == ["https://bunches/cc.json"], "//开头的字幕地址要补成 https"
+
+
+def test_subtitle_falls_back_to_ai_and_labels_it(monkeypatch):
+    client, _ = _subtitle_client(
+        monkeypatch,
+        tracks=[{"ai_type": 1, "lan": "zh-CN", "subtitle_url": "/bunches/ai.json"}],
+        body=[{"content": "自动识别的一句话"}],
+    )
+    result = client.subtitle_of("BV1ai")
+    assert result.ok and result.kind == "ai"
+
+
+def test_subtitle_anonymous_empty_tracks_points_at_cookie(monkeypatch):
+    """匿名请求 code=0 但空轨，这时说「没字幕」是撒谎，必须点名要 cookie。"""
+    client, calls = _subtitle_client(monkeypatch, cookie="", tracks=[])
+    result = client.subtitle_of("BV1an")
+    assert not result.ok
+    assert "BILI_COOKIE" in result.reason
+    assert result.logged_in is False
+    assert calls == ["view", "player"], "没有轨就不该再去下载字幕文件"
+
+
+def test_subtitle_login_but_no_track_is_reported_as_no_track(monkeypatch):
+    client, _ = _subtitle_client(monkeypatch, cookie="SESSDATA=x", tracks=[])
+    result = client.subtitle_of("BV1none")
+    assert not result.ok and "没有字幕轨" in result.reason
+
+
+def test_subtitle_empty_file_and_missing_cid_have_distinct_reasons(monkeypatch):
+    client, calls = _subtitle_client(
+        monkeypatch,
+        tracks=[{"ai_type": 0, "lan": "zh-CN", "subtitle_url": "/bunches/cc.json"}],
+        body=[],
+    )
+    result = client.subtitle_of("BV1empty")
+    assert "空的" in result.reason and calls == ["view", "player", "file"]
+
+    dead, dead_calls = _subtitle_client(monkeypatch, view={"cid": 0, "title": ""})
+    gone = dead.subtitle_of("BV1gone")
+    assert "cid" in gone.reason and dead_calls == ["view"], "视频查不到就不该继续打播放器接口"
+
+
+def test_subtitle_download_failure_names_the_step(monkeypatch):
+    client, _ = _subtitle_client(
+        monkeypatch,
+        tracks=[{"ai_type": 0, "lan": "zh-CN", "subtitle_url": "/bunches/cc.json"}],
+        fail="file",
+    )
+    result = client.subtitle_of("BV1dl")
+    assert "字幕文件下载失败" in result.reason and not result.ok
+
+
+def test_subtitle_player_blocked_reason_is_kept(monkeypatch):
+    """view 通了、player 被风控——reason 要写出是哪一步断的。"""
+    client, _ = _subtitle_client(monkeypatch, fail="player")
+    result = client.subtitle_of("BV1r")
+    assert "播放器信息失败" in result.reason

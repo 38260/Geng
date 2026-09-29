@@ -25,7 +25,7 @@ from typing import Any, Iterable
 
 from app.config import settings
 from app.models import Meme, MemeCertification, Video, VideoTranscript
-from app.models.transcript import TRANSCRIPT_LABELS, TranscriptKind
+from app.models.transcript import TRANSCRIPT_LABELS, TranscriptKind, transcript_digest
 
 from .certification import ENCYCLOPEDIA, GUIDE, UP_AUTHORS
 
@@ -226,6 +226,8 @@ def transcript_block(
         # 非认证视频的字幕也能佐证内容，但来源要能被认出来，不能伪装成双 UP 的说法
         "certified": cert is not None,
         "chars": row.chars or len(row.text or ""),
+        # 字幕内容的指纹：AI 浓缩的缓存键用它，重抓过字幕就不会命中旧结果
+        "version": transcript_digest(row.bvid, row.text),
         "excerpt": segment,
         "excerpt_chars": len(segment),
         "matched_sentences": hits,
@@ -273,16 +275,21 @@ def compose_intro(
     certifications: Iterable[MemeCertification] = (),
     videos: Iterable[Video] = (),
     transcripts: Iterable[VideoTranscript] = (),
+    summary: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """组装详情页要用的介绍结构体。
 
     ``videos`` 传进来时应当已按播放量降序（取第一条简介够长的做摘录）；
-    ``transcripts`` 是这些视频的字幕，只有配了 BILI_COOKIE 才可能有。
+    ``transcripts`` 是这些视频的字幕，只有配了 BILI_COOKIE 才可能有；
+    ``summary`` 是字幕的 AI 浓缩版（已通过逐字校验，由调用方从缓存读来），
+    没校验过的绝不该传进来。
     """
     evidence = evidence_lines(certifications)
     manual = _clean(meme.description)
     # 字幕块就算有人工介绍也照样给：详情页要能点开对照，看这句话到底是不是视频里说的
     transcript = transcript_block(meme, certifications, transcripts)
+    if transcript is not None:
+        transcript["summary"] = summary
 
     excerpt = None
     for video in videos:
@@ -310,13 +317,21 @@ def compose_intro(
         }
 
     if transcript:
+        # 浓缩版能当正文，只因为它被证明是原文句子的子集；证据不足时退回规则摘录，
+        # 两者都是逐字原文，区别只在长短和来源标签。
+        condensed = (summary or {}).get("text") if (summary or {}).get("verified") else ""
         return {
-            "text": transcript["excerpt"],
+            "text": _clean(condensed) or transcript["excerpt"],
             "source": "transcript",
-            "source_label": "字幕原文摘录",
+            "source_label": "字幕原文摘录" if not condensed else "字幕原文（AI 缩短）",
             "note": (
                 "还没有人工介绍。这段摘自解说视频的字幕原文，"
                 "系统只按「出自/来历/这个梗」这类说法把在讲这个梗的句子挑出来，没有改写也没有归纳。"
+                if not condensed
+                else (
+                    "还没有人工介绍。这段是 AI 从字幕原文里挑出来的整句，"
+                    "逐字核对过：它只负责决定留哪几句，一个字都没写。"
+                )
             ),
             "evidence": evidence,
             "excerpt": excerpt,

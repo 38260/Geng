@@ -115,10 +115,28 @@ if items:
     detail = call("GET", f"/api/memes/{meme_id}")
     check(detail and set(detail) >= {"meme", "hotness", "lifecycle", "metrics", "certification", "intro", "videos", "trend", "insight"}, "详情结构完整")
     check(detail and bool(detail["intro"]["text"].strip()), f"详情有介绍（来源 {detail['intro']['source']}）")
+    check(detail and set(detail["intro"]) >= {"text", "source", "source_label", "note", "evidence", "excerpt", "transcript"}, "介绍结构完整")
     check(
-        detail and detail["intro"]["source"] in {"manual", "evidence"},
+        detail and detail["intro"]["source"] in {"manual", "transcript", "evidence"},
         f"介绍标了来源：{detail['intro']['source_label']}",
     )
+    # 字幕块：正文必须能在原文里逐字找到，AI 只能挑句子
+    block = (detail or {}).get("intro", {}).get("transcript")
+    if block:
+        check(
+            block["excerpt"].replace(" ", "") in block["full"].replace(" ", "") or not block["excerpt"],
+            f"摘录逐字来自字幕原文（{block['kind_label']}，{block['chars']} 字）",
+        )
+        summary = block.get("summary")
+        if summary:
+            check(
+                all(item.replace(" ", "") in block["full"].replace(" ", "") for item in summary["sentences"]),
+                f"AI 缩短版也是整句照抄（{summary['chars']} 字，来源 {summary['source']}）",
+            )
+            check(
+                summary["text"].replace(" ", "") in block["excerpt"].replace(" ", ""),
+                "缩短版是规则摘录的子集，没多出内容",
+            )
     # 整库扫一遍：点进任何一条详情都不该看到空白介绍
     library = call("GET", "/api/memes?scope=all&limit=100") or {}
     blank, sources = [], {}

@@ -129,6 +129,16 @@ function TranscriptBlock({ intro }: { intro: MemeIntro }) {
         <p className="mt-1 text-[13px] leading-relaxed text-ink-mute">{item.excerpt}</p>
       )}
 
+      {isSource && item.summary ? (
+        <p
+          className="mt-1 text-[12px] leading-relaxed text-ink-faint"
+          title={`模型想加但原文没有的句子：${item.summary.invented.length} 条，已全部丢弃`}
+        >
+          AI 只做了挑选：从 {item.matched_sentences} 句相关原句里留了 {item.summary.sentences.length} 句
+          （{item.summary.chars} 字），整句照抄、逐字核对；未缩短的摘录是 {item.excerpt_chars} 字。
+        </p>
+      ) : null}
+
       <details className="mt-1.5">
         <summary className="cursor-pointer list-none text-[12px] text-flare hover:underline">
           {item.full_truncated

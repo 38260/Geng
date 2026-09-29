@@ -43,6 +43,31 @@ def _data_through(session) -> date | None:
     return session.scalar(select(MemeDailyStats.stat_date).order_by(MemeDailyStats.stat_date.desc()))
 
 
+def run_condense(*, force: bool = False) -> dict:
+    """给已抓到的字幕生成 AI 浓缩介绍；没字幕或没配 key 就整步跳过。
+
+    缓存键是字幕指纹，所以每天跑一次只在"字幕重抓过"时才真打模型，不会天天烧额度。
+    """
+    from app.scripts.condense_intros import condense_all
+    from app.services.llm.config import load_config
+
+    config = load_config()
+    if not config.is_configured:
+        return {"skipped": True, "reason": "没配 LLM_API_KEY"}
+
+    session = SessionLocal()
+    try:
+        return condense_all(session, force=force, config=config, log_line=_echo)
+    except Exception as exc:  # noqa: BLE001 - 文案层塌了不能带崩整轮刷新
+        return {"skipped": True, "reason": f"浓缩步骤异常：{exc}"}
+    finally:
+        session.close()
+
+
+def _echo(level: str, message: str) -> None:
+    print(f"    {message}")
+
+
 def acquire_lock(source: str) -> bool:
     """单实例：定时任务和手动按钮可能同时触发，撞车会把同一批请求打两遍。"""
     if LOCK_FILE.exists():
@@ -119,6 +144,16 @@ def write_markdown(state: dict) -> None:
         else f"失败（已跳过，不影响老梗更新）：{discovery.get('error')}"
     )
     NL = chr(10)          # 用 chr(10) 拼，免得转义在工具链里被吃掉
+    condensed = state.get("condense") or {}
+    condense_line = (
+        f"跳过：{condensed.get('reason')}"
+        if condensed.get("skipped")
+        else (
+            f"有可用字幕 {condensed.get('targets')} 个 / 新写 {condensed.get('ok')}"
+            f" / 缓存命中 {condensed.get('cached')} / 逐字校验不过 {condensed.get('rejected')}"
+            f" / 异常 {condensed.get('error')}"
+        )
+    )
     block = NL.join([
         f"## {state['started_at']} · {state['trigger']} · {state['mode']}",
         "",
@@ -129,6 +164,7 @@ def write_markdown(state: dict) -> None:
         f" / 跳过纯演示 {collect.get('skipped_demo', 0)}",
         f"- 同日沿用更好观测 {collect.get('kept_better_days', 0)} 天；本次更薄的梗 {collect.get('thinned', 0)} 个",
         f"- 指标重算 {state['recompute'].get('computed')} 个梗（跳过 {state['recompute'].get('skipped')}）",
+        f"- 介绍浓缩：{condense_line}",
         f"- 发现层：{discovery_line}",
         f"- 范围说明：{collect.get('scope_note', '—')}；探测：{collect.get('reason', '—')}",
         "",
@@ -153,6 +189,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="赶梗潮 · 每日刷新（发现新梗 + 刷新老梗 + 重算）")
     parser.add_argument("--full", action="store_true", help="重采整个报告窗口（默认只补昨天）")
     parser.add_argument("--skip-discovery", action="store_true", help="不跑发现层，只刷新已有梗")
+    parser.add_argument(
+        "--skip-condense", action="store_true",
+        help="不给字幕生成 AI 浓缩介绍（默认：配了 LLM 且有字幕就生成）",
+    )
     parser.add_argument("--trigger", default="手动", help="写进报告的触发方式：手动 / 定时")
     parser.add_argument("--pages", type=int, default=4, help="发现层每位 UP 翻几页")
     parser.add_argument("--gap", type=float, default=1.2, help="发现层翻页间隔秒")
@@ -193,6 +233,18 @@ def main(argv: list[str] | None = None) -> int:
         recomputed = recompute_all(window_days=settings.analysis_window_days)
         print(f"  → 算了 {recomputed['computed']} 个梗，跳过 {recomputed['skipped']} 个")
 
+        condensed: dict = {"skipped": True, "reason": "本次跳过（--skip-condense）"}
+        if not args.skip_condense:
+            print("· 介绍浓缩：给已入库字幕生成 AI 缩短版（只挑原句，逐字校验）…")
+            condensed = run_condense()
+            if condensed.get("skipped"):
+                print(f"  → 跳过：{condensed.get('reason')}")
+            else:
+                print(
+                    f"  → 有可用字幕 {condensed.get('targets')} 个，新写 {condensed.get('ok')}，"
+                    f"缓存命中 {condensed.get('cached')}，逐字校验不过 {condensed.get('rejected')}"
+                )
+
         if not collected["ok"]:
             exit_code = 2
         elif collected["failed"] or collected["collected"] == 0:
@@ -222,6 +274,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
             },
             "recompute": recomputed,
+            "condense": condensed,
             "data_through": through.isoformat() if through else None,
             "data_lag_days": (date.today() - through).days if through else None,
         }

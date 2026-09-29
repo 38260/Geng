@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime
 from typing import Any
 
@@ -18,6 +19,14 @@ from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .base import Base
+
+
+def transcript_digest(bvid: str, text: str | None) -> str:
+    """字幕内容指纹：详情接口与 AI 浓缩缓存都用它当版本号。
+
+    键里带 bvid 是因为字幕会被重抓/UP 主改，文本一变旧结论就该自动失效。
+    """
+    return f"{bvid}:{hashlib.sha1((text or '').encode('utf-8')).hexdigest()[:12]}"
 
 
 class TranscriptKind:

@@ -66,6 +66,13 @@ function IntroCard({ detail }: { detail: MemeDetail }) {
             {who ? `（${who}）` : ""} · {transcript.kind_label}
           </Text>
           {intro.source === "transcript" ? null : <Text className="excerpt-body">{transcript.excerpt}</Text>}
+          {intro.source === "transcript" && transcript.summary ? (
+            <Text className="excerpt-note">
+              AI 只做了挑选：从 {transcript.matched_sentences} 句相关原句里留了{' '}
+              {transcript.summary.sentences.length} 句（{transcript.summary.chars} 字），整句照抄、逐字核对；
+              未缩短的摘录是 {transcript.excerpt_chars} 字。
+            </Text>
+          ) : null}
           <Text className="excerpt-toggle" onClick={() => setFullOpen(!fullOpen)}>
             {fullOpen
               ? "收起字幕原文"

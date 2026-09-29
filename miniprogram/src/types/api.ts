@@ -235,6 +235,21 @@ export interface IntroExcerpt {
   data_source: DataSource;
 }
 
+/** AI 浓缩版介绍：只能是字幕原文句子的子集，逐字校验过才敢给前端 */
+export interface IntroSummary {
+  text: string;
+  /** 被选中照抄的原文句子，顺序就是原文顺序 */
+  sentences: string[];
+  /** 模型想加但原文没有的话，留着当证据，界面不显示 */
+  invented: string[];
+  chars: number;
+  source: "llm" | "cache" | "rule";
+  model: string;
+  data_version: string;
+  generated_at: string | null;
+  verified: boolean;
+}
+
 /** 解说视频字幕原文：正文只放挑出来的那几句，折叠区给可对照的原文 */
 export interface IntroTranscript {
   bvid: string;
@@ -255,6 +270,8 @@ export interface IntroTranscript {
   full: string;
   full_truncated: boolean;
   fetched_at: string;
+  /** 没生成过就是 null：页面继续用未缩短的规则摘录 */
+  summary: IntroSummary | null;
 }
 
 export interface MemeIntro {

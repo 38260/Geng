@@ -40,7 +40,8 @@ from app.models import (
 from app.mock.catalogue import spec_for
 
 from ..llm.service import generate_catch_up_advice, generate_trend_explanation
-from .intro import compose_intro
+from .intro import compose_intro, transcript_block
+from .summary import read_cached_summary
 from .certification import (
     ENCYCLOPEDIA,
     GUIDE,
@@ -555,24 +556,35 @@ def get_meme_or_none(session: Session, meme_id: int) -> Meme | None:
     return session.get(Meme, meme_id)
 
 
-def intro_payload(session: Session, meme: Meme) -> dict[str, Any]:
-    """详情页的「这个梗是什么」：人工介绍 > 字幕原文 > 真实证据原文 > 显式空态。
+def meme_transcripts(session: Session, meme: Meme) -> list[VideoTranscript]:
+    """这个梗能用到的字幕：本梗名下的 + 双 UP 认证视频名下的。
 
-    字幕按 bvid 存，可能挂在别的梗名下（同一条解说视频被两个梗共用），
-    所以除了本梗的字幕，还要把双 UP 认证视频的字幕一起捞进来。
+    一条解说视频可能被两个梗共用（字幕按 bvid 存，归属第一个抓到它的梗），
+    只查 meme_id 会让第二个梗看不见已经抓好的原文。
     """
     bvids = [cert.bvid for cert in meme.certifications if cert.bvid]
     conditions = [VideoTranscript.meme_id == meme.id]
     if bvids:
         conditions.append(VideoTranscript.bvid.in_(bvids))
-    rows = list(
+    return list(
         session.scalars(
             select(VideoTranscript)
             .where(or_(*conditions))
             .order_by(VideoTranscript.chars.desc())
         )
     )
-    return compose_intro(meme, meme.certifications, kept_videos(session, meme, 6), rows)
+
+
+def intro_payload(session: Session, meme: Meme) -> dict[str, Any]:
+    """详情页的「这个梗是什么」：人工介绍 > 字幕原文 > 真实证据原文 > 显式空态。
+
+    AI 浓缩版只读缓存，不在详情请求里现调模型——那会让页面为一行文案等几十秒。
+    缓存键是字幕内容指纹，所以要先用同一套选段规则算出页面用的是哪条字幕。
+    """
+    rows = meme_transcripts(session, meme)
+    block = transcript_block(meme, meme.certifications, rows)
+    summary = read_cached_summary(session, meme_id=meme.id, version=block["version"]) if block else None
+    return compose_intro(meme, meme.certifications, kept_videos(session, meme, 6), rows, summary)
 
 
 def detail_payload(session: Session, meme: Meme) -> dict[str, Any] | None:

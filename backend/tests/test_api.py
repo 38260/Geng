@@ -7,10 +7,20 @@ import math
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from app.config import HOME_FILTERS, settings
 from app.main import app
-from app.models import Meme, SessionLocal, VideoTranscript, reset_db
+from app.models import (
+    AIInsight,
+    InsightSource,
+    InsightStatus,
+    Meme,
+    SessionLocal,
+    VideoTranscript,
+    reset_db,
+)
+from app.services.meme.summary import INTRO_KIND
 
 from .conftest import make_video
 
@@ -420,9 +430,50 @@ def test_detail_prefers_subtitle_over_title_evidence(client):
         assert intro["text"] == block["excerpt"], "正文只能是摘录本身，不能是系统另写的一句"
         assert block["full"] == text and block["full_truncated"] is False
         assert block["url"] == "https://www.bilibili.com/video/BV1subtitle01"
+        assert block["summary"] is None, "没生成过浓缩版就不能凭空出现"
+
+        # 缓存里放上通过逐字校验的浓缩版，详情接口只读它、不现调模型
+        condensed = "这个梗出自 2019 年的一场直播，主播在逆风局里反复念同一句话。"
+        session.add(
+            AIInsight(
+                meme_id=meme_id,
+                kind=INTRO_KIND,
+                data_version=block["version"],
+                status=InsightStatus.OK,
+                source=InsightSource.LLM,
+                model="test-model",
+                result={
+                    "text": condensed,
+                    "sentences": [condensed],
+                    "invented": [],
+                    "ok": True,
+                    "chars": len(condensed),
+                    "bvid": "BV1subtitle01",
+                },
+            )
+        )
+        session.commit()
+
+        sharpened = client.get(f"/api/memes/{meme_id}").json()["intro"]
+        assert sharpened["text"] == condensed, "详情页正文换成缩短版，原文仍在折叠区"
+        assert "AI 缩短" in sharpened["source_label"]
+        assert sharpened["transcript"]["summary"]["source"] == "cache"
+        assert sharpened["transcript"]["excerpt"] == block["excerpt"], "未缩短的选段要留着可对照"
+
+        # 校验没过的那类结果（ok=False）不该被读出来
+        row = session.scalar(
+            select(AIInsight).where(AIInsight.meme_id == meme_id, AIInsight.kind == INTRO_KIND)
+        )
+        row.result = {**row.result, "ok": False}
+        session.commit()
+        assert client.get(f"/api/memes/{meme_id}").json()["intro"]["source_label"] == "字幕原文摘录"
     finally:
         meme = session.get(Meme, meme_id)
         meme.description = original
+        for row in session.scalars(
+            select(AIInsight).where(AIInsight.meme_id == meme_id, AIInsight.kind == INTRO_KIND)
+        ):
+            session.delete(row)
         row = session.get(VideoTranscript, "BV1subtitle01")
         if row is not None:
             session.delete(row)

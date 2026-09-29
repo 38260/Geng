@@ -1,0 +1,105 @@
+{
+  "rows": 85,
+  "pool": 71,
+  "real": 35,
+  "board": 20,
+  "verified_both": 8,
+  "partially": 38,
+  "unverified": 39,
+  "stages": {
+    "萌芽期": 9,
+    "数据不足": 33,
+    "退潮期": 12,
+    "上升期": 8,
+    "平稳期": 5,
+    "过气": 3,
+    "爆发期": 1
+  },
+  "mean_coverage": 0.553,
+  "top_board": [
+    {
+      "name": "闪身步",
+      "score": 76.8,
+      "stage": "爆发期",
+      "catch": "还来得及",
+      "conf": 0.95
+    },
+    {
+      "name": "耍起",
+      "score": 67.2,
+      "stage": "上升期",
+      "catch": "还来得及",
+      "conf": 0.95
+    },
+    {
+      "name": "闹吃vs古振兴",
+      "score": 54.6,
+      "stage": "上升期",
+      "catch": "慎赶",
+      "conf": 0.81
+    },
+    {
+      "name": "琵琶曲",
+      "score": 50.3,
+      "stage": "数据不足",
+      "catch": "说不准",
+      "conf": 0.0
+    },
+    {
+      "name": "牛来",
+      "score": 48.6,
+      "stage": "平稳期",
+      "catch": "慎赶",
+      "conf": 0.81
+    },
+    {
+      "name": "驾考宝典",
+      "score": 48.5,
+      "stage": "退潮期",
+      "catch": "你来晚了",
+      "conf": 0.92
+    },
+    {
+      "name": "老叟戏顽童",
+      "score": 48.2,
+      "stage": "退潮期",
+      "catch": "你来晚了",
+      "conf": 0.92
+    },
+    {
+      "name": "verity",
+      "score": 48.2,
+      "stage": "退潮期",
+      "catch": "你来晚了",
+      "conf": 0.88
+    },
+    {
+      "name": "野生狗奶",
+      "score": 47.5,
+      "stage": "上升期",
+      "catch": "慎赶",
+      "conf": 0.77
+    },
+    {
+      "name": "大狗叫",
+      "score": 47.0,
+      "stage": "数据不足",
+      "catch": "说不准",
+      "conf": 0.0
+    },
+    {
+      "name": "许愿柳",
+      "score": 46.6,
+      "stage": "数据不足",
+      "catch": "说不准",
+      "conf": 0.0
+    },
+    {
+      "name": "拳击猫",
+      "score": 45.5,
+      "stage": "上升期",
+      "catch": "还来得及",
+      "conf": 0.86
+    }
+  ]
+}

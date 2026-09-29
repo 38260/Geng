@@ -371,7 +371,13 @@ export default function MemeDetail() {
   const [videos, setVideos] = useState<VideoItem[] | null>(null);
   // 相关视频两档排法：B 站搜这个词的默认（综合）顺序 vs 播放量
   const [videoSort, setVideoSort] = useState<"rank" | "view">("rank");
-  const [videoSortLabel, setVideoSortLabel] = useState("");
+  // 后端会不会真按默认排序给：没抓到名次的梗会退回播放量，界面必须当场说，
+  // 否则点「B站默认排序」列表纹丝不动，看起来就是按钮坏了
+  const [videoSortState, setVideoSortState] = useState<{ applied: string; label: string; note: string }>({
+    applied: "rank",
+    label: "B站默认排序",
+    note: "",
+  });
 
   useEffect(() => {
     if (!valid) return;
@@ -381,8 +387,11 @@ export default function MemeDetail() {
         if (!alive) return;
         setTrend30(trend);
         setVideos(videoList.items);
-        // 库里一条名次都没抓到时后端会退回播放量，标签要跟着说实话
-        setVideoSortLabel(videoList.sort_label || "");
+        setVideoSortState({
+          applied: videoList.sort_applied || videoSort,
+          label: videoList.sort_label || "",
+          note: videoList.note || "",
+        });
       })
       .catch(() => {
         if (!alive) return;
@@ -511,34 +520,50 @@ export default function MemeDetail() {
               <CatchUpCards bundle={bundle} onRetry={regenerate} generating={generating} />
 
               <section id="videos">
-                <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+                <div className="mb-1 flex flex-wrap items-end justify-between gap-3">
                   <h2 className="section-title">
                     <span className="grid h-[22px] w-[22px] place-items-center rounded-full bg-flare text-[10px] text-white">
                       <PlayIcon size={13} />
                     </span>
                     相关视频
-                    <span className="ml-2 text-[13px] font-normal text-ink-faint">
-                      {videoSortLabel || (videoSort === "rank" ? "B站默认排序" : "播放量")}
-                    </span>
                   </h2>
                   <div className="flex items-center gap-3">
                     <div className="flex rounded-full bg-rail p-1">
                       {([
                         { key: "rank", label: "B站默认排序" },
                         { key: "view", label: "播放量" },
-                      ] as const).map((item) => (
-                        <button
-                          key={item.key}
-                          type="button"
-                          onClick={() => setVideoSort(item.key)}
-                          className={[
-                            "rounded-full px-3.5 py-1 text-[12px] font-semibold transition",
-                            videoSort === item.key ? "bg-flare text-white shadow-sm" : "text-ink-mute hover:text-ink",
-                          ].join(" ")}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
+                      ] as const).map((item) => {
+                        // 请求了默认排序却被后端退回播放量 = 这个梗一条名次都没抓到
+                        // 只有"我们要了默认排序、后端却没给"才叫排不出来：
+                        // 用户主动切到播放量时 applied 本来就是 view，不能反过来把默认档标成坏的
+                        const starved =
+                          item.key === "rank" && videoSort === "rank" && videoSortState.applied !== "rank";
+                        return (
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => setVideoSort(item.key)}
+                            title={
+                              starved
+                                ? "这条梗还没抓到 B 站综合排序的名次，这一档暂时排不出来（补一名次后会生效）"
+                                : item.key === "rank"
+                                  ? "按你在 B 站搜这个词看到的默认（综合）顺序排"
+                                  : "按播放量从高到低排"
+                            }
+                            className={[
+                              "rounded-full px-3.5 py-1 text-[12px] font-semibold transition",
+                              starved
+                                ? "text-ink-faint line-through decoration-ink-faint/60"
+                                : videoSort === item.key
+                                  ? "bg-flare text-white shadow-sm"
+                                  : "text-ink-mute hover:text-ink",
+                            ].join(" ")}
+                          >
+                            {item.label}
+                            {starved ? "（暂无名次）" : ""}
+                          </button>
+                        );
+                      })}
                     </div>
                     <Link to="/library" className="link-quiet">
                       查看梗库
@@ -546,6 +571,10 @@ export default function MemeDetail() {
                     </Link>
                   </div>
                 </div>
+                <p className="mb-4 text-[12px] text-ink-faint">
+                  当前顺序：{videoSortState.label}
+                  {videoSortState.note ? ` · ${videoSortState.note}` : ""}
+                </p>
                 {shownVideos.length ? (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     {shownVideos.map((video) => (

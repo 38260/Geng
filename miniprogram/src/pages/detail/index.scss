@@ -274,6 +274,12 @@
   border-radius: $radius-pill;
 }
 
+/* 这一档现在排不出来（该梗还没抓到综合排序名次）：划掉比"点了没反应"诚实 */
+.seg-item-starved {
+  color: $ink-faint;
+  text-decoration: line-through;
+}
+
 .seg-on {
   background: $surface;
   color: $nav;

@@ -243,7 +243,13 @@ export default function Detail() {
   const [videoTotal, setVideoTotal] = useState(0);
   // 两档排法：B 站搜这个词的默认（综合）顺序 vs 播放量
   const [videoSort, setVideoSort] = useState<"rank" | "view">("rank");
-  const [videoSortLabel, setVideoSortLabel] = useState("");
+  // 后端会不会真按默认排序给：没抓到名次的梗会退回播放量，界面必须当场说，
+  // 否则点「B站默认」列表纹丝不动，看起来就是按钮坏了
+  const [videoSortState, setVideoSortState] = useState<{ applied: string; label: string; note: string }>({
+    applied: "rank",
+    label: "B站默认排序",
+    note: "",
+  });
   const [expanded, setExpanded] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [videoError, setVideoError] = useState<string | null>(null);
@@ -263,7 +269,11 @@ export default function Detail() {
         setVideos(page.items);
         setVideoTotal(page.total);
         // 后端在没抓到名次时会退回播放量，标签跟着它说，别自顾自写"默认排序"
-        setVideoSortLabel(page.sort_label || "");
+        setVideoSortState({
+          applied: page.sort_applied || videoSort,
+          label: page.sort_label || "",
+          note: page.note || "",
+        });
       })
       .catch((error) => alive && setVideoError(describeError(error)));
     return () => {
@@ -427,19 +437,31 @@ export default function Detail() {
                 {([
                   { key: "rank", label: "B站默认" },
                   { key: "view", label: "播放量" },
-                ] as const).map((item) => (
-                  <Text
-                    key={item.key}
-                    className={`seg-item${videoSort === item.key ? " seg-on" : ""}`}
-                    onClick={() => setVideoSort(item.key)}
-                  >
-                    {item.label}
-                  </Text>
-                ))}
+                ] as const).map((item) => {
+                  // 请求了默认排序却被退回 = 这个梗一条名次都没抓到
+                  // 只有"我们要了默认排序、后端却没给"才叫排不出来：
+                        // 用户主动切到播放量时 applied 本来就是 view，不能反过来把默认档标成坏的
+                        const starved =
+                          item.key === "rank" && videoSort === "rank" && videoSortState.applied !== "rank";
+                  return (
+                    <Text
+                      key={item.key}
+                      className={`seg-item${starved ? " seg-item-starved" : ""}${
+                        videoSort === item.key && !starved ? " seg-on" : ""
+                      }`}
+                      onClick={() => setVideoSort(item.key)}
+                    >
+                      {item.label}
+                      {starved ? "（暂无名次）" : ""}
+                    </Text>
+                  );
+                })}
               </View>
             </View>
             <Text className="faint video-hint">
-              {videoSortLabel ? `当前顺序：${videoSortLabel} · ` : ""}
+              当前顺序：{videoSortState.label}
+              {videoSortState.applied !== videoSort ? "（默认排序要的名次还没抓到，这一档排不出来）" : ""}
+              {" · "}
               {videoOpensExternally()
                 ? "点一条直接打开这条视频。"
                 : "点一条把地址复制到剪贴板——微信小程序打不开站外链接，去浏览器粘贴即可。"}

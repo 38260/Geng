@@ -453,8 +453,8 @@ def video_page(
         "sort": sort,
         "sort_applied": applied,
         "sort_label": "B站默认排序" if applied == "rank" else "播放量",
-        "note": "已按相关性过滤（标题/简介/标签命中梗名或别名才算），再"
-                + sort_note,
+        # 两段都是完整子句，用分号接——拼成"再这条梗还没抓到…"这种病句没法看
+        "note": "已按相关性过滤（标题/简介/标签命中梗名或别名才算）；" + sort_note,
     }
 
 

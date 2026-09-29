@@ -122,9 +122,15 @@ export const api = {
     request<Trend>(`/api/memes/${id}/trend${query({ window })}`),
 
   memeVideos: (id: number, limit = 8, sort: "rank" | "view" = "rank") =>
-    request<{ items: VideoItem[]; total: number; sort: string; sort_applied: string; sort_label: string }>(
-      `/api/memes/${id}/videos${query({ limit, sort })}`,
-    ),
+    request<{
+      items: VideoItem[];
+      total: number;
+      sort: string;
+      /** 实际生效的排法：请求默认排序但库里没名次时会是 view */
+      sort_applied: string;
+      sort_label: string;
+      note: string;
+    }>(`/api/memes/${id}/videos${query({ limit, sort })}`),
 
   regenerateInsight: (id: number, refresh = true) =>
     request<{ trend_explanation: InsightRecord; catch_up_advice: InsightRecord }>(

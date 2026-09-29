@@ -341,6 +341,8 @@ def test_videos_rank_sort_degrades_honestly(session, meme_factory):
     assert page["sort"] == "rank" and page["sort_applied"] == "view"
     assert [item["bvid"] for item in page["items"]] == ["BVa", "BVb"]
     assert "还没抓到" in page["note"], page["note"]
+    # 说明是两段完整子句拼的，不许出现"，再这条梗…"这种接不上茬的病句
+    assert "，再这" not in page["note"] and "；" in page["note"], page["note"]
 
 
 def test_videos_sort_param_validated(client, top_meme_id):

@@ -33,13 +33,19 @@ log = get_logger("refresh_rank")
 def refresh_one(session, collector, meme: Meme, *, dry_run: bool) -> tuple[int, int]:
     """返回 (补上的名次条数, 新入库的视频条数)。"""
     ranked = collector._totalrank(meme)
+    # 同一页里偶尔会重复出现同一个 bvid（B 站自己给的结果就不去重），
+    # 只留第一次出现的名次，否则第二次插入会撞 videos.meme_id+bvid 唯一键
+    first_seen: dict[str, dict] = {}
+    for item in ranked:
+        first_seen.setdefault(item["bvid"], item)
+    ranked = list(first_seen.values())
     if not ranked:
         return 0, 0
+    # 唯一键是 (meme_id, bvid)，不含 data_source：按来源过滤着查，
+    # 就会漏掉"这条视频以演示来源先入库了"的情况，再插入直接 IntegrityError
     stored = {
         row.bvid: row
-        for row in session.scalars(
-            select(Video).where(Video.meme_id == meme.id, Video.data_source == collector.source)
-        )
+        for row in session.scalars(select(Video).where(Video.meme_id == meme.id))
     }
     touched = 0
     added = 0

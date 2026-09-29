@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
+from sqlalchemy import select
 
 from app.collectors import BilibiliCollector, MockCollector, make_collector
 from app.collectors.bilibili import BilibiliBlocked, BiliClient, parse_search_row, sign_params
@@ -708,3 +709,73 @@ def test_subtitle_player_blocked_reason_is_kept(monkeypatch):
     client, _ = _subtitle_client(monkeypatch, fail="player")
     result = client.subtitle_of("BV1r")
     assert "播放器信息失败" in result.reason
+
+
+# --------------------------------------------------------------------------- #
+# 名次补录脚本：不能因为脏数据整条梗崩掉
+
+
+class _RankOnlyCollector:
+    """只回应"综合排序"这一件事的假采集器，用来单测补录脚本。"""
+
+    source = "bilibili"
+
+    def __init__(self, items):
+        self.items = items
+
+    def _totalrank(self, meme):
+        return self.items
+
+
+def _ranked(bvid: str, rank: int) -> dict:
+    return {
+        "bvid": bvid,
+        "aid": None,
+        "title": f"{bvid} 的综合排序第 {rank} 条",
+        "description": "",
+        "author": "某UP",
+        "author_mid": None,
+        "cover": "",
+        "duration_seconds": 60,
+        "view": 1000 + rank,
+        "reply": 1,
+        "danmaku": 1,
+        "relevance_score": 0.9,
+        "matched_terms": [],
+        "publish_time": datetime(2026, 9, 20),
+        "search_rank": rank,
+    }
+
+
+def test_refresh_rank_tolerates_duplicate_rows_and_demo_sourced_rows(session, certified_meme):
+    """两个真实坑：B 站同一页里重复给同一个 bvid；这条视频先以演示来源入过库。
+
+    两者都会撞 videos(meme_id, bvid) 唯一键——唯一键不含 data_source，
+    按来源过滤着查就漏判成"库里没有"，然后整条梗补录失败。
+    """
+    from app.scripts.refresh_video_rank import refresh_one
+
+    session.add(
+        Video(
+            meme_id=certified_meme.id,
+            bvid="BV1demo",
+            title="先以演示来源入库的同一条",
+            view=10,
+            publish_time=datetime(2026, 9, 18),
+            data_source="mock",
+        )
+    )
+    session.flush()
+    collector = _RankOnlyCollector([_ranked("BV1demo", 1), _ranked("BV1dup", 2), _ranked("BV1dup", 3)])
+
+    touched, added = refresh_one(session, collector, certified_meme, dry_run=False)
+
+    assert touched == 1, "演示来源那条只补名次，不重复插入"
+    assert added == 1, "重复出现的 bvid 只入库一次"
+    rows = {
+        row.bvid: row
+        for row in session.scalars(select(Video).where(Video.meme_id == certified_meme.id))
+    }
+    assert set(rows) == {"BV1demo", "BV1dup"}
+    assert rows["BV1demo"].search_rank == 1 and rows["BV1demo"].data_source == "mock"
+    assert rows["BV1dup"].search_rank == 2, "同名次取第一次出现的位置"

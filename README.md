@@ -79,7 +79,7 @@ $env:VITE_API_TARGET="http://127.0.0.1:8010"; npm run dev
 
 | 命令 | 作用 |
 | --- | --- |
-| `python -m pytest`（backend 目录） | 252 个后端测试，全部离线（假客户端 + 内存库） |
+| `python -m pytest`（backend 目录） | 279 个后端测试，全部离线（假客户端 + 内存库） |
 | `python scripts/smoke_api.py` | 对运行中的后端逐个打接口（125 项） |
 | `bash scripts/screenshot.sh` | Chrome 无头截图，做视觉比对 |
 | `bash scripts/ui_shot.sh home "/"` | 截图 + 缩到参考图画板宽度，输出并排图与 50% 叠图（`.shots/cmp-*.png` / `blend-*.png`） |
@@ -150,6 +150,43 @@ Hotness = 0.25*ViewScore + 0.20*InteractionScore + 0.16*ContentScore
 * 增长权重给到 0.25，只看「最近 7 天 vs 前 7 天」——去年 1 亿播放、今天没人做的梗不会霸榜
 * 近两周样本过小时，增长率不外推（考古区冒出一条视频不算 +100%），整体打折
 * 权重与阈值全部集中在 `backend/app/config/algorithms.py`，前端不写任何判定逻辑
+
+### 2026-09-29 的两处算法修正（附原因）
+
+修完之后榜首热度从 80.4 变成 76.8，阶段与赶梗结论也随之变化；下表是最新实测值。
+
+1. **`creator` 分量原本是 `content` 的复制品。** 采集层给的 `creator_count` 是
+   *当日去重作者数*，而样本里几乎每条视频来自不同作者（实测
+   `creator_count / video_count` 中位数 = **1.000**，库里有 1,011 行两者相等），
+   聚合层再逐日累加，于是它变成了"视频数换个名字"：
+   `content` 与 `creator` 两个分量的相关系数一度是 **r = 0.9997**，
+   权重 0.16 + 0.14 = 0.30 实际全给了一个因子。
+   现在改用 `creator_peak`（窗口内单日去重峰值 —— 这个值 `series.py` 本来就算好了、
+   却一直没被读取），r 降到 **0.952**，扣掉 `content` 能解释的部分后仍留下约 31% 的独立变异。
+   *仍未解决*：真正的去重需要按 author mid 跨日求并集，而库里只存了作者名、没存 mid。
+2. **`caution_min_heat` 是一条从未执行过的死规则。** 它原本是 `85.0`，而全库最高热度
+   只有 80.4、`score >= 85` 的记录数为 **0**。于是高热度「慎赶」规则一次都没命中，
+   所有「慎赶」都由文件末尾的兜底分支产出 —— 而兜底文案写的是
+   「没有明显往上走的迹象」，最后贴在 growth 高达 +82% 的**上升期**梗上，自相矛盾。
+   改成 70 之后仍然几乎不命中（热度 ≥70 的梗全库只有 1 个，且它的 `peak_gap` 是 0.018），
+   所以判据换成 `peak_gap`：**"离开峰值多少"才是"窗口还剩多大"的直接度量**，
+   热度高低交给上升/爆发/退潮那几条规则。现在 `peak_gap` 落在 0.10~0.35 的梗有 9 个，
+   规则真在干活（`off_peak_mild` ×1、`off_peak_strong` ×7）。
+
+顺带补了两件相关的事：
+
+* **`plateau_band` 原本配了却没有引用** —— 平稳期只是 `classify()` 末尾的兜底 `else`，
+  任何没命中前面规则的输入都会被打成平稳期。现在是显式规则。
+* **新梗的 `data_source` 原本写成空串**，于是库里出现第三种"无来源"状态：
+  既不是 `bilibili` 也不是 `mock`，既进不了真实榜单也拿不到「演示数据」标注。
+  已改成显式的 `pending`（"已入池、待采集"），历史 11 条用
+  `python -m app.scripts.fix_data_source_state --apply` 对齐。
+
+这两类问题现在由 `backend/tests/test_threshold_reachability.py` 守着：
+它会对**每条阈值**构造边界用例，确认阈值两侧给出不同结论，
+并断言关键阈值落在真实数据可达的范围内。
+（既有的 `test_catch_up.py` 没发现第 2 条，是因为它的用例传了 `heat=96.0` ——
+一个现实中不存在的分数，恰好绕过了这个 bug。）
 
 ### 生命周期（时间序列 + 规则，不由 LLM 决定）
 
@@ -289,7 +326,7 @@ AI 字幕要单独标出来（`kind_label`）：机器听写把专有名词听�
 | B 站综合排序名次 | 63 个有真实视频的梗里 **61 个有名次**（1,150 条视频带名次），够两档排法用 |
 | 有指标快照的梗 | 72 个（其余是采到但窗口内没内容，界面显式说"数据不足"而不是给 0 分） |
 | 字幕 / 浓缩介绍 | 0 条 —— 表已建好，等 `BILI_COOKIE`（实测匿名请求只返回空字幕轨） |
-| 榜首示例 | 闪身步 80.4（正在爆）· 耍起 70.4（正在爆）· 闹吃vs古振兴 57.6（快起飞） |
+| 榜首示例 | 闪身步 76.8（上升期）· 耍起 67.2（上升期）· 闹吃vs古振兴 54.6（慎赶） |
 | 最近一轮全量回补 | 目标 76 / 成功 51 / 空窗 25，耗时 16,696 秒（约 4.6 小时，含重试） |
 
 重建整个数据集（约 15 分钟，会覆盖现有数据）：
@@ -439,7 +476,7 @@ backend/
     mock/         # 演示梗库与曲线
     scripts/      # seed_data / run_pipeline / collect_data / daily_refresh / backfill_days /
                   # refresh_video_rank / fetch_transcripts / condense_intros / rebuild_from_bilibili
-  tests/          # 252 例
+  tests/          # 279 例
 frontend/src/
   api/  types/  hooks/  components/  pages/  utils/
 miniprogram/      # 微信小程序端（Taro 4 + React + TS）：一份源码出 weapp / h5
@@ -492,7 +529,7 @@ scripts/          # smoke_api.py / screenshot.sh / restart-backend.sh
 
 ### 测试
 
-- [x] `python -m pytest` → 252 passed（认证闸门、算法七态、热度边界与 NaN、相关性阈值、
+- [x] `python -m pytest` → 279 passed（认证闸门、算法七态、热度边界与 NaN、相关性阈值、阈值可达性、
       赶梗三态、观测覆盖度闸门、LLM 降级与缓存、字幕抓取与逐字校验、采集层离线全流程、接口集成）
 - [x] `python scripts/smoke_api.py` → 125/125 通过（对运行中的真实服务）
 - [x] `npm test`（miniprogram）→ 21 passed；两端 `tsc --noEmit` 干净，Web 构建通过

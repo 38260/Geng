@@ -155,7 +155,11 @@ def create_meme(session: Session, payload: dict[str, Any]) -> dict[str, Any]:
         status=MemeStatus.CANDIDATE,
         certified=False,
         verification_state="unverified",
-        data_source="",          # 还没数据，等采集器如实回填
+        # 还没数据，等采集器如实回填。这里必须写成 "pending" 而不是空串：
+        # 空串会变成第三种"无来源"状态——既不是 bilibili 也不是 mock，
+        # 于是既进不了真实榜单、也拿不到「演示数据」标注，界面上无从解释。
+        # 库里曾经因此积了 11 条 data_source='' 的梗（见 docs/改进建议.md B2）。
+        data_source="pending",
     )
     session.add(meme)
     session.commit()

@@ -200,7 +200,9 @@ def ingest(session, report: dict) -> list[int]:
                 status=MemeStatus.CANDIDATE,
                 certified=False,
                 verification_state="unverified",
-                data_source="",
+                # "pending" = 已入池、还没有采集数据。不要写空串：
+                # 空串会成为第三种"无来源"状态，界面和榜单都解释不了它。
+                data_source="pending",
                 keywords=[name],
             )
             session.add(meme)

@@ -101,14 +101,29 @@ def compute_hotness(series: Series, *, end_index: int | None = None) -> HotnessR
         cur.view, prev.view,
         cur.discussion, prev.discussion,
         cur.video_count, prev.video_count,
-        cur.creator_count, prev.creator_count,
+        cur.creator_peak, prev.creator_peak,
     )
 
+    # 创作者分量用「单日去重峰值」，不用「周累计」。
+    #
+    # 采集层给出的 creator_count 是**当日去重作者数**（bilibili_collector.py），
+    # 而样本里几乎每条视频来自不同作者，于是 creator_count ≈ video_count
+    # （实测 creator_count / video_count 中位数 = 1.000）。
+    # 聚合层再把它逐日累加，就变成"视频数换了个名字"：
+    # 实测 content 与 creator 两个分量的相关系数 r = 0.9997，
+    # 等于把「内容规模」这一个因子按 0.16 + 0.14 = 0.30 的权重数了两遍。
+    #
+    # creator_peak 是**去重后的下界**（series.py 里本来就算好了、却一直没被读取），
+    # 换成它之后 r 降到 0.952，扣掉 content 能解释的部分后仍留下约 31% 的独立变异，
+    # 分量这才真的在描述"有多少人在参与"而不是"有多少条内容"。
+    #
+    # 仍未解决的部分：真正的去重需要按 author mid 跨日求并集，而现在库里只存了
+    # 作者名、没存 mid。这是已知局限，不假装已经解决。
     components = {
         "view": log_score(cur.view, "view"),
         "interaction": log_score(cur.interaction, "interaction"),
         "content": log_score(cur.video_count, "content"),
-        "creator": log_score(cur.creator_count, "creator"),
+        "creator": log_score(cur.creator_peak, "creator"),
         "growth": growth_score(growth),
     }
 
@@ -153,7 +168,11 @@ def compute_hotness(series: Series, *, end_index: int | None = None) -> HotnessR
         "view": cur.view,
         "interaction": cur.interaction,
         "video_count": cur.video_count,
+        # creator_count 保留为「参与 UP 主(日累计)」的诊断量——
+        # 它随着天数线性膨胀，不能当分量用（见上面 components 的注释）。
         "creator_count": cur.creator_count,
+        # 打分实际用的是这个：窗口内单日去重峰值。
+        "creator_peak": cur.creator_peak,
         "discussion": cur.discussion,
         "reply": cur.reply,
         "danmaku": cur.danmaku,
@@ -161,11 +180,14 @@ def compute_hotness(series: Series, *, end_index: int | None = None) -> HotnessR
         "prev_discussion": prev.discussion,
         "prev_video_count": prev.video_count,
         "prev_creator_count": prev.creator_count,
+        "prev_creator_peak": prev.creator_peak,
         "growth": growth,
         "view_growth": growth_rate(cur.view, prev.view),
         "discussion_growth": growth_rate(cur.discussion, prev.discussion),
         "video_growth": growth_rate(cur.video_count, prev.video_count),
-        "creator_growth": growth_rate(cur.creator_count, prev.creator_count),
+        # 与 components.creator 保持同一个口径：都用峰值，
+        # 否则界面上那个"参与 UP 主"百分比会跟实际参与打分的数不是一回事。
+        "creator_growth": growth_rate(cur.creator_peak, prev.creator_peak),
         "reply_growth": growth_rate(cur.reply, prev.reply),
         "danmaku_growth": growth_rate(cur.danmaku, prev.danmaku),
     }

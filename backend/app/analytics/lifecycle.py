@@ -167,10 +167,22 @@ def classify(inp: LifecycleInput) -> LifecycleResult:
             f"已离开近期峰值 {peak_gap * 100:.0f}%，且热度连续 {inp.declining_days} 天往下走",
         )
 
-    # 🌊 平稳
+    # 🌊 平稳：增长落在中立带里。
+    # 这条规则以前是缺失的——`plateau` 只是函数末尾的兜底 else，
+    # 于是 `plateau_band` 这个阈值配了却从来没人读，
+    # 任何"没命中前面任何规则"的输入都会被打成平稳期，包括反常在涨的梗。
+    # 现在它是显式规则：先判持平，判不到才落兜底。
+    if abs(growth) <= t.plateau_band:
+        return _make(
+            "plateau",
+            f"增长基本持平（{growth * 100:+.0f}%），热度稳定在 {inp.heat:.0f}",
+        )
+
+    # 兜底：没命中以上任何一条（例如在涨但还没到上升期的量级，
+    # 或在跌但没跌到退潮的线）。归到平稳期并如实说明它是"没特征"。
     return _make(
         "plateau",
-        f"增长基本持平（{growth * 100:+.0f}%），热度稳定在 {inp.heat:.0f}",
+        f"没有明显方向（增长 {growth * 100:+.0f}%），热度 {inp.heat:.0f}，按平稳期处理",
     )
 
 

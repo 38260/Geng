@@ -30,6 +30,34 @@ SPACE_ARCHIVE_URL = "https://api.bilibili.com/x/space/wbi/arc/search"
 VIEW_URL = "https://api.bilibili.com/x/web-interface/view"
 PLAYER_URL = "https://api.bilibili.com/x/player/wbi/v2"
 
+# B 站搜索接口有三种"没有结果"的返回，长得完全不同，必须分清楚：
+#
+#   ① 有结果        : {"result": [...], "numResults": 682, "numPages": 35, ...}
+#   ② 真的没内容    : {"result": [], "numResults": 0, "numPages": 0, ...}
+#   ③ 被限流吞掉    : {"v_voucher": "voucher_xxxx"}          ← 没有 numResults 字段
+#
+# ③ 是 B 站的风控应答：HTTP 200、没有错误码，但结果被整个拿掉，
+# 只回一个 v_voucher 令牌。实测搜「动画」这种绝对有内容的词也会被这样吞掉，
+# 所以它**不代表"当天没有内容"**。
+#
+# 关键在于它会随持续请求累积：冷启动时命中率 ~98%，
+# 连续打几百次后掉到 0~30%，停手静默约 5 分钟后恢复。
+# 也就是"吞"是会话级的限流状态，不是你查的那一天真的没数据。
+#
+# 老实现把 ② 和 ③ 混成一个 rows==[]（`numResults` 缺失时 total 兜底成 0），
+# 于是"被限流"在库里长得和"当天没人做这个梗"一模一样——
+# 这正是历史上 1070 行 observed=0 的来源。
+THROTTLE_KEY = "v_voucher"
+
+
+class BilibiliThrottled(RuntimeError):
+    """搜索被 B 站限流吞掉（返回体只有 v_voucher）。
+
+    这不是错误、也不是"没有数据"，而是"这次没给我"。
+    调用方应当退避后重试；连续多次出现说明已进入限流状态，
+    继续打只会加深处罚，应该停下来。
+    """
+
 MIXIN_KEY_ENC_TAB = [
     46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5, 49,
     33, 9, 42, 19, 29, 28, 14, 39, 12, 38, 41, 13, 37, 48, 7, 16, 24, 55, 40,
@@ -247,6 +275,9 @@ class BiliClient:
 
         这是拿到"逐日"序列的唯一可靠途径：不带区间时搜索结果会被最近的
         内容占满，早期日期直接看不见。
+
+        被限流吞掉时抛 :class:`BilibiliThrottled`——**不能**返回 ([], 0)，
+        那会让"被限流"和"当天真没内容"在上层看起来一模一样。
         """
         data = self.signed_get(
             SEARCH_URL,
@@ -261,6 +292,10 @@ class BiliClient:
             },
         )
         rows = data.get("result") or []
+        if not rows and THROTTLE_KEY in data:
+            raise BilibiliThrottled(
+                "搜索被限流吞掉（返回体只有 %s，没有 numResults）" % THROTTLE_KEY)
+        # 真空返回会带着 numResults=0，这是可信的"当天没有内容"。
         try:
             total = int(data.get("numResults") or len(rows))
         except (TypeError, ValueError):

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time as _time, timedelta
 from types import SimpleNamespace
 
 import httpx
@@ -10,7 +10,13 @@ import pytest
 from sqlalchemy import select
 
 from app.collectors import BilibiliCollector, MockCollector, make_collector
-from app.collectors.bilibili import BilibiliBlocked, BiliClient, parse_search_row, sign_params
+from app.collectors.bilibili import (
+    BilibiliBlocked,
+    BilibiliThrottled,
+    BiliClient,
+    parse_search_row,
+    sign_params,
+)
 from app.models import Meme, MemeCertification, MemeDailyStats, Video
 from app.services.pipeline import _demo_only_ids, collect_all
 
@@ -458,10 +464,12 @@ def test_explicit_ids_bypass_scope(session, monkeypatch, certified_meme):
 
 
 class FlakyClient(FakeClient):
-    """按"第几次请求这一天"决定给不给货，用来复现 B 站搜索的空壳抖动。
+    """按"第几次请求这一天"决定给不给货，用来复现 B 站搜索的限流抖动。
 
-    实测：同一个词同一天连打两次，能一次返回 20 条、一次返回 0 条，
-    而两种情况在返回体里长得一模一样（HTTP 200 + 空 result）。
+    实测：B 站对同一天同一个词会返回带 ``v_voucher`` 的风控应答
+    （HTTP 200、没有 numResults 字段、result 为空），而**真空返回**是
+    ``result=[] 且 numResults=0``。两者必须分开：前者是"这次没给我"，
+    后者才是"当天真没内容"。这个假客户端复现的是前者。
     """
 
     def __init__(self, *, rows=None, give_on: int = 2):
@@ -476,9 +484,76 @@ class FlakyClient(FakeClient):
             row for row in self.rows
             if begin.timestamp() <= row["pubdate"] < end.timestamp()
         ]
-        if self.attempts[key] < self.give_on or not rows:
-            return [], 0                 # 空壳：接口没给这一天的数据
+        if self.attempts[key] < self.give_on:
+            raise BilibiliThrottled("被限流吞掉（返回体只有 v_voucher）")
+        if not rows:
+            return [], 0                 # 真空返回：这些天确实没内容
         return rows[:page_size], len(rows)
+
+
+def test_flaky_day_is_retried_and_recovered(certified_meme, monkeypatch):
+    """第二次才给货的日子，必须被记成"观测到了"，而不是留一个 0。"""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "collect_day_retries", 2, raising=False)
+    name = certified_meme.name
+    client = FlakyClient(rows=[_row(0, days_ago=2, title=f"{name}名场面")], give_on=2)
+    collector = BilibiliCollector(client=client, request_gap=0, enrich_limit=2)
+    bundle = collector.collect(certified_meme, window_days=5)
+
+    day2 = [s for s in bundle.daily_stats if s.video_count > 0]
+    assert len(day2) == 1, "重试拿到内容的那天应该有数"
+    assert day2[0].observed is True
+    assert client.attempts[f"{name}@{day2[0].stat_date}"] == 2, "应该是第二次请求才拿到"
+
+
+def test_throttled_day_is_unobserved_and_flagged(certified_meme, monkeypatch):
+    """整天都被限流：必须标 observed=False，并且明确回报"这是被限流"。
+
+    这一条是整套区分的关键——被限流和"当天没人做这个梗"在旧实现里
+    都是 ``rows == []``，于是库里积了 1070 行假的 observed=0。
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "collect_day_retries", 2, raising=False)
+    client = FlakyClient(rows=[_row(0, days_ago=1, title="测试标题")], give_on=99)
+    collector = BilibiliCollector(client=client, request_gap=0, enrich_limit=2)
+
+    rows, total, observed, throttled = collector._search_day(
+        certified_meme.name,
+        begin=datetime.combine(date.today() - timedelta(days=1), _time.min),
+        end=datetime.combine(date.today(), _time.min))
+    assert (rows, observed) == ([], False), "被限流不能算观测到"
+    assert throttled is True, "必须回报这是限流，而不是普通的空结果"
+
+    # 真空返回（numResults=0 那种）不该被标成限流
+    quiet = FakeClient(rows=[])
+    collector2 = BilibiliCollector(client=quiet, request_gap=0, enrich_limit=2)
+    rows2, _, observed2, throttled2 = collector2._search_day(
+        certified_meme.name,
+        begin=datetime.combine(date.today() - timedelta(days=1), _time.min),
+        end=datetime.combine(date.today(), _time.min))
+    assert (rows2, observed2, throttled2) == ([], False, False), (
+        "真没内容不该被当成限流，否则会白白重试并误报风控")
+
+
+def test_throttle_streak_stops_the_window_early(certified_meme, monkeypatch):
+    """连续被限流到阈值就提前收工，不再空转（限流是会话级的，越打恢复越慢）。"""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "collect_day_retries", 1, raising=False)
+    monkeypatch.setattr(settings, "collect_throttle_stop_after", 3, raising=False)
+    client = FlakyClient(rows=[_row(0, days_ago=1, title="测试标题")], give_on=99)
+    collector = BilibiliCollector(client=client, request_gap=0, enrich_limit=2)
+    stats_list = collector.collect_daily(certified_meme, window_days=30)[0]
+
+    calls = sum(client.attempts.values())
+    # 阈值 3 天就该停，不该打满 30 天。注意会跑两轮（梗名 + 别名兜底），
+    # 所以用宽松上界，重点断言"停得下来"而不是精确次数。
+    assert calls <= 16, f"连续限流后没有提前停止，共打了 {calls} 次请求"
+    # 提前停止意味着后面的天没有生成行；已生成的那些必须如实标成未观测
+    assert len(stats_list) < 30, "提前停止后不该仍有 30 天记录"
+    assert all(s.observed is False for s in stats_list), "被限流的天不能标成观测到"
 
 
 def test_flaky_day_is_retried_and_recovered(certified_meme, monkeypatch):

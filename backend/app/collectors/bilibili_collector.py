@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import random
 import time
 from datetime import date, datetime, time as _time, timedelta
 
@@ -23,7 +24,13 @@ from app.config import get_logger, settings
 from app.models import Meme
 
 from .base import CollectedBundle, CertificationEvidence
-from .bilibili import BilibiliBlocked, BiliClient, get_client, parse_search_row
+from .bilibili import (
+    BilibiliBlocked,
+    BilibiliThrottled,
+    BiliClient,
+    get_client,
+    parse_search_row,
+)
 from ..analytics.relevance import MemeTerms, score_text
 from ..services.meme.certification import UP_AUTHORS
 
@@ -139,13 +146,15 @@ class BilibiliCollector:
 
     def _search_day(
         self, term: str, *, begin: datetime, end: datetime
-    ) -> tuple[list[dict], int, bool]:
-        """查一个发布区间，返回 (原始行, B站报的总数, 这一天到底观测到没有)。
+    ) -> tuple[list[dict], int, bool, bool]:
+        """查一个发布区间，返回 (原始行, B站报的总数, 观测到没有, 是否被限流)。
 
-        B 站匿名搜索对同一个词、同一天会随机返回空壳（实测逐日 15 天 × 2 次，
-        30 次只有 12 次有货，且同一天两次能一次 20 条一次 0 条）。空壳不等于
-        "当天没人做这个梗"，所以拿到空结果要重试；几次都空就如实标 observed=False，
-        让上层知道这是洞、不是零。
+        B 站搜索的"没结果"分两种，必须分开对待：
+          * **被限流**（返回体只有 v_voucher）：不是"当天没有内容"，而是
+            "这次没给我"。退避后重试；连续多次说明会话进了处罚状态。
+          * **真空返回**（numResults=0）：可信的"当天没有内容"。
+        两者混成一个空列表，库里就会把"被限流"记成"当天没人做这个梗"——
+        历史上那 1070 行 observed=0 就是这么来的。
 
         注意：拿到行但全被相关性过滤掉，算**真观测到零活动**（返回行 > 0），
         不在这个函数里管。
@@ -154,9 +163,20 @@ class BilibiliCollector:
         day = begin.date()
         rows: list[dict] = []
         total = 0
+        throttled = 0
         for attempt in range(attempts):
             try:
                 rows, total = self.client.search_range(term, begin=begin, end=end, order="click")
+            except BilibiliThrottled as exc:
+                # 被限流吞掉：不等于"当天没有内容"。退避后重试，
+                # 而且退避要比普通异常长——持续快打只会加深限流（实测
+                # 冷启动命中率 ~98%，打几百次后掉到 0~30%，静默约 5 分钟才恢复）。
+                throttled += 1
+                log.info("梗「%s」%s 被限流吞掉（第 %d 次）：%s",
+                         term, day, attempt + 1, exc)
+                if attempt < attempts - 1:
+                    time.sleep(self._backoff_seconds(attempt, throttled=True))
+                continue
             except BilibiliBlocked:
                 raise                      # 被风控是全局状态，交给上层决定停不停
             except Exception as exc:  # noqa: BLE001 - 单日失败不该毁掉整条序列
@@ -168,10 +188,27 @@ class BilibiliCollector:
                         "梗「%s」%s 重试第 %d 次才拿到 %d 条（B站搜索抖动）",
                         term, day, attempt + 1, len(rows),
                     )
-                return rows, total, True
+                return rows, total, True, False
             if attempt < attempts - 1:
-                time.sleep(settings.collect_retry_gap * (attempt + 1))
-        return [], total, False
+                time.sleep(self._backoff_seconds(attempt, throttled=False))
+        if throttled:
+            # 全被限流：明确记为"没观测到"，而不是"当天零活动"。
+            log.warning("梗「%s」%s 连续 %d 次都被限流，本次记为未观测（不是零活动）",
+                        term, day, throttled)
+        return [], total, False, bool(throttled)
+
+    @staticmethod
+    def _backoff_seconds(attempt: int, *, throttled: bool) -> float:
+        """退避时长：被限流时给得更长，并带抖动避免多梗同步重试。
+
+        抖动按 `collect_retry_gap` 成比例，而不是固定值——测试里把 gap 设成 0
+        就是为了不睡觉，固定抖动会让整个测试套件挂住。
+        """
+        base = settings.collect_retry_gap * (attempt + 1)
+        if throttled:
+            base *= settings.collect_throttle_backoff_factor
+        return base + random.random() * base * 0.4
+
 
     def _daily_pass(
         self, meme: Meme, term: str, *, window_days: int = 30
@@ -192,16 +229,31 @@ class BilibiliCollector:
         stats: list[MemeDailyStats] = []
         seen: dict[str, dict] = {}
         filtered_out = 0
+        throttle_streak = 0
 
         for offset in range(1, window_days + 1):          # 不含今天（今天还没过完）
             day = today - timedelta(days=offset)
             begin = datetime.combine(day, _time.min)
             end = begin + timedelta(days=1)
             try:
-                rows, total, observed = self._search_day(term, begin=begin, end=end)
+                rows, total, observed, was_throttled = self._search_day(
+                    term, begin=begin, end=end)
             except BilibiliBlocked as exc:
                 log.warning("梗「%s」%s 采集被拒：%s", term, day, exc)
                 raise
+
+            # 连续被限流说明整条会话已进入处罚状态，再往下打只会拖长恢复时间。
+            # 停下来让上层决定（剩余的日记为未观测，不会伪装成零活动）。
+            if was_throttled and not rows:
+                throttle_streak += 1
+            else:
+                throttle_streak = 0
+            if throttle_streak >= settings.collect_throttle_stop_after:
+                log.warning(
+                    "梗「%s」连续 %d 天被限流，提前停止本条窗口（剩余天记为未观测）；"
+                    "限流是会话级状态，静默几分钟即可恢复",
+                    term, throttle_streak)
+                break
 
             parsed = []
             for row in rows:

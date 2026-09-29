@@ -39,6 +39,9 @@ frontend/.vite/
 frontend/coverage/
 *.local
 
+# ---- 工具自己的会话记忆，不进版本库 ----
+.workbuddy/
+
 # ---- editors / os ----
 .DS_Store
 Thumbs.db

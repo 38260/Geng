@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 from datetime import datetime
 
 from sqlalchemy import select
@@ -94,6 +95,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, default=None, help="最多处理几个梗")
     parser.add_argument("--all", action="store_true", help="连演示来源的梗也刷（默认只刷真实梗）")
     parser.add_argument("--dry-run", action="store_true", help="不写库，只报会改多少")
+    parser.add_argument(
+        "--gap", type=float, default=2.5,
+        help="两个梗之间的间隔秒数。连打会被 B 站回空页（code=0 但 result 为空），"
+             "空页重试三次仍空就等于这条梗一条名次都没拿到",
+    )
     args = parser.parse_args(argv)
 
     ensure_schema()
@@ -133,6 +139,8 @@ def main(argv: list[str] | None = None) -> int:
                 failed += 1
                 continue
             done += 1
+            if index < len(memes) and args.gap > 0:
+                time.sleep(args.gap)
             skipped += 1 if not (touched or added) else 0
             log.info("[%d/%d] %s：更新名次 %d，新入库 %d", index, len(memes), meme.name, touched, added)
         print(

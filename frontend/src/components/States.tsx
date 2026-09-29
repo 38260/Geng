@@ -64,7 +64,12 @@ export function describeError(error: unknown): string {
   return "未知错误";
 }
 
-/** 演示数据标记：不允许把 Mock 伪装成实时抓取结果。 */
+/**
+ * 演示数据标记：不允许把 Mock 伪装成实时抓取结果。
+ *
+ * 只在数据不是真实抓取时出现——"B站真实数据"这种正面自我认证不再挂到界面上：
+ * 它是一句我们自己的声明，用户没法核对；而"这是演示数据"是可执行的提醒，两者不对等。
+ */
 export function DemoBadge({ isDemo, source }: { isDemo: boolean; source: string }) {
   if (isDemo && source === "mixed") {
     return (
@@ -77,14 +82,7 @@ export function DemoBadge({ isDemo, source }: { isDemo: boolean; source: string 
       </span>
     );
   }
-  if (!isDemo) {
-    return (
-      <span className="chip hidden bg-go/10 text-go sm:inline-flex">
-        <span className="h-1.5 w-1.5 rounded-full bg-go" />
-        B站真实数据
-      </span>
-    );
-  }
+  if (!isDemo) return null;
   return (
     <span
       className="chip hidden bg-gold/20 text-[#B2750A] sm:inline-flex"

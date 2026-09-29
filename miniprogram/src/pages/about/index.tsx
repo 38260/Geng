@@ -57,7 +57,8 @@ export default function About() {
       <View className="card">
         <Text className="about-title">{meta.data?.app_name || "赶梗潮"}</Text>
         <Text className="about-sub">
-          只看 B 站 · 数据源 {meta.data?.data_source === "bilibili" ? "真实采集" : "演示数据"} · 版本{" "}
+          {/* 只报数据源，不替数据质量背书：是演示数据时下面会显式标出来 */}
+          只看 B 站 · 数据源 {meta.data?.data_source === "bilibili" ? "Bilibili" : "演示数据"} · 版本{" "}
           {meta.data?.version || "—"}
         </Text>
         <Text className={`about-fresh${stale ? " about-fresh-stale" : ""}`}>

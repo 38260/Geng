@@ -390,13 +390,18 @@ export default function Manage() {
                 <div className="flex flex-wrap items-center gap-3">
                   <h2 className="text-[22px] font-black">{view.name}</h2>
                   <span className={`chip ${coverOrigin(view).cls}`}>{coverOrigin(view).label}</span>
-                  <span className="chip bg-rail text-ink-mute">
-                    {view.data_source === "bilibili"
-                      ? "B站真实数据"
-                      : view.data_source === "pending"
-                        ? "待采集"
-                        : "演示数据"}
-                  </span>
+                  {view.data_source === "bilibili" ? null : (
+                    <span
+                      className="chip bg-rail text-ink-mute"
+                      title={
+                        view.data_source === "pending"
+                          ? "刚建好，还没采到过任何数据"
+                          : "这个梗的数据是演示数据，不是真实抓取结果"
+                      }
+                    >
+                      {view.data_source === "pending" ? "待采集" : "演示数据"}
+                    </span>
+                  )}
                   <span
                     className={`chip ${certChipClass(view)}`}
                     title={

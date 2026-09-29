@@ -262,12 +262,14 @@ export default function Settings() {
               { label: "运行环境", value: data.environment },
               {
                 label: "数据来源",
+                // 只报配置的数据源，不替数据质量背书：是不是演示数据由库里的实际内容决定，
+                // 上面「含演示数据」那颗标记才是结论。
                 value:
                   data.data_source === "bilibili"
-                    ? "Bilibili（真实采集）"
+                    ? "Bilibili"
                     : data.data_source === "mixed"
                       ? "Bilibili + 演示数据混合"
-                      : "Bilibili（演示数据）",
+                      : "演示数据（Mock）",
               },
             ].map((item) => (
               <div key={item.label} className="rounded-xl bg-rail px-4 py-3">

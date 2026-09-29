@@ -65,18 +65,14 @@ function HeadCard({
             <span className={`h-1.5 w-1.5 rounded-full ${catchStyle.dot}`} />
             {bundle.catch_up.label}
           </span>
-          <span
-            className={`chip px-2.5 py-1 text-[11px] ${
-              meme.meme_data_source === "bilibili" ? "bg-flare/10 text-flare" : "bg-gold/20 text-[#B2750A]"
-            }`}
-            title={
-              meme.meme_data_source === "bilibili"
-                ? "这个梗的数据来自 B 站真实采集"
-                : "这个梗的数据是演示数据，不是真实抓取结果"
-            }
-          >
-            {meme.meme_data_source === "bilibili" ? "B站真实数据" : "演示数据"}
-          </span>
+          {meme.meme_data_source === "bilibili" ? null : (
+            <span
+              className="chip bg-gold/20 px-2.5 py-1 text-[11px] text-[#B2750A]"
+              title="这个梗的数据是演示数据，不是真实抓取结果"
+            >
+              演示数据
+            </span>
+          )}
           {meme.thumbnail.manual ? (
             <span className="chip bg-brand-soft px-2.5 py-1 text-[11px] text-brand" title="封面由人工在梗管理里指定，不是某条视频自带封面">
               人工封面

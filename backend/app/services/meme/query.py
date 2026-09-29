@@ -35,6 +35,7 @@ from app.models import (
     MemeDailyStats,
     MemeStatus,
     Video,
+    VideoTranscript,
 )
 from app.mock.catalogue import spec_for
 
@@ -555,8 +556,23 @@ def get_meme_or_none(session: Session, meme_id: int) -> Meme | None:
 
 
 def intro_payload(session: Session, meme: Meme) -> dict[str, Any]:
-    """详情页的「这个梗是什么」：人工介绍 > 真实证据原文 > 显式空态。"""
-    return compose_intro(meme, meme.certifications, kept_videos(session, meme, 6))
+    """详情页的「这个梗是什么」：人工介绍 > 字幕原文 > 真实证据原文 > 显式空态。
+
+    字幕按 bvid 存，可能挂在别的梗名下（同一条解说视频被两个梗共用），
+    所以除了本梗的字幕，还要把双 UP 认证视频的字幕一起捞进来。
+    """
+    bvids = [cert.bvid for cert in meme.certifications if cert.bvid]
+    conditions = [VideoTranscript.meme_id == meme.id]
+    if bvids:
+        conditions.append(VideoTranscript.bvid.in_(bvids))
+    rows = list(
+        session.scalars(
+            select(VideoTranscript)
+            .where(or_(*conditions))
+            .order_by(VideoTranscript.chars.desc())
+        )
+    )
+    return compose_intro(meme, meme.certifications, kept_videos(session, meme, 6), rows)
 
 
 def detail_payload(session: Session, meme: Meme) -> dict[str, Any] | None:
@@ -712,6 +728,13 @@ def meta_payload(session: Session) -> dict[str, Any]:
                 "算法拒绝给生命周期与赶梗结论，只报「数据不足」。热度分数照给——"
                 "那是存量水平，跨梗同一把尺子；被洞影响的是「在涨还是在退」这种时间轴比较。"
             ) if site_source == "bilibili" else "演示数据不涉及接口抖动，无观测闸门。",
+            # 介绍这一段的来源也要能被用户查到底：四档优先级 + 谁改写的，界面自解释
+            "intro_rule": (
+                "梗介绍的优先级：人工撰写 > 解说视频字幕原文 > 解说视频标题与简介原文 > 显式「暂无介绍」。"
+                "后三档都不由系统写句子：字幕选段只按「出自/来历/这个梗」这类说法把原句挑出来拼接，"
+                "一个字都不改写；字幕要 BILI_COOKIE 才抓得到（实测匿名请求只返回空字幕轨）。"
+                "AI 只做缩短，且摘要里的数字与专名必须能在字幕原文里逐字找到，否则退回原文。"
+            ),
             "llm_role": "仅负责趋势解释与赶梗建议的文案，不参与计算",
             "sampling": (
                 "真实采集口径：每日取 B 站该关键词下播放量最高的前 20 条相关视频作为样本，"

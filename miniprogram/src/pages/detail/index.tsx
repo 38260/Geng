@@ -33,9 +33,14 @@ const METRICS: { key: keyof MemeDetail["metrics"]; label: string }[] = [
   { key: "danmaku", label: "弹幕" },
 ];
 
-/** 介绍卡：人工撰写 / 证据原文拼出 / 暂无介绍，三种情况都要有明确说法。 */
+/** 介绍卡：人工撰写 / 字幕原文摘录 / 证据原文拼出 / 暂无介绍，四种情况都要有明确说法。 */
 function IntroCard({ detail }: { detail: MemeDetail }) {
   const intro = detail.intro;
+  const transcript = intro.transcript;
+  const [fullOpen, setFullOpen] = useState(false);
+  const who = transcript
+    ? [transcript.up_label, transcript.certified ? "" : "非认证视频"].filter(Boolean).join(" · ")
+    : "";
   return (
     <View className="card">
       <View className="row-between">
@@ -53,6 +58,33 @@ function IntroCard({ detail }: { detail: MemeDetail }) {
           <Text className="intro-empty-link">介绍由人工在后台维护，补完刷新即可看到</Text>
         </View>
       )}
+
+      {transcript ? (
+        <View className="excerpt">
+          <Text className="excerpt-head">
+            {intro.source === "transcript" ? "字幕原文" : "字幕原文对照"} · 来自《{transcript.video_title || transcript.bvid}》
+            {who ? `（${who}）` : ""} · {transcript.kind_label}
+          </Text>
+          {intro.source === "transcript" ? null : <Text className="excerpt-body">{transcript.excerpt}</Text>}
+          <Text className="excerpt-toggle" onClick={() => setFullOpen(!fullOpen)}>
+            {fullOpen
+              ? "收起字幕原文"
+              : transcript.full_truncated
+                ? `展开字幕原文（共 ${transcript.chars} 字，这里放前 ${transcript.full.length} 字）`
+                : `展开字幕原文（${transcript.chars} 字，介绍挑了 ${transcript.matched_sentences} 句）`}
+          </Text>
+          {fullOpen ? <Text className="excerpt-body">{transcript.full}</Text> : null}
+          <Text className="excerpt-note" onClick={() => Taro.showToast({ title: transcript.kind_hint, icon: "none" })}>
+            {transcript.kind === "ai" ? "AI 识别字幕，错字未纠正" : "人工字幕"}
+            {transcript.fetched_at ? ` · 抓取于 ${transcript.fetched_at}` : ""}
+          </Text>
+          {transcript.url ? (
+            <Text className="excerpt-link" onClick={() => openVideoUrl(transcript.url)}>
+              {videoOpensExternally() ? "看完整视频 ›" : "复制视频链接"}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
 
       {intro.excerpt ? (
         <View className="excerpt">

@@ -104,6 +104,7 @@ export default function About() {
           <Text className="para">{t.lifecycle_algorithm}</Text>
           <Text className="para">{t.sampling || "抽样口径见后台说明。"}</Text>
           {t.coverage_rule ? <Text className="para">{t.coverage_rule}</Text> : null}
+          {t.intro_rule ? <Text className="para">{t.intro_rule}</Text> : null}
           <Text className="para">{t.llm_role}</Text>
         </View>
       ) : null}

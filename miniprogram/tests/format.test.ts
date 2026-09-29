@@ -63,8 +63,10 @@ test("配色映射不能漏阶段，否则界面会拿到 undefined", () => {
   for (const status of ["can_catch", "caution", "too_late", "insufficient"]) {
     assert.ok(catchTone(status as never).chip, status);
   }
-  assert.ok(introTone("evidence"));
-  assert.ok(introTone("none"));
+  // 介绍四档都要有配色：漏一档，来源标签就会拿到 undefined 而画成灰块
+  for (const source of ["manual", "transcript", "evidence", "none"]) {
+    assert.ok(introTone(source as never), source);
+  }
 });
 
 test("真实与演示要分得开", () => {

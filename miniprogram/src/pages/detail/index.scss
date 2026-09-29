@@ -163,6 +163,29 @@
   color: $ink-mute;
 }
 
+/* 字幕原文是折叠的：默认只给挑出来的那几句，展开才看整段，否则详情页会被字幕淹没 */
+.excerpt-toggle {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 22px;
+  line-height: 1.5;
+  color: $flare;
+}
+
+.excerpt-note {
+  display: block;
+  margin-top: 8px;
+  font-size: 21px;
+  color: $ink-faint;
+}
+
+.excerpt-link {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 22px;
+  color: $flare;
+}
+
 .evidence {
   margin-top: 14px;
   padding-top: 12px;

@@ -11,17 +11,37 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from app.models import CertRole
+from app.models import CertRole, VideoTranscript
 from app.services.meme.certification import record_certification
-from app.services.meme.intro import MAX_EXCERPT_CHARS, compose_intro
+from app.services.meme.intro import (
+    MAX_EXCERPT_CHARS,
+    MAX_FULL_CHARS,
+    MAX_SEGMENT_CHARS,
+    compose_intro,
+    select_segment,
+)
 
 from .conftest import make_video
 
 LONG_DESC = "这个梗出自一段老动画里的名场面，后来被大家拿来当万能回应句式，弹幕和评论区都在用。"
 
 
-def _intro(meme, certifications=(), videos=()):
-    return compose_intro(meme, certifications, videos)
+def _intro(meme, certifications=(), videos=(), transcripts=()):
+    return compose_intro(meme, certifications, videos, transcripts)
+
+
+def _transcript(bvid: str, text: str, *, kind: str = "cc", title: str = "解说视频标题", chars: int | None = None):
+    """字幕行不用入库：介绍合成只读字段，构造对象就够了。"""
+    return VideoTranscript(
+        bvid=bvid,
+        kind=kind,
+        lang="zh-CN",
+        text=text,
+        chars=len(text) if chars is None else chars,
+        video_title=title,
+        logged_in=True,
+        fetched_at=datetime(2026, 9, 29, 10, 0),
+    )
 
 
 def test_manual_description_wins(meme_factory):
@@ -124,3 +144,148 @@ def test_demo_evidence_gets_no_clickable_link(meme_factory, session, monkeypatch
     result = _intro(meme, meme.certifications)
     assert result["evidence"][0]["video_url"] == ""
     assert result["evidence"][0]["verified"] is False
+
+
+# --------------------------------------------------------------------------- #
+# 第②档：字幕原文。视频里说的话才是内容，标题和简介都只是包装
+
+
+CC_TEXT = (
+    "哈喽大家好，欢迎来到本期视频，我们直接开始。"
+    "这个梗出自 2019 年的一场游戏直播，主播在逆风局里反复念同一句话。"
+    "所谓逆风局就是快输了的局面。"
+    "后来评论区把它做成了万能回应，谁不想解释就发一句。"
+    "记得三连加个关注，我们下期再见。"
+)
+
+
+def _certified(session, meme):
+    record_certification(
+        session, meme, CertRole.ENCYCLOPEDIA,
+        bvid="BV1enc0009", video_title="【梗百科】测试梗是啥梗？", data_source="bilibili",
+    )
+
+
+def test_transcript_beats_title_and_description_evidence(meme_factory, session):
+    """有人工介绍之前，字幕原文优先于「标题+简介拼出来的证据」——那是内容，这不是。"""
+    meme = meme_factory(description="")
+    _certified(session, meme)
+    result = _intro(meme, meme.certifications, [], [_transcript("BV1enc0009", CC_TEXT)])
+
+    assert result["source"] == "transcript"
+    assert result["source_label"] == "字幕原文摘录"
+    block = result["transcript"]
+    assert block["kind"] == "cc" and block["kind_label"] == "人工字幕"
+    assert block["certified"] is True and block["up_label"] == "梗百科"
+    assert block["bvid"] == "BV1enc0009"
+    assert block["url"] == "https://www.bilibili.com/video/BV1enc0009"
+    assert "没有改写也没有归纳" in result["note"]
+
+
+def test_segment_only_keeps_sentences_that_explain_the_meme(meme_factory, session):
+    """开场白、求三连、道别都不该进介绍；留下的每句都还能在原文里找到。"""
+    meme = meme_factory(description="")
+    _certified(session, meme)
+    block = _intro(meme, meme.certifications, [], [_transcript("BV1enc0009", CC_TEXT)])["transcript"]
+
+    assert "欢迎来到本期视频" not in block["excerpt"]
+    assert "三连" not in block["excerpt"]
+    assert "下期再见" not in block["excerpt"]
+    assert block["excerpt"] == (
+        "这个梗出自 2019 年的一场游戏直播，主播在逆风局里反复念同一句话。"
+        "所谓逆风局就是快输了的局面。"
+        "后来评论区把它做成了万能回应，谁不想解释就发一句。"
+    )
+    assert block["matched_sentences"] == 3
+    assert block["excerpt_chars"] == len(block["excerpt"]) <= MAX_SEGMENT_CHARS
+    # 没超长的字幕就该整段给折叠区，不截
+    assert block["full_truncated"] is False and block["full"] == CC_TEXT
+
+
+def test_ai_subtitle_is_labelled_as_ai(meme_factory, session):
+    """AI 识别的字幕错字多，界面必须说清这是机器听写的，不是 UP 主写的。"""
+    meme = meme_factory(description="")
+    _certified(session, meme)
+    result = _intro(
+        meme, meme.certifications, [],
+        [_transcript("BV1enc0009", CC_TEXT, kind="ai")],
+    )
+    block = result["transcript"]
+    assert block["kind"] == "ai" and block["kind_label"] == "AI 识别字幕"
+    assert "错字" in block["kind_hint"]
+
+
+def test_human_cc_preferred_over_ai_subtitle(meme_factory, session):
+    meme = meme_factory(description="")
+    _certified(session, meme)
+    result = _intro(
+        meme, meme.certifications, [],
+        [
+            _transcript("BV1enc0009", CC_TEXT, kind="ai"),
+            _transcript("BV1enc0009", "这个梗的来历是主播口误，后来被剪成了鬼畜素材。", kind="cc"),
+        ],
+    )
+    assert result["transcript"]["kind"] == "cc"
+    assert result["transcript"]["excerpt"] == "这个梗的来历是主播口误，后来被剪成了鬼畜素材。"
+
+
+def test_subtitle_without_any_explaining_line_falls_back_to_evidence(meme_factory, session):
+    """整期都在闲聊／念弹幕时宁可退回证据档，也不随便挑一句当「这个梗是什么」。"""
+    meme = meme_factory(description="")
+    _certified(session, meme)
+    chatter = "哈喽大家好。今天天气不错。弹幕别说我听不清。我们下期再见。"
+    result = _intro(meme, meme.certifications, [], [_transcript("BV1enc0009", chatter)])
+    assert result["source"] == "evidence"
+    assert result["transcript"] is None
+    assert result["text"], "证据档仍要有内容"
+
+
+def test_subtitle_from_uncertified_video_is_marked(meme_factory, session):
+    """非认证视频的字幕也能用，但要标出来，不能伪装成双 UP 的说法。"""
+    meme = meme_factory(description="")
+    _certified(session, meme)
+    block = _intro(
+        meme, meme.certifications, [],
+        [_transcript("BV1random", "这个梗出自一条整活视频，后来才火起来的。")],
+    )["transcript"]
+    assert block["certified"] is False and block["bvid"] == "BV1random"
+
+
+def test_manual_intro_still_ships_the_subtitle_for_comparison(meme_factory, session):
+    """人工介绍排第一，但字幕块照样给：详情页要能点开对照，看这句话是不是视频真说过。"""
+    meme = meme_factory(description="人工写好的介绍")
+    _certified(session, meme)
+    result = _intro(meme, meme.certifications, [], [_transcript("BV1enc0009", CC_TEXT)])
+    assert result["source"] == "manual"
+    assert result["transcript"] is not None
+
+
+def test_full_transcript_truncated(meme_factory, session):
+    """折叠区只给前 MAX_FULL_CHARS 字，剩下的引导去看视频，别把详情接口变成下载器。"""
+    meme = meme_factory(description="")
+    _certified(session, meme)
+    block = _intro(
+        meme, meme.certifications, [],
+        [_transcript("BV1enc0009", "这个梗的来历是主播口误。" * 200)],
+    )["transcript"]
+    assert block["full_truncated"] is True
+    assert len(block["full"]) <= MAX_FULL_CHARS + 10
+    assert block["chars"] == 12 * 200
+    # 正文选段仍然受更小的预算管住，不受全文长度影响
+    assert len(block["excerpt"]) <= MAX_SEGMENT_CHARS
+
+
+def test_select_segment_returns_empty_when_nothing_matches():
+    assert select_segment("今天心情不错，随便聊聊。", ["测试梗"]) == ("", 0)
+
+
+def test_segment_keeps_document_order_not_score_order():
+    """分数决定谁先进预算，原文顺序决定读起来的顺序。"""
+    text = (
+        "这个梗的来历其实很简单。"
+        "所谓出处就是那场直播里的一句话。"
+        "测试梗的说法来自一句口误。"
+    )
+    excerpt, hits = select_segment(text, ["测试梗"])
+    assert hits == 3
+    assert excerpt == text, "三句都命中且预算够，就按原文顺序全留"

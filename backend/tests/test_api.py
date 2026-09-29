@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from app.config import HOME_FILTERS, settings
 from app.main import app
-from app.models import Meme, reset_db
+from app.models import Meme, SessionLocal, VideoTranscript, reset_db
 
 from .conftest import make_video
 
@@ -195,7 +195,7 @@ def test_detail_shape(client, top_meme_id):
 
     # 详情页的「这个梗是什么」：必须有来源标注，且不许是空白
     intro = payload["intro"]
-    assert intro["source"] in {"manual", "evidence", "none"}
+    assert intro["source"] in {"manual", "transcript", "evidence", "none"}
     assert intro["source_label"]
     assert intro["text"], "点进详情不能看到一片空白"
     if intro["source"] == "evidence":
@@ -372,6 +372,65 @@ def test_no_meme_detail_is_blank(client):
         if not intro["text"].strip():
             blanks.append((item["name"], intro["source"]))
     assert not blanks, f"这些梗的详情页没有介绍：{blanks}"
+
+
+
+def test_detail_prefers_subtitle_over_title_evidence(client):
+    """字幕进了库，介绍就该改成摘自字幕原文，并把原文留着可对照。
+
+    这条走的是"内容层"：以前只有标题和简介能拼，现在能引用视频里真正说的话，
+    但正文必须逐字等于摘录，不许系统另外编一句过渡话。
+    """
+    text = (
+        "哈喽大家好，欢迎来到本期视频，今天聊一个新东西。"
+        "这个梗出自 2019 年的一场直播，主播在逆风局里反复念同一句话。"
+        "后来评论区把它做成了万能回应。"
+        "记得三连加个关注，我们下期再见。"
+    )
+    ids = [item["id"] for item in client.get("/api/memes?scope=all&limit=100").json()["items"]]
+    meme_id = next(meme_id for meme_id in ids if client.get(f"/api/memes/{meme_id}").status_code == 200)
+
+    session = SessionLocal()
+    original = ""
+    try:
+        meme = session.get(Meme, meme_id)
+        original = meme.description or ""
+        meme.description = ""
+        session.add(
+            VideoTranscript(
+                bvid="BV1subtitle01",
+                meme_id=meme_id,
+                kind="cc",
+                lang="zh-CN",
+                text=text,
+                chars=len(text),
+                video_title="这条梗到底哪来的",
+                logged_in=True,
+            )
+        )
+        session.commit()
+
+        intro = client.get(f"/api/memes/{meme_id}").json()["intro"]
+        assert intro["source"] == "transcript" and intro["source_label"] == "字幕原文摘录"
+        block = intro["transcript"]
+        assert block["bvid"] == "BV1subtitle01"
+        assert block["kind_label"] == "人工字幕" and block["certified"] is False
+        assert "这个梗出自 2019 年的一场直播" in block["excerpt"]
+        assert "欢迎来到本期视频" not in block["excerpt"] and "三连" not in block["excerpt"]
+        assert intro["text"] == block["excerpt"], "正文只能是摘录本身，不能是系统另写的一句"
+        assert block["full"] == text and block["full_truncated"] is False
+        assert block["url"] == "https://www.bilibili.com/video/BV1subtitle01"
+    finally:
+        meme = session.get(Meme, meme_id)
+        meme.description = original
+        row = session.get(VideoTranscript, "BV1subtitle01")
+        if row is not None:
+            session.delete(row)
+        session.commit()
+        session.close()
+
+    back = client.get(f"/api/memes/{meme_id}").json()["intro"]
+    assert back["transcript"] is None, "清理要彻底，别让后面的用例读到这条字幕"
 
 
 def test_detail_trend_and_windows(client, top_meme_id):

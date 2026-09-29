@@ -96,12 +96,67 @@ function HeadCard({
 /** 介绍来源决定这句话说得多硬：人工写的可以直接信，证据拼出的只是原文摘录，没内容就明说。 */
 const INTRO_STYLE: Record<IntroSource, { chip: string; hint: string }> = {
   manual: { chip: "bg-go/10 text-go", hint: "这条介绍是人工在梗管理里维护的" },
+  transcript: {
+    chip: "bg-flare/10 text-flare",
+    hint: "还没有人工介绍，这段直接摘自解说视频的字幕原文，系统只挑句子、不写句子",
+  },
   evidence: {
     chip: "bg-flare/10 text-flare",
     hint: "还没有人工介绍，这段由抓取到的解说视频标题与简介原文拼出，系统没有改写",
   },
   none: { chip: "bg-gold/20 text-[#B2750A]", hint: "既没有人工介绍，也没有可用的原文证据" },
 };
+
+/**
+ * 字幕原文块：正文那几句从哪来的，得能当场核对。
+ * source=transcript 时正文已经是这段摘录，所以只补出处与折叠原文；
+ * 有人工介绍时它作为「对照」出现，让人看得见人工稿写的是不是视频里说过的话。
+ */
+function TranscriptBlock({ intro }: { intro: MemeIntro }) {
+  const item = intro.transcript;
+  if (!item) return null;
+  const isSource = intro.source === "transcript";
+  const who = [item.up_label, item.certified ? "" : "非认证视频"].filter(Boolean).join(" · ");
+  return (
+    <div className="mt-3 rounded-xl border border-dashed border-line bg-canvas px-4 py-3">
+      <div className="text-[12px] font-bold text-ink-faint">
+        {isSource ? "字幕原文" : "字幕原文对照"} · 来自《{item.video_title || item.bvid}》
+        {who ? `（${who}）` : ""}
+        <span title={item.kind_hint}> · {item.kind_label}</span>
+      </div>
+
+      {isSource ? null : (
+        <p className="mt-1 text-[13px] leading-relaxed text-ink-mute">{item.excerpt}</p>
+      )}
+
+      <details className="mt-1.5">
+        <summary className="cursor-pointer list-none text-[12px] text-flare hover:underline">
+          {item.full_truncated
+            ? `展开字幕原文（共 ${item.chars} 字，这里放前 ${item.full.length} 字）`
+            : `展开字幕原文（${item.chars} 字，挑了 ${item.matched_sentences} 句进介绍）`}
+        </summary>
+        <p className="mt-1.5 whitespace-pre-line text-[12px] leading-relaxed text-ink-mute">
+          {item.full}
+        </p>
+      </details>
+
+      <div className="mt-1.5 flex flex-wrap items-center gap-3 text-[12px] text-ink-faint">
+        {item.url ? (
+          <a
+            href={item.url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-flare hover:underline"
+          >
+            <LinkIcon className="h-3 w-3" />
+            看完整视频
+          </a>
+        ) : null}
+        {item.fetched_at ? <span>字幕抓取于 {item.fetched_at}</span> : null}
+      </div>
+    </div>
+  );
+}
 
 function IntroCard({ intro }: { intro: MemeIntro }) {
   const style = INTRO_STYLE[intro.source];
@@ -130,6 +185,8 @@ function IntroCard({ intro }: { intro: MemeIntro }) {
           </Link>
         </p>
       )}
+
+      {intro.transcript ? <TranscriptBlock intro={intro} /> : null}
 
       {intro.excerpt ? (
         <div className="mt-3 rounded-xl border border-dashed border-line bg-canvas px-4 py-3">

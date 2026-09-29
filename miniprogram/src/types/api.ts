@@ -19,7 +19,7 @@ export type LifecycleStage =
 export type CatchUpStatus = "can_catch" | "caution" | "too_late" | "insufficient";
 export type HomeFilter = "all" | "hot" | "taking_off" | "receding";
 export type CertLabel = "双 UP 认证" | "梗百科认证" | "梗指南认证" | "未认证";
-export type IntroSource = "manual" | "evidence" | "none";
+export type IntroSource = "manual" | "transcript" | "evidence" | "none";
 
 export interface Transparency {
   data_platform: string;
@@ -32,6 +32,8 @@ export interface Transparency {
   sampling?: string;
   /** 观测闸门：接口空返回怎么记、观测不足时为什么拒绝给趋势结论 */
   coverage_rule?: string;
+  /** 梗介绍四档来源与「不改写」的约定 */
+  intro_rule?: string;
   lifecycle_algorithm: string;
   llm_role: string;
 }
@@ -233,6 +235,28 @@ export interface IntroExcerpt {
   data_source: DataSource;
 }
 
+/** 解说视频字幕原文：正文只放挑出来的那几句，折叠区给可对照的原文 */
+export interface IntroTranscript {
+  bvid: string;
+  video_title: string;
+  url: string;
+  /** cc = UP 主/字幕组上传的人工字幕，ai = B 站自动识别，错字明显更多 */
+  kind: "cc" | "ai";
+  kind_label: string;
+  kind_hint: string;
+  role: string;
+  up_label: string;
+  /** 这条字幕来自双 UP 认证的解说视频吗；不是的话界面要标出来 */
+  certified: boolean;
+  chars: number;
+  excerpt: string;
+  excerpt_chars: number;
+  matched_sentences: number;
+  full: string;
+  full_truncated: boolean;
+  fetched_at: string;
+}
+
 export interface MemeIntro {
   text: string;
   source: IntroSource;
@@ -240,6 +264,7 @@ export interface MemeIntro {
   note: string;
   evidence: IntroEvidence[];
   excerpt: IntroExcerpt | null;
+  transcript: IntroTranscript | null;
 }
 
 export interface VideoItem {

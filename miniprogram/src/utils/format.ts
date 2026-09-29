@@ -90,6 +90,7 @@ const CERT_TONE: Record<CertLabel, string> = {
 
 const INTRO_TONE: Record<IntroSource, string> = {
   manual: "chip-go",
+  transcript: "chip-flare",
   evidence: "chip-flare",
   none: "chip-gold",
 };

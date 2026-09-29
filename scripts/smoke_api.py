@@ -177,8 +177,16 @@ if items:
     call("GET", f"/api/memes/{meme_id}/videos?limit=99", expect=(422,), note="limit 越界应 422")
 
     insight = call("POST", f"/api/memes/{meme_id}/insight", {"refresh": True})
-    check(insight and insight["trend_explanation"]["status"] == "ok", "无 Key 时趋势解释走算法兜底而非报错")
-    check(insight and insight["catch_up_advice"]["result"]["status"] in {"can_catch", "caution", "too_late"}, "赶梗状态是三枚举之一")
+    trend = (insight or {}).get("trend_explanation") or {}
+    check(
+        trend.get("status") == "ok" and trend.get("source") in {"llm", "rule", "cache"},
+        f"趋势解释可用（source={trend.get('source')}）——配了 Key 走 LLM，没配则算法兜底，两种都不许报错",
+    )
+    advice = ((insight or {}).get("catch_up_advice") or {}).get("result") or {}
+    check(
+        advice.get("status") in {"can_catch", "caution", "too_late", "insufficient"},
+        f"赶梗状态在枚举内（{advice.get('status')}）",
+    )
 
     # 刷新状态：接口必须能说出"上次什么时候刷的、自动刷新开没开"
     refresh = call("GET", "/api/jobs/refresh")

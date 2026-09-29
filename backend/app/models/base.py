@@ -56,6 +56,10 @@ if IS_SQLITE:
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.execute("PRAGMA journal_mode=WAL")
+        # WAL 只允许一个写者。默认 busy_timeout=0，第二个并发写请求立刻抛
+        # "database is locked" —— 实测点一次「重新判断」就会同时写两行 ai_insights，
+        # 直接 500。给它 8 秒等待，竞争变成"排队"而不是"报错"。
+        cursor.execute("PRAGMA busy_timeout=8000")
         cursor.close()
 
 
@@ -72,6 +76,9 @@ def get_session() -> Iterator[Session]:
     try:
         yield session
     finally:
+        # 出错时（比如 LLM 抛异常）事务还开着，只 close 不够直观；
+        # 显式回滚，避免连接带着半成品状态回到池里。
+        session.rollback()
         session.close()
 
 

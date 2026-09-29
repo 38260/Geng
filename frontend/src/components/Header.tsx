@@ -6,34 +6,28 @@ import { CalendarIcon, SearchIcon } from "@/components/icons";
 import { useMeta } from "@/hooks/useAppData";
 import { formatDateTime } from "@/utils/format";
 
-/** 参考图顶部通栏：日历图标 + 日期 + 两行小字。日期给的是"统计截至哪天"，不是"今天"。 */
+/**
+ * 参考图顶部通栏：日历图标 + 日期 + 两行小字。
+ * 日期给的是"统计截至哪天"，不是"今天"；第二行必须把**两个时间点**都写明白——
+ * 这一天覆盖到什么时候、这批数是几点采回来的，否则"数据截至"四个字没有意义。
+ */
 function DateChip({ through, updatedAt }: { through?: string | null; updatedAt?: string | null }) {
   const iso = through?.slice(0, 10) || (updatedAt ? formatDateTime(updatedAt).slice(0, 10) : "—");
+  const stamp = updatedAt && updatedAt !== "—" ? formatDateTime(updatedAt).slice(5) : "";
   const tip = through
-    ? `统计窗口不含今天（今天没过完，头部样本会偏低、增幅会假跌）\n上次采集/重算：${formatDateTime(updatedAt)}`
+    ? `统计窗口不含今天（今天没过完，头部样本会偏低、增幅会假跌）\n`
+      + `「${iso}」= 这一天 00:00–24:00 的数据，采集/重算完成于 ${formatDateTime(updatedAt)}`
     : "还没有采集到统计数据";
   return (
     <div className="hidden items-center gap-2 sm:flex" title={tip}>
       <CalendarIcon size={20} className="text-nav" />
       <div className="leading-tight">
         <div className="tabular text-[15px] font-bold text-ink">{iso}</div>
-        <div className="text-[11px] text-ink-mute">{through ? "数据截至" : "今日更新"}</div>
+        <div className="tabular text-[11px] text-ink-mute">
+          {through ? `数据截至当日 24:00${stamp ? ` · 采集于 ${stamp}` : ""}` : "今日更新"}
+        </div>
       </div>
     </div>
-  );
-}
-
-/** V1 不做登录，头像只是占位；素材直接从参考图裁出。 */
-function Avatar() {
-  return (
-    <img
-      src="/thumbs/avatar.png"
-      width={36}
-      height={36}
-      alt=""
-      title="V1 不做登录体系"
-      className="h-9 w-9 shrink-0 rounded-full object-cover ring-1 ring-line"
-    />
   );
 }
 
@@ -113,8 +107,7 @@ export function TopBar({
         <div className="ml-auto flex shrink-0 items-center gap-3 lg:gap-4">
           {meta ? <DemoBadge isDemo={meta.is_demo} source={meta.data_source} /> : null}
           <DateChip through={meta?.data_through} updatedAt={updatedAt ?? meta?.data_updated_at} />
-          <div className="hidden h-7 w-px bg-line sm:block" />
-          <Avatar />
+          {/* V1 不做登录，右上角原来挂的是参考图里裁出来的占位头像，已删 */}
         </div>
       </div>
     </header>

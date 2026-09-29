@@ -85,7 +85,19 @@ def chat(
                 choices = data.get("choices") or []
                 if not choices:
                     raise LLMError("模型返回为空", kind="empty", status=200)
-                text = (choices[0].get("message") or {}).get("content") or ""
+                message = choices[0].get("message") or {}
+                finish = choices[0].get("finish_reason")
+                text = (message.get("content") or "").strip()
+                if not text:
+                    # 带思考段的模型会把正文放在 reasoning_content，content 留空；
+                    # 另外 max_tokens 被思考吃光时 finish_reason=length 且 content 也是空的。
+                    # 不接住这两种情况，界面就永远只显示"AI 不可用"，而日志里看不出为什么。
+                    reasoning = (message.get("reasoning_content") or "").strip()
+                    text = reasoning
+                    log.warning(
+                        "LLM content 为空（finish_reason=%s, usage=%s），改用 reasoning_content %d 字",
+                        finish, (data.get("usage") or {}).get("completion_tokens", "?"), len(reasoning),
+                    )
                 latency = int((time.perf_counter() - started) * 1000)
                 log.info(
                     "LLM 调用成功 model=%s attempt=%s latency=%sms tokens=%s",

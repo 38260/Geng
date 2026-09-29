@@ -63,10 +63,15 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_model: str = "LongCat-2.5-Preview"
     llm_temperature: float = 0.3
-    llm_max_tokens: int = 300
-    # 最坏耗时 ≈ timeout * (retries + 1) + 退避；默认控制在 21s 左右，
-    # 前端 AI 卡片有"生成中"状态，不阻塞页面
-    llm_timeout: float = 10.0
+    # LongCat-2.5-Preview 是带思考段的模型：300 token 会被 reasoning 吃光，
+    # 实测 content 返回空串、usage.total_tokens=330，界面就只能退回算法文案。
+    # 给到 900，正文才真的落在 content 里。
+    llm_max_tokens: int = 900
+    # 最坏耗时 ≈ timeout * (retries + 1) + 退避。10s 是照着"非思考模型"定的：
+    # 实测同一次调用 10s 内两次超时、第 3 次 32.2s 才回，等于白白重试两次再失败。
+    # LongCat 冷启动排队时会超过 45s（实测三次尝试合计 77s 才拿到一次成功），
+    # 所以给到 60s。前端 AI 卡片有"生成中"状态，不阻塞页面。
+    llm_timeout: float = 60.0
     llm_max_retries: int = 2
     llm_backoff_base: float = 0.8
     # When the LLM is unavailable we still answer with an algorithm-written

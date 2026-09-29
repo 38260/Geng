@@ -34,9 +34,8 @@ export default function MemeLibrary() {
   return (
     <div className="px-5 pb-12 pt-8 lg:px-[33px]">
       <SectionHeader emoji="📚" title="梗库" />
-      <p className="-mt-2 mb-6 text-[15px] text-ink-mute">
-        只收录通过 梗百科 + 梗指南 双 UP 认证的梗，共 {data?.total ?? 0} 个。
-      </p>
+      {/* 原来这里写"只收录通过 梗百科 + 梗指南 双 UP 认证的梗"——那是已经废掉的交集口径，
+          准入早就改成并集了，留着就是一句假话，按要求删掉。梗库分母在下方筛选行与口径页都有。 */}
 
       <div className="mb-7 flex flex-wrap items-center gap-3">
         <FilterPills

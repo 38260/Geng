@@ -79,13 +79,26 @@ $env:VITE_API_TARGET="http://127.0.0.1:8010"; npm run dev
 
 | 命令 | 作用 |
 | --- | --- |
-| `python -m pytest`（backend 目录） | 102 个后端测试 |
-| `python scripts/smoke_api.py` | 对运行中的后端逐个打接口 |
+| `python -m pytest`（backend 目录） | 252 个后端测试，全部离线（假客户端 + 内存库） |
+| `python scripts/smoke_api.py` | 对运行中的后端逐个打接口（125 项） |
 | `bash scripts/screenshot.sh` | Chrome 无头截图，做视觉比对 |
 | `bash scripts/ui_shot.sh home "/"` | 截图 + 缩到参考图画板宽度，输出并排图与 50% 叠图（`.shots/cmp-*.png` / `blend-*.png`） |
 | `python scripts/extract_ref_assets.py` | 从 `docs/design/reference-ui.png` 重切前端素材（封面、Logo、Hero 装饰带） |
 | `bash scripts/restart-backend.sh` | 重启本地后端 |
-| `python -m app.scripts.collect_data --source bilibili --limit 3` | 真实 B 站采集 |
+
+后端数据侧的脚本（都在 `backend/` 下跑，写库前先备份 `backend/data/gengv1.db`）：
+
+| 命令 | 作用 |
+| --- | --- |
+| `python -m app.scripts.collect_data --source bilibili --limit 3` | 单批真实采集（试水用） |
+| `python -m app.scripts.daily_refresh` | 每日刷新：发现新梗 + 只补 T-1 + 重算 + 写运行报告（`--full` 重采整窗口，`--skip-condense` 不给字幕生成浓缩介绍） |
+| `python -m app.scripts.backfill_days <快照.db> --apply` | 用某次快照把"我们观测得更准的日子"补回现库（只换更好的天，不整体覆盖；不加 `--apply` 只出报告） |
+| `python -m app.scripts.refresh_video_rank` | 只补 B 站综合排序名次（每梗 1~2 次请求，不重采日序列；`--gap` 默认 3 秒，连打会被回空页） |
+| `python -m app.scripts.fetch_transcripts` | 抓解说视频字幕入库（**要 `BILI_COOKIE`**，没有就直接退出 2） |
+| `python -m app.scripts.condense_intros` | 给字幕生成 AI 浓缩介绍，逐字校验通过才入库 |
+| `python -m app.scripts.list_recent_certified` | 打印两位 UP 主近期投稿里的梗候选（发现层口径核对） |
+| `python -m app.scripts.probe_certification` | 只读探测：某梗在两位 UP 主空间里能不能搜到（受风控限制，需 Cookie） |
+| `python -m app.scripts.dedupe_memes --drop 12,34 --apply` | 删指定重名梗（默认只报告；`--drop-placeholders` 清单占位空壳） |
 
 ---
 
@@ -94,7 +107,7 @@ $env:VITE_API_TARGET="http://127.0.0.1:8010"; npm run dev
 | 路由 | 内容 |
 | --- | --- |
 | `/` | Hero + 筛选（全部/正在爆/快起飞/退潮中）+ 今日热榜 5 卡 + 精选推荐 + 数据透明度页脚 |
-| `/meme/:id` | 梗头卡（热度/阶段/赶梗状态/数据来源）、四项指标带增幅、ECharts 热度趋势 7/30 天、生命周期轨道、赶梗判断、趋势解释、相关视频（**B站默认排序 / 播放量两档可切**）、认证证据（含认证强度标签） |
+| `/meme/:id` | 顶栏「← 返回 ｜ 首页」两个出口；梗头卡（热度/阶段/赶梗状态）、「这个梗是什么」介绍（四档来源，字幕原文可折叠对照）、四项指标带增幅、ECharts 热度趋势 7/30 天（含观测覆盖度）、生命周期轨道、赶梗判断、趋势解释、相关视频（**B站默认排序 / 播放量两档可切**）、认证证据（含认证强度标签） |
 | `/library` | 全量已认证梗，筛选 + 搜索 + 排序 |
 | `/trends` | 热度榜表格（相对位置 + 增幅 + 赶梗结论） |
 | `/favorites` | 本机 localStorage 收藏，无账号体系 |
@@ -261,14 +274,23 @@ AI 字幕要单独标出来（`kind_label`）：机器听写把专有名词听�
 
 ## 四、当前数据集：真实 B 站数据
 
-本仓库当前数据库里的指标**全部来自 B 站真实抓取**（`backend/.env` 里 `DATA_SOURCE=bilibili`）：
+`backend/.env` 里 `DATA_SOURCE=bilibili`，热榜与梗库展示的指标都来自 B 站真实抓取；
+库里仍留着 12 条演示梗与 108 条演示视频（`data_source=mock`，界面按 `meme_data_source`
+标「演示数据」，不进真实榜单）。下面这些数是 2026-09-29 从 `/api/meta` 与库内实测的，
+统计窗口 30 天：
 
 | 项目 | 实测结果 |
 | --- | --- |
-| 采集到的真实视频 | 2,500+ 条候选，相关性过滤后保留约 1,100 条 |
-| 被剔除的无关视频 | 1,446 条（短词会被 B 站模糊匹配到大量无关内容） |
-| 有真实数据的梗 | 28 个（另 8 个近 30 天无相关视频，已清空而非保留演示值） |
-| 榜首示例 | 哈基米 66.6 / 上升期 / +89%（真实播放量最高单条 643.3 万） |
+| 梗库 / 热榜 / 候选池 | 35 个入池 · 20 个上热榜 · 1 个未入池候选 |
+| 库里的梗记录 | 85 条：62 条真实来源 + 12 条演示 + 11 条还没采到（候选或手工新建） |
+| 真实视频 | 5,044 条（另有 108 条演示数据，来源字段分开，不混算） |
+| 逐日序列 | 2,209 行，覆盖 2026-08-28 ~ 09-28 |
+| 近 7 天观测率 | 254/451 天（56%）——没观测到的日子记 `observed=0`，不当成"当天没人做这个梗" |
+| B 站综合排序名次 | 63 个有真实视频的梗里 **61 个有名次**（1,150 条视频带名次），够两档排法用 |
+| 有指标快照的梗 | 72 个（其余是采到但窗口内没内容，界面显式说"数据不足"而不是给 0 分） |
+| 字幕 / 浓缩介绍 | 0 条 —— 表已建好，等 `BILI_COOKIE`（实测匿名请求只返回空字幕轨） |
+| 榜首示例 | 闪身步 80.4（正在爆）· 耍起 70.4（正在爆）· 闹吃vs古振兴 57.6（快起飞） |
+| 最近一轮全量回补 | 目标 76 / 成功 51 / 空窗 25，耗时 16,696 秒（约 4.6 小时，含重试） |
 
 重建整个数据集（约 15 分钟，会覆盖现有数据）：
 
@@ -295,8 +317,11 @@ python -m app.scripts.rebuild_from_bilibili    # 在线核验 + 逐日真实采�
   默认（综合）顺序——那是用户自己在站内看到的排列，掺了相关性与时效，头部常是
   几百万播放的老稿（实测「琵琶曲」站内第 1 是 987 万播放那条，逐日头部样本里根本没有它）。
   名次存在 `videos.search_rank`，取**相关性筛之前的原始位置**，宁可跳号也不谎称名次；
-  一条名次都没抓到时接口如实退回播放量（`sort_applied=view` + note 说明），不返回假排过序的列表。
-  补历史名次用 `python -m app.scripts.refresh_video_rank`（每梗 1~2 次请求，不重采日序列）。
+  一条名次都没抓到时接口如实退回播放量（`sort_applied=view` + note 说明），不返回假排过序的列表；
+  界面把「B站默认排序」划掉标（暂无名次），否则用户只会觉得"按钮点了没反应"。
+  补历史名次用 `python -m app.scripts.refresh_video_rank --gap 3`：B 站对连打会回空页
+  （`code=0` 但 `result` 为空），第一轮 62 个梗连着跑就有 29 个空手，加间隔后只剩 1 个。
+  同一页还会重复给同一个 bvid，入库前必须按 bvid 去重——`videos(meme_id,bvid)` 是唯一键。
 * **短别名不能单独判定相关**：中文 2~3 字的别名基本就是常用词。
   「我不是黄豆」的别名"黄豆"会撞上琵琶曲黄豆版、炒黄豆、树叶做豆腐——旧规则里
   别名命中即 0.85，`0.6×0.85=0.51` 直接过阈值，于是 418 条样本里 343 条其实只在讲黄豆
@@ -381,10 +406,13 @@ curl -X POST "http://127.0.0.1:8010/api/jobs/collect?source=bilibili&limit=3"
 1. **UP 主空间接口被风控**（`code=-352`），要拉两位 UP 主的真实投稿作为认证证据，
    需要在 `backend/.env` 填 `BILI_COOKIE`。没有 Cookie 时认证仍沿用梗库既有记录，
    且**不会拼半份证据**。
-2. 单次抓取只能得到「当天发布的视频 + 此刻的累计指标」，
+2. **视频内容层也只有登录态才有**：`player/wbi/v2` 匿名返回 `code=0` 但字幕轨是空数组，
+   B 站自己的 AI 视频总结端点直接 `-101 未登录`。所以梗介绍里的「字幕原文摘录」这一档
+   要 `BILI_COOKIE` 才有内容，没 Cookie 时如实退回标题+简介拼的证据（见「梗介绍」一节）。
+3. 单次抓取只能得到「当天发布的视频 + 此刻的累计指标」，
    越早的日期样本越稀疏，所以**首次真实采集会把增长率算得偏高**。
    要得到可信的时间序列，需要每天定时跑一次采集积累。
-3. 一个梗只保留一份数据来源：采集时会先清掉该梗旧数据，避免演示与真实混算。
+4. 一个梗只保留一份数据来源：采集时会先清掉该梗旧数据，避免演示与真实混算。
 
 ---
 
@@ -395,26 +423,29 @@ backend/
   app/
     api/          # FastAPI 路由：memes / llm / settings / jobs / meta
     models/       # SQLAlchemy：Meme, MemeCertification, Video, MemeDailyStats,
-                  #           HotnessSnapshot, LifecycleSnapshot, AIInsight
+                  #           HotnessSnapshot, LifecycleSnapshot, AIInsight, VideoTranscript
     schemas/      # 请求体模型
     services/
       llm/        # config / client / service（LongCat 走 OpenAI 兼容接口）
-      meme/       # certification（准入并集 + 双 UP 徽章）、discovery（发现层并集）、query（读侧组装）
+      meme/       # certification（准入并集 + 双 UP 徽章）、discovery（发现层并集）、
+                  # intro（介绍四档来源 + 字幕规则选段）、summary（AI 浓缩 + 逐字校验）、
+                  # query（读侧组装）、manage（人工四字段）
       pipeline.py # 采集 → 匹配 → 聚合 → 热度 → 生命周期
       settings_store.py  # 把前端填的配置写回 .env
     analytics/    # relevance / series / hotness / lifecycle / catch_up / aggregation
     collectors/   # mock_collector / bilibili_collector / base 契约
-    prompts/      # trend-explanation.txt / catch-up-advice.txt
+    prompts/      # trend-explanation.txt / catch-up-advice.txt / intro-summary.txt
     config/       # settings(.env) / algorithms(阈值) / logging(带密钥脱敏)
     mock/         # 演示梗库与曲线
-    scripts/      # seed_data / run_pipeline / collect_data
-  tests/          # 177 例
+    scripts/      # seed_data / run_pipeline / collect_data / daily_refresh / backfill_days /
+                  # refresh_video_rank / fetch_transcripts / condense_intros / rebuild_from_bilibili
+  tests/          # 252 例
 frontend/src/
   api/  types/  hooks/  components/  pages/  utils/
 miniprogram/      # 微信小程序端（Taro 4 + React + TS）：一份源码出 weapp / h5
   src/api/        # 只读接口封装（地址可按环境覆盖），不调没有鉴权的写接口
   src/pages/      # 热榜 / 梗库 / 口径 三个 tab + 详情页
-  tests/          # 14 例：展示层纯函数 + 对着真实后端的接口契约
+  tests/          # 21 例：展示层纯函数 + 对着真实后端的接口契约
 docs/             # 产品与前端提示词、UI 参考图（前端按它 1:1 复刻）
 scripts/          # smoke_api.py / screenshot.sh / restart-backend.sh
 ```
@@ -439,7 +470,11 @@ scripts/          # smoke_api.py / screenshot.sh / restart-backend.sh
 - [x] 梗库准入（并集）与双 UP 认证（交集徽章）两层规则，模型 + 管线 + 接口三处强制，且有测试
 - [x] 热度与生命周期均由算法计算，AI 不参与任何数值判断
 - [x] 演示/真实数据全站明确标注，接口与前端都带 `meme_data_source` 与 `verification_state`
-- [x] 真实数据已替换演示数据：28 个梗、约 1,100 条真实视频、逐日 30 天序列
+- [x] 真实数据已替换演示数据：35 个入池梗、5,044 条真实视频、逐日 30 天序列
+- [x] 接口空返回不当成"零活动"：`observed` 标记 + 同日取更好观测 + 观测不足拒给趋势结论
+- [x] 介绍四档来源可核对（人工 > 字幕原文 > 标题简介原文 > 显式暂无介绍），每档都标来源、
+      系统一个字都不改写；AI 只允许整句照抄着缩短，逐字校验不过就整段作废
+- [x] 界面只做反向声明：含演示数据才标「演示数据」，不再挂「B站真实数据」这种自我认证
 
 ### AI
 
@@ -457,9 +492,10 @@ scripts/          # smoke_api.py / screenshot.sh / restart-backend.sh
 
 ### 测试
 
-- [x] `python -m pytest` → 100 passed（认证闸门、算法六态、热度边界与 NaN、
-      相关性阈值、赶梗三态、LLM 降级与缓存、采集层离线全流程、接口集成）
-- [x] `python scripts/smoke_api.py` → 46/46 通过（对运行中的真实服务）
+- [x] `python -m pytest` → 252 passed（认证闸门、算法七态、热度边界与 NaN、相关性阈值、
+      赶梗三态、观测覆盖度闸门、LLM 降级与缓存、字幕抓取与逐字校验、采集层离线全流程、接口集成）
+- [x] `python scripts/smoke_api.py` → 125/125 通过（对运行中的真实服务）
+- [x] `npm test`（miniprogram）→ 21 passed；两端 `tsc --noEmit` 干净，Web 构建通过
 - [x] `npm run build` 通过；首页 JS 204KB（gzip 66KB），ECharts 拆到详情页
 - [x] 后端停机时前端渲染错误态 + 启动提示 + 重新加载，不白屏
 

@@ -8,14 +8,20 @@
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import pytest
 
 from app.analytics import Series
 from app.analytics.hotness import compute_hotness
 from app.config import BOARD_MIN_RECENT_VIEW, settings
-from app.models import HotnessSnapshot, LifecycleSnapshot, MemeDailyStats, MemeStatus
+from app.models import (
+    HotnessSnapshot,
+    LifecycleSnapshot,
+    MemeCertification,
+    MemeDailyStats,
+    MemeStatus,
+)
 from app.services.meme.query import board_gate_reason, list_memes, meta_payload, on_board
 
 from .conftest import make_stats
@@ -122,3 +128,55 @@ def test_meme_daily_stats_rows_are_untouched_by_the_gate(session, live_meme):
     _snap(session, meme, stage="obsolete")
 
     assert session.query(MemeDailyStats).filter_by(meme_id=meme.id).count() == 6
+
+
+def _cert(session, meme, *, days_ago: int, source: str = "bilibili"):
+    """给某只梗记一条"UP 主解说"证据，published_at 可以拨到认证窗口外。"""
+    session.add(MemeCertification(
+        meme_id=meme.id, role="encyclopedia", up_name="梗百科", up_mid=1544008396,
+        bvid="BV1fresh" if source == "bilibili" else "",
+        video_title=f"「{meme.name}」是什么梗？｜梗百科",
+        video_url="", published_at=datetime.now() - timedelta(days=days_ago),
+        confirmed=True, confirmed_at=datetime.now(), data_source=source,
+    ))
+    session.flush()
+
+
+def test_board_requires_evidence_inside_cert_window(session, live_meme, monkeypatch):
+    """热榜只看"最新准入池"：解说证据出窗的梗不该再占"今天玩什么"的位置。
+
+    页面口径与 meta 计数用的是同一个函数，所以这里一并断言两个数对得上——
+    数字对不上时用户只会觉得数据不可信。
+    """
+    from app.services.meme.query import meta_payload
+
+    monkeypatch.setattr(settings, "data_source", "bilibili")
+    fresh = live_meme("池内新梗")
+    _snap(session, fresh)
+    _cert(session, fresh, days_ago=10)
+    stale = live_meme("池外老梗")
+    _snap(session, stale, score=90.0)          # 存量热度更高，照样不该占榜
+    _cert(session, stale, days_ago=settings.cert_window_days + 20)
+
+    names = _names(session, "board")
+    assert fresh.name in names, "认证窗口内有真实解说证据的梗应该在榜上"
+    assert stale.name not in names, "证据出窗的老梗即使热度更高也要掉出热榜"
+    assert stale.name in _names(session, "all"), "完整梗库仍然要查得到它"
+
+    meta = meta_payload(session)
+    assert meta["certified_count"] == len(names)
+    assert meta["gated_out"] >= 1
+
+    monkeypatch.setattr(settings, "leaderboard_require_fresh_cert", False)
+    assert stale.name in _names(session, "board"), "开关关掉应退回旧口径"
+
+
+def test_self_declared_evidence_does_not_open_the_board(session, live_meme, monkeypatch):
+    """演示来源的认证记录（自造证据）不算"最新池"——它没有真实的解说视频。"""
+    monkeypatch.setattr(settings, "data_source", "bilibili")
+    meme = live_meme("自造证据梗")
+    _snap(session, meme)
+    _cert(session, meme, days_ago=3, source="mock")
+
+    assert meme.name not in _names(session, "board")
+    assert meme.name in _names(session, "all")

@@ -99,6 +99,7 @@ $env:VITE_API_TARGET="http://127.0.0.1:8010"; npm run dev
 | `python -m app.scripts.list_recent_certified` | 打印两位 UP 主近期投稿里的梗候选（发现层口径核对） |
 | `python -m app.scripts.probe_certification` | 只读探测：某梗在两位 UP 主空间里能不能搜到（受风控限制，需 Cookie） |
 | `python -m app.scripts.dedupe_memes --drop 12,34 --apply` | 删指定重名梗（默认只报告；`--drop-placeholders` 清单占位空壳） |
+| `python -m app.scripts.prune_mock_memes --apply` | 删"纯演示梗"（`data_source=mock` 且库里没有任何 B 站真实证据）；不加 `--apply` 只报告要删哪些行，`--apply` 会先自动备份整库 |
 
 ---
 
@@ -201,7 +202,7 @@ Hotness = 0.25*ViewScore + 0.20*InteractionScore + 0.16*ContentScore
 ### 上榜门槛（准入 ≠ 上榜）
 
 ```
-热榜 = 通过发现层准入（并集）∧ 有指标快照 ∧ 不是过气 ∧ 近 7 天头部播放 ≥ 1 万
+热榜 = 通过发现层准入（并集）∧ 认证窗口内还有真实解说证据 ∧ 有指标快照 ∧ 不是过气 ∧ 近 7 天头部播放 ≥ 1 万
 ```
 
 * 准入只回答"这是不是个真梗"，首页还要回答"今天玩什么"，所以过气（考古区）的梗不进热榜，
@@ -214,6 +215,14 @@ Hotness = 0.25*ViewScore + 0.20*InteractionScore + 0.16*ContentScore
   并把门槛口径写进 `transparency.board_gate`
 * 实测效果（2026-09-28）：31 个入池有数据的梗 → 12 个上热榜，被挡掉的 17 个全是过气、2 个只剩残值
 * 关掉用 `LEADERBOARD_GATE=false`（只在排查数据时用）
+* **热榜还必须是"最新池"**（`LEADERBOARD_REQUIRE_FRESH_CERT`，2026-09-30 加）：
+  上榜资格要落到 `meme_certifications` 里**认证窗口内有 `published_at` 的真实解说证据**，
+  不能只看 `encyclopedia_confirmed` 这种一次性布尔标记——它一旦为真就永远为真，
+  而解说视频是会过期的。梗库定义本来就写着"任一 UP 主在近 90 天真介绍过"，
+  这条闸门就是把定义变成可执行的查询。
+  实测（2026-09-30，小号 Cookie 之后）：45 只梗有窗口内真实证据 → 20 只热榜里
+  **0 只**出自池外；旧口径下漏进梗库口径的 2 只（走个面儿、被生活磨平了妙脆角）
+  解说证据已出窗，现在被挡在热榜外（`scope=all` 仍然查得到）。
 
 ### 赶梗判断
 

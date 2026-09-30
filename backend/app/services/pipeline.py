@@ -391,7 +391,14 @@ def collect_all(
             ))
             have = {hot.meme_id for hot, _ in rows}
             if scope == "board":
+                from app.services.meme.query import fresh_cert_ids
+
                 have &= {hot.meme_id for hot, life in rows if on_board(hot, life)}
+                if settings.data_source == "bilibili" and settings.leaderboard_require_fresh_cert:
+                    # 跟页面同一个口径：只刷"最新准入池"里的梗。
+                    # 解说证据早出窗的老梗在热榜上本来就不显示，
+                    # 给它们逐日重采就是把请求烧在没人看的行上。
+                    have &= fresh_cert_ids(session)
             before = len(memes)
             memes = [meme for meme in memes if meme.id in have]
             summary["scope_note"] = f"{scope} 口径：{before} 个候选里留下 {len(memes)} 个"

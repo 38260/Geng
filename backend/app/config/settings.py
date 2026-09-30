@@ -93,6 +93,14 @@ class Settings(BaseSettings):
     # 认证记录也是自造的，让它跟真梗同榜混排等于用假数字压真热度。
     # 跑演示（DATA_SOURCE=mock）时这条不生效，否则演示产品会空掉。
     leaderboard_require_verified: bool = True
+    # 热榜只看"最新准入池"：上榜资格 = 认证窗口（``CERT_WINDOW_DAYS``，默认 90 天滚动）内
+    # 还有**真实解说证据**（`meme_certifications` 里 `data_source=bilibili` 且
+    # `published_at` 在窗口内）。这实现的就是梗库定义本身——准入靠的就是
+    # "任一 UP 主近期真介绍过"；一次性布尔标记 `encyclopedia_confirmed` 一旦为真就永远为真，
+    # 扛不住时间，老梗会靠存量热度一直赖在"今天玩什么"里。
+    # 只收紧热榜口径；`scope=all` 的完整梗库不受影响，老梗仍可查。
+    # 演示模式（DATA_SOURCE=mock）下不生效，跟 require_verified 一样。
+    leaderboard_require_fresh_cert: bool = True
     # 热榜还要过"活着"门槛（过气不出榜 + 有内容天数或近 7 天头部播放达标）。
     # 关掉后首页会把考古区的梗也排进来，只建议在排查数据时临时打开。
     leaderboard_gate: bool = True

@@ -7,7 +7,7 @@ AI 文案单独走 :mod:`app.services.llm.service`，失败只影响它自己那
 from __future__ import annotations
 
 import math
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, or_, select
@@ -32,6 +32,7 @@ from app.models import (
     HotnessSnapshot,
     LifecycleSnapshot,
     Meme,
+    MemeCertification,
     MemeDailyStats,
     MemeStatus,
     Video,
@@ -251,6 +252,43 @@ def on_board(hotness: HotnessSnapshot, lifecycle: LifecycleSnapshot) -> bool:
     return not board_gate_reason(hotness, lifecycle)
 
 
+def fresh_cert_ids(session: Session, *, days: int | None = None) -> set[int]:
+    """认证窗口内还有**真实解说证据**的梗 id —— 就是发现层定义的那个"最新池"。
+
+    热榜回答的是"今天玩什么"，所以资格不认 `Meme.encyclopedia_confirmed` 这种
+    一次性布尔标记：它一旦为真就永远为真，解说视频却是会过期的。
+    只认带 `published_at` 的真实证据行（`data_source='bilibili'`）。
+    """
+    floor = datetime.now() - timedelta(days=days or settings.cert_window_days)
+    return {
+        row[0]
+        for row in session.execute(
+            select(MemeCertification.meme_id).where(
+                MemeCertification.data_source == "bilibili",
+                MemeCertification.published_at >= floor,
+            )
+        )
+    }
+
+
+def _board_rows(
+    session: Session,
+    rows: list[tuple[Meme, HotnessSnapshot, LifecycleSnapshot]],
+) -> list[tuple[Meme, HotnessSnapshot, LifecycleSnapshot]]:
+    """热榜口径：先过"活着"门槛，再限定在最新准入池内。
+
+    两处（列表与 meta 计数）共用这一个函数，免得页面显示 20 个、
+    头部却报 26 个——数字对不上时用户只会觉得数据不可信。
+    """
+    kept = [row for row in rows if on_board(row[1], row[2])]
+    if settings.data_source == "bilibili" and settings.leaderboard_require_fresh_cert:
+        # 解说证据出窗的梗不算"今天能赶的梗"，哪怕存量热度还很高；
+        # 完整梗库（scope=all）仍然查得到它。
+        fresh = fresh_cert_ids(session)
+        kept = [row for row in kept if row[0].id in fresh]
+    return kept
+
+
 def parse_ids(raw: str, *, cap: int = 100) -> list[int]:
     """把 "1,2, 3" 解析成 [1,2,3]；非数字丢掉，超出上限截断。
 
@@ -285,7 +323,7 @@ def list_memes(
     library_total = len(rows)
     gated = 0
     if scope != "all":
-        kept = [row for row in rows if on_board(row[1], row[2])]
+        kept = _board_rows(session, rows)
         gated = library_total - len(kept)
         rows = kept
 
@@ -644,9 +682,9 @@ def detail_payload(session: Session, meme: Meme) -> dict[str, Any] | None:
 def meta_payload(session: Session) -> dict[str, Any]:
     latest = session.scalar(select(Meme.data_updated_at).order_by(Meme.data_updated_at.desc()))
     library_rows = _load_rows(session)
-    # 热榜口径 = 梗库再过滤一道"活着"门槛（过气不出榜、天数/近 7 天播放二选一达标）。
+    # 热榜口径 = 梗库再过滤一道"活着"门槛，并且只看最新准入池（解说证据在认证窗口内）。
     # 两个数都要给出去：只报热榜数会让人以为梗库就这么点。
-    rows = [row for row in library_rows if on_board(row[1], row[2])]
+    rows = _board_rows(session, library_rows)
     # 统计截至日：只看"榜单里这些梗"的序列最后一天。采集窗口刻意不含今天
     # （今天没过完，头部样本会偏低、增幅会假跌），所以这里必须把"截至哪天"讲明白，
     # 否则用户看到的就是"数据是过去的"。取可见梗而不是全库，免得被演示数据顶高。
@@ -725,8 +763,17 @@ def meta_payload(session: Session) -> dict[str, Any]:
             ),
             "cert_window_days": settings_cert_window_days(),
             "board_gate": (
-                f"热榜另加「活着」门槛：过气（考古区）不上榜，且近 7 天头部播放须 ≥"
-                f"{BOARD_MIN_RECENT_VIEW:,}（不用有内容天数卡，避免误杀琵琶曲这种脉冲型梗）"
+                (
+                    f"热榜只收「活着」且「在最新池里」的梗：最近 {settings_cert_window_days()} 天内"
+                    f"有真实解说证据（发现层并集的证据行）才算池内；过气（考古区）不上榜，"
+                    f"且近 7 天头部播放须 ≥{BOARD_MIN_RECENT_VIEW:,}"
+                    "（不用有内容天数卡，避免误杀琵琶曲这种脉冲型梗）"
+                    + (
+                        "" if settings.leaderboard_require_fresh_cert
+                        else "；注意最新池闸门已被关掉（LEADERBOARD_REQUIRE_FRESH_CERT=false），"
+                             "此时解说证据出窗的老梗也会回到榜上"
+                    )
+                )
                 if settings.leaderboard_gate else "上榜门槛已关闭（LEADERBOARD_GATE=false）"
             ),
             "board_gate_on": bool(settings.leaderboard_gate),
@@ -734,11 +781,15 @@ def meta_payload(session: Session) -> dict[str, Any]:
             "lifecycle_algorithm": "时间序列 + 阈值规则，不由 LLM 决定",
             # 观测闸门也要界面自解释：用户看得见"什么时候我们拒绝给结论"
             "coverage_rule": (
-                f"B 站匿名搜索对同一个词、同一天会随机返回空结果（实测单次命中率约四成，"
-                f"每天重试两次可到 87%）。这类日子记成「未观测」，不当成「当天没人做这个梗」；"
+                "B 站的「没结果」要分开看：返回体只有 v_voucher 的是**被限流吞掉**，"
+                "我们没看清；连续几次都空的日子也只敢记成「未观测」——那可能是 B 站没给，"
+                "不等于当天没人做这个梗。只有「接口给了行、但都跟这个梗无关」才算"
+                "**观测到当天零活动**。未观测的日子不计入零活动，也不参与趋势；"
                 f"近 7 天真正观测到不足 {LIFECYCLE_THRESHOLDS.min_observed_days} 天时，"
                 "算法拒绝给生命周期与赶梗结论，只报「数据不足」。热度分数照给——"
                 "那是存量水平，跨梗同一把尺子；被洞影响的是「在涨还是在退」这种时间轴比较。"
+                "（限流是会话级累积状态、处罚窗口数小时级；实测配了 BILI_COOKIE 之后"
+                "30 天窗口能观测到 29~30 天，匿名则几百次请求就进处罚。）"
             ) if site_source == "bilibili" else "演示数据不涉及接口抖动，无观测闸门。",
             # 介绍这一段的来源也要能被用户查到底：四档优先级 + 谁改写的，界面自解释
             "intro_rule": (

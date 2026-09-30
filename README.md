@@ -90,7 +90,7 @@ $env:VITE_API_TARGET="http://127.0.0.1:8010"; npm run dev
 
 | 命令 | 作用 |
 | --- | --- |
-| `python -m app.scripts.collect_data --source bilibili --limit 3` | 单批真实采集（试水用） |
+| `python -m app.scripts.collect_data --source bilibili --limit 3` | 单批真实采集（试水用；配 `--offset` 分批铺全库） |
 | `python -m app.scripts.daily_refresh` | 每日刷新：发现新梗 + 只补 T-1 + 重算 + 写运行报告（`--full` 重采整窗口，`--skip-condense` 不给字幕生成浓缩介绍） |
 | `python -m app.scripts.backfill_days <快照.db> --apply` | 用某次快照把"我们观测得更准的日子"补回现库（只换更好的天，不整体覆盖；不加 `--apply` 只出报告） |
 | `python -m app.scripts.refresh_video_rank` | 只补 B 站综合排序名次（每梗 1~2 次请求，不重采日序列；`--gap` 默认 3 秒，连打会被回空页） |
@@ -463,6 +463,11 @@ PYTHONIOENCODING=utf-8 python -m app.scripts.list_recent_certified --ingest   # 
 
 ```bash
 python -m app.scripts.collect_data --source bilibili --limit 3
+# 分批铺全库（实测 68 次请求/梗、约 3.2 分钟/梗：一批 10 个梗 ≈ 30 分钟，全库 ≈ 3.5 小时）
+python -m app.scripts.collect_data --source bilibili --offset 0  --limit 10   # 第一棒
+python -m app.scripts.collect_data --source bilibili --offset 10 --limit 10   # 第二棒
+# 一把梭：--scope real 会自动跳过 B 站上不存在的纯演示梗
+python -m app.scripts.collect_data --source bilibili --scope real
 # 或
 curl -X POST "http://127.0.0.1:8010/api/jobs/collect?source=bilibili&limit=3"
 ```

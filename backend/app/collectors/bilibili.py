@@ -295,6 +295,12 @@ class BiliClient:
         if not rows and THROTTLE_KEY in data:
             raise BilibiliThrottled(
                 "搜索被限流吞掉（返回体只有 %s，没有 numResults）" % THROTTLE_KEY)
+        if not rows and "numResults" not in data:
+            # 既没给行、又没给 numResults —— 这不是 B 站在说"当天没有内容"，
+            # 是我们**读不懂这个答复**。按被吞处理：宁可记成未观测，
+            # 也不许伪装成零活动（琵琶曲那次误判就是这么来的）。
+            raise BilibiliThrottled(
+                "搜索返回体既没有 result 也没有 numResults，判不了，按被限流处理")
         # 真空返回会带着 numResults=0，这是可信的"当天没有内容"。
         try:
             total = int(data.get("numResults") or len(rows))

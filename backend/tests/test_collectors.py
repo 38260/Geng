@@ -949,3 +949,58 @@ def test_collect_all_block_fuse_can_be_switched_off(session, meme_factory, monke
     assert result["failed"] == 3
     assert any(e.startswith(memes[2].name) for e in client.requested), \
         "最后一个梗仍然被尝试过"
+
+
+def test_search_range_treats_unreadable_body_as_throttled(monkeypatch):
+    """返回体既没有 result、也没有 numResults：读不懂就按被限流处理。
+
+    只有 ``numResults`` 在场的空 result 才是 B 站明确说的"当天没有内容"。
+    把读不懂的答复当成零活动，就又会攒出假零——琵琶曲那次误判就是这么来的。
+    """
+    client = BiliClient(cookie="", timeout=5)
+    begin = datetime.now() - timedelta(days=2)
+    end = begin + timedelta(days=1)
+
+    monkeypatch.setattr(client, "signed_get", lambda url, params: {"esCode": 10000})
+    with pytest.raises(BilibiliThrottled) as exc:
+        client.search_range("测试词", begin=begin, end=end)
+    assert "numResults" in str(exc.value)
+
+    # 带 numResults=0 的真空返回照旧是可信的"当天没有"
+    monkeypatch.setattr(client, "signed_get",
+                        lambda url, params: {"result": [], "numResults": 0, "numPages": 0})
+    assert client.search_range("测试词", begin=begin, end=end) == ([], 0)
+
+
+def test_collect_all_offset_is_applied_before_limit(session, meme_factory, monkeypatch):
+    """分批跑：offset 要在 limit 之前生效，否则第二棒会把第一棒那批重采一遍。
+
+    这是"分天铺全库"的前提——没有 offset，``--limit 10`` 之后再跑
+    ``--limit 10`` 拿到的还是同样前 10 个梗。
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "collect_day_retries", 0, raising=False)
+    monkeypatch.setattr(settings, "collect_request_gap", 0.0, raising=False)
+    monkeypatch.setattr(settings, "collect_throttle_cooldown", 0.0, raising=False)
+    memes = [meme_factory(name=f"分批梗{tag}") for tag in "ABCD"]
+    ids = [m.id for m in memes]
+
+    c1 = FakeClient(rows=[])
+    _patch_client(monkeypatch, c1)
+    first = collect_all("bilibili", meme_ids=ids, window_days=1, limit=2)
+
+    c2 = FakeClient(rows=[])
+    _patch_client(monkeypatch, c2)
+    second = collect_all("bilibili", meme_ids=ids, window_days=1, offset=2, limit=2)
+
+    assert first["targets"] == 2 and second["targets"] == 2
+    for prefix, should_hit in (("分批梗A", True), ("分批梗B", True),
+                               ("分批梗C", False), ("分批梗D", False)):
+        assert any(k.startswith(prefix) for k in c1.requested) is should_hit, (
+            f"第一棒{prefix}{'该打' if should_hit else '不该打'}")
+    for prefix, should_hit in (("分批梗A", False), ("分批梗B", False),
+                               ("分批梗C", True), ("分批梗D", True)):
+        assert any(k.startswith(prefix) for k in c2.requested) is should_hit, (
+            f"第二棒{prefix}{'该打' if should_hit else '不该打'}")
+    assert "跳过前 2 个" in str(second["scope_note"])

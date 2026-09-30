@@ -309,6 +309,7 @@ def collect_all(
     *,
     meme_ids: list[int] | None = None,
     limit: int | None = None,
+    offset: int | None = None,
     window_days: int | None = None,
     commit: bool = True,
     purge_when_empty: bool = False,
@@ -325,6 +326,10 @@ def collect_all(
 
     ``scope``：``real``（默认，真实模式下跳过纯演示梗）| ``all`` | ``library``
     （已有指标快照的）| ``board``（还在热榜上的，最省请求）。
+
+    ``offset``：在 scope 过滤之后、``limit`` 之前跳过前 N 个梗。
+    分批跑要用它——``--limit 10`` 再 ``--offset 10`` 是第二棒，
+    没有 offset 的话第二棒会把第一棒那 10 个梗重采一遍。
     """
     from app.collectors import make_collector
     from app.collectors.bilibili import BilibiliBlocked
@@ -390,9 +395,16 @@ def collect_all(
             before = len(memes)
             memes = [meme for meme in memes if meme.id in have]
             summary["scope_note"] = f"{scope} 口径：{before} 个候选里留下 {len(memes)} 个"
+        if offset:
+            memes = memes[int(offset):]
         if limit:
             memes = memes[:limit]
         summary["targets"] = len(memes)
+        if offset:
+            summary["scope_note"] = (
+                f"{summary.get('scope_note', '')}；跳过前 {offset} 个（分批跑的第二棒）"
+                .lstrip("；")
+            )
 
         # 硬风控连锁计数器：连续多少个梗撞上 BilibiliBlocked（412 / -352 / 需要 Cookie）。
         # 软限流（v_voucher）只是把结果吞掉，硬风控是风控升级的信号——

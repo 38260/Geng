@@ -23,6 +23,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--source", choices=["mock", "bilibili"], default=settings.data_source)
     parser.add_argument("--days", type=int, default=settings.analysis_window_days)
     parser.add_argument("--limit", type=int, default=None, help="只采前 N 个梗，避免一次打太多请求")
+    parser.add_argument(
+        "--offset", type=int, default=None,
+        help="先跳过前 N 个梗（分批时用：--offset 10 --limit 10 就是第二棒 10 个）",
+    )
     parser.add_argument("--meme-id", type=int, action="append", help="只采指定梗，可重复")
     parser.add_argument(
         "--scope", choices=["real", "all", "library", "board"], default="real",
@@ -34,6 +38,7 @@ def main(argv: list[str] | None = None) -> int:
         args.source,
         meme_ids=args.meme_id,
         limit=args.limit,
+        offset=args.offset,
         window_days=args.days,
         scope=args.scope,
     )

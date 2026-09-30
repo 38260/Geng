@@ -2,7 +2,7 @@
   "miniprogramRoot": "dist/weapp/",
   "projectname": "赶梗潮",
   "description": "B 站网络梗热度与生命周期分析 —— 微信小程序端",
-  "appid": "touristappid",
+  "appid": "wx5b2985f61a6e9230",
   "setting": {
     "urlCheck": false,
     "es6": false,

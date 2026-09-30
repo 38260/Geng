@@ -2,7 +2,7 @@ import { Button, Image, Text, View } from "@tarojs/components";
 import Taro, { useRouter, usePullDownRefresh, useShareAppMessage } from "@tarojs/taro";
 import { useEffect, useRef, useState } from "react";
 
-import { openLibrarySearch, openVideoUrl, videoOpensExternally } from "@/utils/nav";
+import { openLibrarySearch, openVideoUrl, videoActionHint, videoActionWord } from "@/utils/nav";
 
 import { describeError, getDetail, getTrend, getVideos } from "@/api/client";
 import { TrendBars, type TrendMetric } from "@/components/TrendBars";
@@ -87,7 +87,7 @@ function IntroCard({ detail }: { detail: MemeDetail }) {
           </Text>
           {transcript.url ? (
             <Text className="excerpt-link" onClick={() => openVideoUrl(transcript.url)}>
-              {videoOpensExternally() ? "看完整视频 ›" : "复制视频链接"}
+              看完整视频 ›
             </Text>
           ) : null}
         </View>
@@ -114,14 +114,12 @@ function IntroCard({ detail }: { detail: MemeDetail }) {
               <Text className="chip chip-flare">{item.up_label}</Text>
               <Text className="evidence-title">{item.published_at ? `${item.published_at} · ` : ""}{item.video_title}</Text>
               <Text className="evidence-copy">
-                {item.video_url ? (videoOpensExternally() ? "打开" : "复制") : "无链接"}
+                {item.video_url ? videoActionWord() : "无链接"}
               </Text>
             </View>
           ))}
           <Text className="faint evidence-tip">
-            {videoOpensExternally()
-              ? "介绍引的就是这两条解说投稿，点一条直接打开。"
-              : "微信小程序打不开站外链接，点一条把视频地址复制到剪贴板。"}
+            介绍引的就是这两条解说投稿。{videoActionHint()}
           </Text>
         </View>
       ) : null}
@@ -159,7 +157,7 @@ function VideoRow({ video }: { video: VideoItem }) {
       <View className="video-num">
         <Text className="video-view tabular">{video.view_text}</Text>
         <Text className="faint tabular">{video.danmaku_text} 弹幕</Text>
-        <Text className="video-go">{video.url ? (videoOpensExternally() ? "打开" : "复制") : "无链接"}</Text>
+        <Text className="video-go">{video.url ? videoActionWord() : "无链接"}</Text>
       </View>
     </View>
   );
@@ -462,9 +460,7 @@ export default function Detail() {
               当前顺序：{videoSortState.label}
               {videoSortState.applied !== videoSort ? "（默认排序要的名次还没抓到，这一档排不出来）" : ""}
               {" · "}
-              {videoOpensExternally()
-                ? "点一条直接打开这条视频。"
-                : "点一条把地址复制到剪贴板——微信小程序打不开站外链接，去浏览器粘贴即可。"}
+              {videoActionHint()}
             </Text>
             {shownVideos.length ? (
               <View>

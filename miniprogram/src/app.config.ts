@@ -1,3 +1,5 @@
+import { BILIBILI_MINIAPP_ID } from "@/utils/bilibili";
+
 export default defineAppConfig({
   pages: [
     "pages/home/index",
@@ -41,4 +43,8 @@ export default defineAppConfig({
   },
   style: "v2",
   sitemapLocation: "sitemap.json",
+  // 详情页"去 B 站"要跳到哔哩哔哩小程序的播放页（见 utils/nav.ts）。
+  // 微信要求：用了跳转其他小程序的能力，就必须在这里把目标 appId 声明出来，
+  // 否则调用会回调 `fail appId "..." is not in navigateToMiniProgramAppIdList`。
+  navigateToMiniProgramAppIdList: [BILIBILI_MINIAPP_ID],
 });

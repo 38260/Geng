@@ -56,7 +56,17 @@ module.exports = function (merge) {
   }
   return merge({}, base, {
     outputRoot: "dist/weapp",
-    copy: { patterns: [{ from: "src/assets/", to: "dist/weapp/assets/" }], options: {} },
+    // 显式 copy 两类 webpack 不会自动输出的文件：
+    //   assets/  → tabBar 图标与 Hero 抠图，二进制资源
+    //   sitemap.json → 被 app.config.ts 的 sitemapLocation 引用，
+    //                  不复制的话开发者工具导入即报「未找到 sitemap.json」
+    copy: {
+      patterns: [
+        { from: "src/assets/", to: "dist/weapp/assets/" },
+        { from: "src/sitemap.json", to: "dist/weapp/sitemap.json" },
+      ],
+      options: {},
+    },
     mini: {
       postcss: {
         pxtransform: { enable: true, config: {} },

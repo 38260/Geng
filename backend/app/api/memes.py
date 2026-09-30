@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.config import HOME_FILTER_LABELS, settings
+from app.config import COLLECTION_KEYS, HOME_FILTER_LABELS, TAG_KEYS, settings
 from app.schemas.api import RefreshRequest
 from app.services.meme import query as q
 from app.services.meme.certification import ENCYCLOPEDIA, GUIDE, admitted
@@ -42,6 +42,8 @@ def list_memes(
     offset: int = Query(0, ge=0),
     scope: str = Query("board", description="board=热榜（过气与死梗不进）| all=完整梗库"),
     ids: str = Query("", max_length=600, description="只取这些 id，逗号分隔；给本机收藏列表用"),
+    tag: str = Query("", max_length=32, description="主题标签 key；清单见 /api/meta 的 tags"),
+    collection: str = Query("", max_length=32, description="算法专题 key：monthly | yearly"),
 ):
     if filter not in HOME_FILTER_LABELS:
         raise HTTPException(status_code=400, detail=f"未知筛选：{filter}")
@@ -49,10 +51,17 @@ def list_memes(
         raise HTTPException(status_code=400, detail=f"未知排序：{sort}")
     if scope not in {"board", "all"}:
         raise HTTPException(status_code=400, detail="scope 只支持 board | all")
+    # 标签与专题只认清单里的 key。写错时给 400 而不是静默返回空列表——
+    # 静默返回空会让人以为「这个标签下没有梗」，其实是参数写错了。
+    if tag and tag not in TAG_KEYS:
+        raise HTTPException(status_code=400, detail=f"未知标签：{tag}")
+    if collection and collection not in COLLECTION_KEYS:
+        raise HTTPException(status_code=400, detail=f"未知专题：{collection}")
 
     payload = q.list_memes(
         session, filter_key=filter, search=search, sort=sort, limit=limit,
         offset=offset, scope=scope, ids=q.parse_ids(ids),
+        tag=tag, collection=collection,
     )
     return {
         **payload,

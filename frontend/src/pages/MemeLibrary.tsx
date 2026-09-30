@@ -18,17 +18,32 @@ const SORTS: { key: string; label: string }[] = [
   { key: "name", label: "按名称" },
 ];
 
+/**
+ * 分类胶囊：选中实心蓝、未选中浅底。
+ * 刻意比生命周期那排做得小一号——让「处于什么阶段」和「讲的是什么」
+ * 在视觉上是两层不同的筛选，而不是一排混在一起。
+ */
+function categoryClass(active: boolean) {
+  return [
+    "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold transition",
+    active ? "bg-nav text-white shadow-pill" : "bg-[#F6FAFE] text-ink-soft hover:bg-nav-soft",
+  ].join(" ");
+}
+
 export default function MemeLibrary() {
   const [params] = useSearchParams();
   const [filter, setFilter] = useState<HomeFilter>("all");
   const [search, setSearch] = useState(params.get("q") ?? "");
   const [sort, setSort] = useState("hotness");
+  // 分类筛选：专题（算法现算）与主题标签（LLM 打标）。各自单选，可与生命周期叠加。
+  const [collection, setCollection] = useState("");
+  const [tag, setTag] = useState("");
   const { meta } = useMeta();
 
   const { data, loading, error, reload } = useAsync(
     // 梗库是完整数据库：过气与暂时没内容的梗也要能查到，只有首页热榜才收门槛
-    () => api.memes({ filter, search, sort, limit: 100, scope: "all" }),
-    [filter, search, sort],
+    () => api.memes({ filter, search, sort, limit: 100, scope: "all", tag, collection }),
+    [filter, search, sort, tag, collection],
   );
 
   return (
@@ -75,6 +90,49 @@ export default function MemeLibrary() {
           </div>
         </div>
       </div>
+
+      {/* 分类：上面那排讲「这个梗处于什么阶段」，这里讲「这个梗是讲什么的」。
+          专题由规则现算（本月新梗 / 年度爆款），标签由模型按固定清单打。
+          都点一下即筛、再点一下取消，与上面的筛选叠加而不是互斥。 */}
+      {meta?.collections?.length || meta?.tags?.length ? (
+        <div className="mb-7 flex flex-col gap-3">
+          {meta?.collections?.length ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="w-[46px] shrink-0 text-[13px] font-bold text-ink-mute">专题</span>
+              {meta.collections.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  title={item.description}
+                  onClick={() => setCollection(collection === item.key ? "" : item.key)}
+                  className={categoryClass(collection === item.key)}
+                >
+                  <span>{item.emoji}</span>
+                  {item.label}
+                  <span className="tabular text-[11px] opacity-70">{item.count}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {meta?.tags?.length ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="w-[46px] shrink-0 text-[13px] font-bold text-ink-mute">主题</span>
+              {meta.tags.map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => setTag(tag === item.key ? "" : item.key)}
+                  className={categoryClass(tag === item.key)}
+                >
+                  <span>{item.emoji}</span>
+                  {item.label}
+                  <span className="tabular text-[11px] opacity-70">{item.count}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {loading ? (
         <LoadingCards count={10} />

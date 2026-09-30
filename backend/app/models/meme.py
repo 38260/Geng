@@ -82,6 +82,14 @@ class Meme(Base):
     data_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     data_version: Mapped[str] = mapped_column(String(64), default="")
 
+    # 主题标签：只存 key 数组（如 ["workplace", "abstract"]），展示时查 TAG_LABELS。
+    # 取值只能来自 app/config/taxonomy.py 的固定清单——模型选了清单外的会被丢掉，
+    # 否则标签会越标越碎，筛选失去意义。
+    tags: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # 标签来源：llm = 模型标的；manual = 有人在管理页改过；空 = 还没标过
+    tags_source: Mapped[str] = mapped_column(String(16), default="")
+    tags_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
@@ -142,6 +150,8 @@ class Meme(Base):
             "guide_confirmed": self.guide_confirmed,
             "certified_at": self.certified_at.isoformat() if self.certified_at else None,
             "data_updated_at": self.data_updated_at.isoformat() if self.data_updated_at else None,
+            "tags": self.tags or [],
+            "tags_source": self.tags_source or "",
         }
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper

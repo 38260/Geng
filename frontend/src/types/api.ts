@@ -73,6 +73,23 @@ export interface RefreshStatus extends RefreshInfo {
   data_source?: string;
 }
 
+/** 主题标签（LLM 打标；只能从后端固定清单里选，见 backend/app/config/taxonomy.py） */
+export interface TagOption {
+  key: string;
+  label: string;
+  emoji: string;
+  count: number;
+}
+
+/** 算法专题（规则现算：本月新梗 / 年度爆款），零人工维护 */
+export interface CollectionOption {
+  key: string;
+  label: string;
+  emoji: string;
+  description: string;
+  count: number;
+}
+
 export interface Meta {
   app_name: string;
   version: string;
@@ -95,6 +112,10 @@ export interface Meta {
   window_days: number;
   filters: { key: HomeFilter; label: string }[];
   lifecycle_stages: { key: LifecycleStage; label: string; emoji: string }[];
+  /** 主题标签清单（一个梗都还没打标时是空数组） */
+  tags?: TagOption[];
+  /** 算法专题清单（计数与点进去的条数一致） */
+  collections?: CollectionOption[];
   transparency: Transparency;
   /** 自动/手动刷新的状态；老版本后端可能没有 */
   refresh?: RefreshInfo;
@@ -116,6 +137,8 @@ export interface MemeCard {
   description: string;
   aliases: string[];
   keywords: string[];
+  /** 主题标签 key 数组；空数组 = 还没打标（与「标成其他」不是一回事） */
+  tags?: string[];
   data_source: DataSource;
   hotness: number;
   stage: LifecycleStage;

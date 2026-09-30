@@ -117,6 +117,11 @@ def ensure_schema() -> list[str]:
                 default = f"'{value}'" if isinstance(value, str) else str(value)
             elif not column.nullable:
                 default = "0" if "INT" in column_type.upper() else "''"
+            # JSON 列存的是 JSON 文本，默认必须给 '[]'。
+            # 给 '' 的话 SQLAlchemy 读回来会对着空串 json.loads('') 抛 JSONDecodeError——
+            # 变成「加一列把整个查询搞挂」，比不加列还糟。实测踩过（memes.tags）。
+            if "JSON" in column_type.upper():
+                default = "'[]'"
             with engine.begin() as conn:
                 conn.execute(text(f"ALTER TABLE {table.name} ADD COLUMN {column.name} {column_type} DEFAULT {default}"))
             added.append(f"{table.name}.{column.name}")

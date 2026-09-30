@@ -27,6 +27,20 @@ from .algorithms import (
 )
 from .logging import configure_logging, get_logger
 from .settings import BACKEND_DIR, ENV_FILE, PROJECT_DIR, Settings, get_settings, settings
+from .taxonomy import (
+    COLLECTION_KEYS,
+    COLLECTIONS,
+    FALLBACK_TAG,
+    MAX_TAGS_PER_MEME,
+    MEME_TAGS,
+    TAG_EMOJI,
+    TAG_HINTS,
+    TAG_KEYS,
+    TAG_LABELS,
+    YEARLY_TOP_N,
+    CollectionSpec,
+    TagSpec,
+)
 
 __all__ = [
     "Settings",
@@ -60,4 +74,17 @@ __all__ = [
     "CATCHUP_EMOJI",
     "HOME_FILTERS",
     "HOME_FILTER_LABELS",
+    # 分类体系（主题标签 + 算法专题）
+    "TagSpec",
+    "CollectionSpec",
+    "MEME_TAGS",
+    "TAG_KEYS",
+    "TAG_LABELS",
+    "TAG_EMOJI",
+    "TAG_HINTS",
+    "FALLBACK_TAG",
+    "MAX_TAGS_PER_MEME",
+    "COLLECTIONS",
+    "COLLECTION_KEYS",
+    "YEARLY_TOP_N",
 ]

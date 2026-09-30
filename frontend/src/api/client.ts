@@ -117,7 +117,7 @@ export const api = {
   /* 数据管线：数据获取/处理/建模/质量/AI 五段实况。只读接口，不需要令牌 */
   pipeline: () => request<PipelineView>("/api/pipeline"),
 
-  memes: (params: { filter?: string; search?: string; sort?: string; limit?: number; offset?: number; scope?: "board" | "all" } = {}) =>
+  memes: (params: { filter?: string; search?: string; sort?: string; limit?: number; offset?: number; scope?: "board" | "all"; tag?: string; collection?: string } = {}) =>
     request<MemeList>(`/api/memes${query(params)}`),
 
   memeDetail: (id: number) => request<MemeDetail>(`/api/memes/${id}`),

@@ -41,6 +41,7 @@ from app.models import (
 from app.mock.catalogue import spec_for
 
 from ..llm.service import generate_catch_up_advice, generate_trend_explanation
+from .collections import collection_member_ids, collection_summary, tag_summary
 from .intro import compose_intro, transcript_block
 from .summary import read_cached_summary
 from .certification import (
@@ -193,6 +194,9 @@ def card_payload(
         "description": meme.description,
         "aliases": meme.aliases or [],
         "keywords": meme.keywords or [],
+        # 主题标签（key 数组）。空数组 = 还没打标，与「标成其他」不是一回事，
+        # 所以界面要能区分：空就什么都不显示，不要硬塞一个「其他」。
+        "tags": meme.tags or [],
         "data_source": settings.data_source,
         "hotness": round(hotness.score, 1),
         "stage": lifecycle.stage,
@@ -317,6 +321,8 @@ def list_memes(
     offset: int = 0,
     scope: str = "board",
     ids: list[int] | None = None,
+    tag: str = "",
+    collection: str = "",
 ) -> dict[str, Any]:
     """scope=board 是热榜口径（还要过"活着"门槛）；scope=all 是完整梗库。"""
     rows = _load_rows(session)
@@ -334,6 +340,18 @@ def list_memes(
     stages = HOME_FILTERS.get(filter_key)
     if stages:
         rows = [row for row in rows if row[2].stage in stages]
+
+    # 主题标签：直接看梗身上标的 key（LLM 打标，见 services/meme/tagging.py）
+    if tag:
+        rows = [row for row in rows if tag in (row[0].tags or [])]
+
+    # 算法专题：成员由规则现算（本月新梗 / 年度爆款），见 services/meme/collections.py。
+    # 传当前可选集合，让专题规则与列表口径取交集——两套口径不交集的话，
+    # 会出现「筛选行写着 74、点进去只有 46」这种对不上的数。
+    if collection:
+        eligible = {row[0].id for row in rows}
+        members = set(collection_member_ids(session, collection, eligible_ids=eligible))
+        rows = [row for row in rows if row[0].id in members]
 
     if search:
         needle = search.strip().lower()
@@ -682,6 +700,9 @@ def detail_payload(session: Session, meme: Meme) -> dict[str, Any] | None:
 def meta_payload(session: Session) -> dict[str, Any]:
     latest = session.scalar(select(Meme.data_updated_at).order_by(Meme.data_updated_at.desc()))
     library_rows = _load_rows(session)
+    # 分类清单的计数只数「梗库里的梗」，与列表接口取同一个集合——
+    # 否则筛选行上的数字与点进去的条数会对不上。
+    library_ids = {meme.id for meme, _, _ in library_rows}
     # 热榜口径 = 梗库再过滤一道"活着"门槛，并且只看最新准入池（解说证据在认证窗口内）。
     # 两个数都要给出去：只报热榜数会让人以为梗库就这么点。
     rows = _board_rows(session, library_rows)
@@ -749,6 +770,11 @@ def meta_payload(session: Session) -> dict[str, Any]:
             {"key": key, "label": HOME_FILTER_LABELS[key]}
             for key in ("all", "hot", "taking_off", "receding")
         ],
+        # 分类：主题标签（LLM 打标）与算法专题（规则现算）。
+        # 计数与列表都基于 library_ids，保证「筛选行上的数字」与「点进去看到的条数」一致——
+        # 一个来自缓存一个现算的话，点进去对不上就会显得数据不可信。
+        "tags": tag_summary(session, eligible_ids=library_ids),
+        "collections": collection_summary(session, eligible_ids=library_ids),
         "lifecycle_stages": [
             {"key": stage, "label": LIFECYCLE_LABELS[stage], "emoji": LIFECYCLE_EMOJI[stage]}
             for stage in LIFECYCLE_STAGES

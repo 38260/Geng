@@ -28,7 +28,7 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from app.collectors.bilibili import BiliClient
+from app.collectors.bilibili import BiliClient, get_client
 from app.config import PROJECT_DIR, get_logger, settings
 from app.services.meme.certification import ENCYCLOPEDIA, GUIDE, UpAuthor
 from app.services.meme.discovery import (
@@ -61,13 +61,23 @@ def _pull(client: BiliClient, author: UpAuthor, pages: int, gap: float, *, not_b
 
 
 def _pull_with_retry(author: UpAuthor, pages: int, gap: float, *, not_before=None):
-    """空间投稿接口按会话风控，连打几次就被 -352；换一个匿名指纹重试成功率高得多。"""
+    """取某位 UP 主的近期投稿，失败最多重试 4 次。
+
+    客户端的选择看有没有配 Cookie：
+
+    * 配了 ``BILI_COOKIE`` —— 一直用**同一个登录态会话**。这时换匿名指纹
+      等于把登录态丢了，space 接口反而更容易 -352。
+    * 没配 —— 第 2 次起换一个**新的匿名设备指纹**再试。这是历史上没有 Cookie
+      时唯一管用过的救急办法（"按会话风控，换指纹成功率高得多"）。
+    """
     videos: list[UpVideo] = []
     pages_ok = blocked = 0
     error = ""
+    logged_in = bool(settings.bili_cookie)
     for attempt in range(4):
+        client = get_client() if logged_in or attempt == 0 else BiliClient()
         try:
-            got, ok, bad = _pull(BiliClient(), author, pages, gap, not_before=not_before)
+            got, ok, bad = _pull(client, author, pages, gap, not_before=not_before)
             pages_ok, blocked = max(pages_ok, ok), blocked + bad
             if got:
                 return got, pages_ok, blocked, ""
@@ -328,7 +338,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--gap", type=float, default=1.2)
     args = parser.parse_args(argv)
 
-    client = BiliClient()
+    client = get_client()
     ok, reason = client.probe()
     print(f"接口探测：{'可用' if ok else '不可用'} — {reason}")
     if not ok:
@@ -362,8 +372,16 @@ def main(argv: list[str] | None = None) -> int:
         print(f"入库 {len(ids)} 个梗，开始逐日采集真实序列…")
         result = collect_all("bilibili", meme_ids=ids or None, window_days=args.days)
         print("采集：", {k: v for k, v in result.items() if isinstance(v, int)})
+        aborted = bool(result.get("aborted"))
+        if aborted:
+            # 熔断必须当场报响：`aborted` 是布尔值，上面那行只打印整数键，
+            # 不单独说就等于没说。这时下面的重算是"半批数据"上算的。
+            print("⚠ 已中止本次采集："
+                  + str(result.get("abort_reason", "连续被 B 站硬风控拦下")))
         print("重算：", recompute_all(window_days=args.days))
-    return 0
+        return 4 if aborted else 0
+
+    return 0        # 没带 --ingest：只出清单，不写库
 
 
 if __name__ == "__main__":

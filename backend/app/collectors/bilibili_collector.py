@@ -168,14 +168,19 @@ class BilibiliCollector:
             try:
                 rows, total = self.client.search_range(term, begin=begin, end=end, order="click")
             except BilibiliThrottled as exc:
-                # 被限流吞掉：不等于"当天没有内容"。退避后重试，
-                # 而且退避要比普通异常长——持续快打只会加深限流（实测
-                # 冷启动命中率 ~98%，打几百次后掉到 0~30%，静默约 5 分钟才恢复）。
+                # 被限流吞掉：不等于"当天没有内容"。
+                #
+                # 关键是**整条会话**停一会儿再继续，而不是拉长这一天的重试间隔：
+                # 限流是会话级状态，换词、换日期、立刻重试都没用。真实翻车现场：
+                # 连续采样时每天 3 次全被吞，一个梗 30 天只拿到 5 天。
                 throttled += 1
                 log.info("梗「%s」%s 被限流吞掉（第 %d 次）：%s",
                          term, day, attempt + 1, exc)
                 if attempt < attempts - 1:
-                    time.sleep(self._backoff_seconds(attempt, throttled=True))
+                    wait = self._backoff_seconds(attempt, throttled=True)
+                    log.info("梗「%s」会话冷却 %.0f 秒后再试（限流是会话级的，硬打只会更慢）",
+                             term, wait)
+                    time.sleep(wait)
                 continue
             except BilibiliBlocked:
                 raise                      # 被风控是全局状态，交给上层决定停不停
@@ -199,15 +204,19 @@ class BilibiliCollector:
 
     @staticmethod
     def _backoff_seconds(attempt: int, *, throttled: bool) -> float:
-        """退避时长：被限流时给得更长，并带抖动避免多梗同步重试。
+        """退避时长。
 
-        抖动按 `collect_retry_gap` 成比例，而不是固定值——测试里把 gap 设成 0
-        就是为了不睡觉，固定抖动会让整个测试套件挂住。
+        被限流时返回**会话冷却**时长（`collect_throttle_cooldown`，默认 180 秒）：
+        限流是会话级状态，只有整条会话静默下来才恢复，所以这个等待是"停手"
+        而不是"这一天的重试间隔"。带抖动避免多个进程同步恢复。
         """
-        base = settings.collect_retry_gap * (attempt + 1)
         if throttled:
-            base *= settings.collect_throttle_backoff_factor
-        return base + random.random() * base * 0.4
+            base = max(settings.collect_throttle_cooldown, settings.collect_retry_gap)
+        else:
+            base = settings.collect_retry_gap * (attempt + 1)
+        # 抖动按 `collect_retry_gap` 成比例，而不是固定值——测试里把 gap 设成 0
+        # 就是为了不睡觉，固定抖动会让整个测试套件挂住。
+        return base + random.random() * settings.collect_retry_gap * (attempt + 1) * 0.4
 
 
     def _daily_pass(

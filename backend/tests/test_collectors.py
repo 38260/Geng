@@ -538,11 +538,13 @@ def test_throttled_day_is_unobserved_and_flagged(certified_meme, monkeypatch):
 
 
 def test_throttle_streak_stops_the_window_early(certified_meme, monkeypatch):
-    """连续被限流到阈值就提前收工，不再空转（限流是会话级的，越打恢复越慢）。"""
+    """一次冷却之后仍连续被吞，才提前收工（限流是会话级的，越打恢复越慢）。"""
     from app.config import settings
 
     monkeypatch.setattr(settings, "collect_day_retries", 1, raising=False)
     monkeypatch.setattr(settings, "collect_throttle_stop_after", 3, raising=False)
+    # 冷却必须归零，否则这个用例真的会睡 180 秒
+    monkeypatch.setattr(settings, "collect_throttle_cooldown", 0.0, raising=False)
     client = FlakyClient(rows=[_row(0, days_ago=1, title="测试标题")], give_on=99)
     collector = BilibiliCollector(client=client, request_gap=0, enrich_limit=2)
     stats_list = collector.collect_daily(certified_meme, window_days=30)[0]
@@ -554,6 +556,28 @@ def test_throttle_streak_stops_the_window_early(certified_meme, monkeypatch):
     # 提前停止意味着后面的天没有生成行；已生成的那些必须如实标成未观测
     assert len(stats_list) < 30, "提前停止后不该仍有 30 天记录"
     assert all(s.observed is False for s in stats_list), "被限流的天不能标成观测到"
+
+
+def test_throttle_cooldown_is_a_session_pause_not_a_retry_gap(monkeypatch):
+    """被限流时的等待必须是"整条会话冷却"，而不是"这一天的重试间隔"。
+
+    限流是会话级状态：换词、换日期、立刻重试都没用，只有整条会话静默才恢复。
+    所以退避时长要以 `collect_throttle_cooldown` 为准，而不是
+    `collect_retry_gap × 次数`——后者只有几秒，实测根本等不回来。
+    """
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "collect_retry_gap", 1.2, raising=False)
+    monkeypatch.setattr(settings, "collect_throttle_cooldown", 180.0, raising=False)
+
+    throttled = BilibiliCollector._backoff_seconds(0, throttled=True)
+    ordinary = BilibiliCollector._backoff_seconds(0, throttled=False)
+
+    assert throttled >= 180.0, f"被限流只等了 {throttled:.1f} 秒，等不回来"
+    assert throttled > ordinary * 10, (
+        f"限流退避 {throttled:.1f}s 与普通退避 {ordinary:.1f}s 没拉开差距")
+    # 普通空结果的退避要克制，别把正常抖动也拖成分钟级
+    assert ordinary < 5.0
 
 
 def test_flaky_day_is_retried_and_recovered(certified_meme, monkeypatch):

@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.config import HOME_FILTER_LABELS, settings
 from app.schemas.api import RefreshRequest
 from app.services.meme import query as q
 from app.services.meme.certification import ENCYCLOPEDIA, GUIDE, admitted
 
-from .deps import SessionDep
+from .deps import SessionDep, require_admin
 
 router = APIRouter(prefix="/api/memes", tags=["memes"])
 
@@ -100,7 +100,7 @@ def meme_videos(
     return q.video_page(session, meme, limit=limit, offset=offset, sort=sort)
 
 
-@router.post("/{meme_id}/insight")
+@router.post("/{meme_id}/insight", dependencies=[Depends(require_admin)])
 def meme_insight(meme_id: int, session: SessionDep, body: RefreshRequest):
     """重新判断：AI 失败后前端点这个按钮重试。"""
     meme = _require_certified(meme_id, session)

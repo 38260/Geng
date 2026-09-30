@@ -41,6 +41,15 @@ class Settings(BaseSettings):
         ]
     )
 
+    # --------------------------- 写接口访问控制 ------------------------------- #
+    # 留空 = 不校验，调用方无需带令牌（默认；只适合本机或内网）。
+    # 公网部署**必须**设置：否则 /api/manage（改封面/介绍/别名）、
+    # /api/jobs（触发全库重采）、/api/llm（消耗 LLM 额度）任何人可调。
+    # 设置后，写接口必须带请求头 `X-Admin-Token: <值>` 才放行。
+    # 只读接口（/api/health、/api/meta、GET /api/memes*）不受影响——
+    # 小程序端只走这几个接口，因此开不开令牌它都能用。
+    admin_token: str = ""
+
     # ------------------------------- database -------------------------------- #
     # Default: local SQLite file. Switch to PostgreSQL by exporting
     # DATABASE_URL=postgresql+psycopg2://user:pass@host:5432/gengv1
@@ -186,6 +195,11 @@ class Settings(BaseSettings):
     @property
     def llm_configured(self) -> bool:
         return bool(self.llm_api_key.strip())
+
+    @property
+    def admin_auth_enabled(self) -> bool:
+        """是否已启用写接口令牌校验。未配置 ADMIN_TOKEN 时为 False（放行）。"""
+        return bool(self.admin_token.strip())
 
     def masked_llm_api_key(self) -> str:
         """Safe representation for the settings UI / logs."""

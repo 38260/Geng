@@ -21,9 +21,10 @@ from typing import Any, Callable
 from sqlalchemy import select
 
 from app.config import TAG_LABELS, get_logger
-from app.models import HotnessSnapshot, Meme, SessionLocal
+from app.models import Meme, SessionLocal
 from app.models.base import ensure_schema
 from app.services.llm.config import load_config
+from app.services.meme.query import list_memes
 from app.services.meme.tagging import tag_meme
 
 log = get_logger("tag_memes")
@@ -49,11 +50,14 @@ def run_tagging(
     if ids:
         wanted = set(ids)
         memes = [meme for meme in memes if meme.id in wanted]
-    # 有指标快照的梗（= 梗库里真正会展示的那些）排在最前面。
-    # 否则 --limit N 会全花在库里另一批「有演示数据、但页面上根本看不到」的梗身上——
-    # 打完发现筛选行还是空的，因为打的和展示的不是同一批。实测踩过。
-    with_snapshot = {row[0] for row in session.execute(select(HotnessSnapshot.meme_id))}
-    memes.sort(key=lambda meme: (0 if meme.id in with_snapshot else 1, meme.id))
+    # 梗库里的梗排最前面，且口径与页面完全一致（直接问 list_memes 要那批 id）。
+    # 注意不能用「有没有指标快照」来近似：库里那批演示数据梗也有快照，
+    # 却进不了梗库（没被 UP 主认证过）——按那个口径排会白打一批页面上看不到的，
+    # 打完一看筛选行还是空的。实测踩过两次。
+    library_ids = {
+        item["id"] for item in list_memes(session, scope="all", limit=200)["items"]
+    }
+    memes.sort(key=lambda meme: (0 if meme.id in library_ids else 1, meme.id))
     if limit:
         memes = memes[: int(limit)]
 

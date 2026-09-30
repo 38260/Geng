@@ -536,3 +536,119 @@ export interface MemeMetaResult {
   changed: string[];
   meme: ManageView;
 }
+
+/* ------------------------ 数据管线（数据科学流程画像） ------------------------ *
+ * 对应后端 GET /api/pipeline（见 backend/app/services/data_profile.py）。
+ * 这里只描述形状，任何数字都由后端算好——前端不重算、不补齐。
+ */
+
+/** 流程里的一步 */
+export interface PipelineStep {
+  key: string;
+  title: string;
+  detail: string;
+}
+
+/** 参数 / 指标的一行 */
+export interface PipelineFact {
+  label: string;
+  value: string;
+  hint: string;
+}
+
+export interface PipelineAcquisition {
+  steps: PipelineStep[];
+  params: PipelineFact[];
+  video_total: number;
+  video_real: number;
+  video_demo: number;
+  creator_total: number;
+  publish_from: string | null;
+  publish_to: string | null;
+  crawl_from: string | null;
+  crawl_to: string | null;
+  window_days: number;
+  est_requests_daily: number;
+  est_requests_enrich: number;
+  est_requests_total: number;
+}
+
+export interface PipelineProcessing {
+  steps: PipelineStep[];
+  observation_points: number;
+  observed_points: number;
+  unobserved_points: number;
+  unobserved_ratio: number | null;
+  meme_with_series: number;
+  stat_from: string | null;
+  stat_to: string | null;
+  /** 逐日序列里真实有值的量：播放量（点赞/投币/收藏不参与逐日聚合） */
+  view_total: number;
+  discussion_total: number;
+  derived: { label: string; value: number; hint: string }[];
+}
+
+export interface PipelineModeling {
+  window_days: number;
+  hotness_windows: number[];
+  stages: { key: string; label: string }[];
+  items: { title: string; detail: string; tag: string }[];
+  note: string;
+}
+
+export interface PipelineQualityCheck {
+  label: string;
+  value: string;
+  /** ok / warn / demo —— 页面据此决定用哪种颜色 */
+  status: string;
+  hint: string;
+}
+
+export interface PipelineQuality {
+  data_through: string | null;
+  data_updated_at: string | null;
+  data_lag_days: number | null;
+  is_demo: boolean;
+  demo_ratio: number | null;
+  missing_ratio: number | null;
+  observed_ratio: number | null;
+  checks: PipelineQualityCheck[];
+}
+
+export interface PipelineAI {
+  configured: boolean;
+  provider: string;
+  model: string;
+  insight_total: number;
+  /** 文案来源分布：llm（真实调用）/ rule（算法兜底）/ cache（命中缓存） */
+  by_source: Record<string, number>;
+  cache_hit_ratio: number | null;
+  avg_latency_ms: number | null;
+  role: string;
+  boundaries: string[];
+  fallback: { rule_based: boolean; cache_gap_hours: number };
+}
+
+export interface PipelineView {
+  generated_at: string;
+  app_name: string;
+  version: string;
+  environment: string;
+  counts: {
+    certified: number | null;
+    library: number | null;
+    gated_out: number | null;
+    candidate: number | null;
+  };
+  source: {
+    platform: string;
+    data_source: DataSource;
+    is_demo: boolean;
+    configured_source: DataSource;
+  };
+  acquisition: PipelineAcquisition;
+  processing: PipelineProcessing;
+  modeling: PipelineModeling;
+  quality: PipelineQuality;
+  ai: PipelineAI;
+}

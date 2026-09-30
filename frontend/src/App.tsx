@@ -6,6 +6,7 @@ import { LoadingCards } from "@/components/States";
 import Favorites from "@/pages/Favorites";
 import Home from "@/pages/Home";
 import MemeLibrary from "@/pages/MemeLibrary";
+import Pipeline from "@/pages/Pipeline";
 import Settings from "@/pages/Settings";
 import Trends from "@/pages/Trends";
 
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="/library" element={<MemeLibrary />} />
         <Route path="/trends" element={<Trends />} />
         <Route path="/favorites" element={<Favorites />} />
+        <Route path="/pipeline" element={<Pipeline />} />
         <Route
           path="/manage"
           element={

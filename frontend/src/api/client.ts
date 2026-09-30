@@ -15,6 +15,7 @@ import type {
   MemeMetaPatch,
   MemeMetaResult,
   Meta,
+  PipelineView,
   RefreshStatus,
   SaveLLMResult,
   SettingsView,
@@ -112,6 +113,9 @@ const query = (params: Record<string, string | number | boolean | undefined>) =>
 
 export const api = {
   meta: () => request<Meta>("/api/meta"),
+
+  /* 数据管线：数据获取/处理/建模/质量/AI 五段实况。只读接口，不需要令牌 */
+  pipeline: () => request<PipelineView>("/api/pipeline"),
 
   memes: (params: { filter?: string; search?: string; sort?: string; limit?: number; offset?: number; scope?: "board" | "all" } = {}) =>
     request<MemeList>(`/api/memes${query(params)}`),

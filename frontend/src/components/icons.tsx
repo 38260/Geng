@@ -254,3 +254,15 @@ export const ManageSolidIcon = (p: IconProps) => (
     <circle cx="17.1" cy="6.9" r="1.9" fill="#fff" />
   </svg>
 );
+
+/**
+ * 数据管线：三层逐级收窄的横条，表示「原始样本 → 清洗过滤 → 指标」的加工过程。
+ * 与 ChartSolidIcon（图表）、ManageSolidIcon（扳手）在轮廓上区分得开。
+ */
+export const PipelineSolidIcon = (p: IconProps) => (
+  <svg {...solid(p)}>
+    <rect x="2.6" y="3.6" width="18.8" height="4.6" rx="2.3" />
+    <rect x="2.6" y="9.7" width="13.4" height="4.6" rx="2.3" />
+    <rect x="2.6" y="15.8" width="8" height="4.6" rx="2.3" />
+  </svg>
+);

@@ -134,7 +134,9 @@ export function RefreshPanel({ onDone }: { onDone?: () => void }) {
           {last.exit_code ? (
             <div className="col-span-2 mt-1 text-[12px] text-brand sm:col-span-4">
               上次退出码 {last.exit_code}：1 = 有梗被拒或一个没采到，2 = 数据源不可用，
-              3 = 当时已有刷新在跑。详情见 docs/data/refresh-report.md
+              4 = 连续被 B 站硬风控拦下、采集中途中止（换小号 Cookie 或把
+              COLLECT_REQUEST_GAP 调大再跑）。3 = 当时已有刷新在跑，只打在终端、不写进报告。
+              详情见 docs/data/refresh-report.md
             </div>
           ) : null}
         </div>

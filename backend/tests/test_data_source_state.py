@@ -47,3 +47,32 @@ def test_pending_source_is_not_treated_as_demo(session):
     assert meme.id not in _demo_only_ids(session), (
         "pending 来源的梗被当成纯演示梗跳过了，它会永远采不到数据"
     )
+
+
+def test_mock_label_with_real_series_is_relabelled_not_deleted(session):
+    """标着 mock、但库里已经躺着 B 站真实日统计的梗：错的是标签，不是数据。
+
+    「你干嘛哎哟」就是这么一条——30 天真实序列，标签还停在演示时代。
+    删它会丢掉真数据，留着错标签又会让它被"纯演示梗"判定误伤。
+    """
+    from datetime import date
+
+    from app.models import MemeDailyStats
+    from app.scripts.fix_data_source_state import _mislabelled, main
+
+    meme = Meme(name="标签错梗", slug="mislabel-src", data_source="mock",
+                status=MemeStatus.CERTIFIED)
+    session.add(meme)
+    session.flush()
+    session.add(MemeDailyStats(meme_id=meme.id, stat_date=date.today(),
+                               video_count=1, view=100, data_source="bilibili"))
+    session.commit()
+
+    assert [m.name for m in _mislabelled(session)] == [meme.name], "该被认成「标签错」而不是「演示数据」"
+
+    main(["--apply"])
+    session.expire_all()
+    assert session.get(Meme, meme.id).data_source == "bilibili"
+    assert session.query(MemeDailyStats).filter_by(meme_id=meme.id).count() == 1, \
+        "真实数据一行都不许被顺手删掉"
+    assert not _mislabelled(session), "改完就不该再出现在待修列表里"

@@ -68,11 +68,16 @@ def test_mock_label_with_real_series_is_relabelled_not_deleted(session):
                                video_count=1, view=100, data_source="bilibili"))
     session.commit()
 
-    assert [m.name for m in _mislabelled(session)] == [meme.name], "该被认成「标签错」而不是「演示数据」"
+    # 只断言"这一只在待修列表里"：测试库是全 suite 共享的内存库，
+    # 别的用例也会留下同类 mock+真实数据的梗，断言整个列表相等就是给自己埋隔离坑
+    # （第一版就是这么写的，单独跑过、全量跑就红）。
+    assert meme.name in [m.name for m in _mislabelled(session)], \
+        "该被认成「标签错」而不是「演示数据」"
 
     main(["--apply"])
     session.expire_all()
     assert session.get(Meme, meme.id).data_source == "bilibili"
     assert session.query(MemeDailyStats).filter_by(meme_id=meme.id).count() == 1, \
         "真实数据一行都不许被顺手删掉"
-    assert not _mislabelled(session), "改完就不该再出现在待修列表里"
+    assert meme.name not in [m.name for m in _mislabelled(session)], \
+        "改完就不该再出现在待修列表里"

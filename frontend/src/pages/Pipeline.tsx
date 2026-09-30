@@ -3,7 +3,13 @@ import { SectionHeader, TransparencyFooter } from "@/components/Sections";
 import { ErrorState, LoadingCards } from "@/components/States";
 import { useAsync } from "@/hooks/useAsync";
 import { useMeta } from "@/hooks/useAppData";
-import type { PipelineFact, PipelineStep, PipelineView } from "@/types/api";
+import type {
+  PipelineFact,
+  PipelineHotness,
+  PipelineHotnessExample,
+  PipelineStep,
+  PipelineView,
+} from "@/types/api";
 import { compact, formatDateTime, withThousands } from "@/utils/format";
 
 /**
@@ -88,6 +94,148 @@ function Block({
       </div>
       {children}
     </section>
+  );
+}
+
+/** 真实算例：把一个梗的五个分量拆开，逐项对上快照分数。 */
+function HotnessExample({ ex }: { ex: PipelineHotnessExample }) {
+  return (
+    <div className="mt-3 rounded-lg border border-line bg-surface px-3.5 py-3">
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+        <span className="text-[12.5px] font-black text-ink">真实算例</span>
+        <span className="text-[12px] text-ink-mute">
+          拿当前热度最高的梗「{ex.meme_name}」逐项列出来对账
+        </span>
+      </div>
+      <div className="mt-2.5 flex flex-col gap-1">
+        {ex.terms.map((term) => (
+          <div key={term.key} className="flex items-center gap-2 text-[12px]">
+            <span className="w-[74px] shrink-0 text-ink-soft">{term.label}</span>
+            <span className="tabular w-[50px] shrink-0 text-right font-semibold text-ink">
+              {term.score.toFixed(1)}
+            </span>
+            <span className="shrink-0 text-ink-faint">×</span>
+            <span className="tabular w-[38px] shrink-0 text-ink-mute">
+              {term.weight.toFixed(2)}
+            </span>
+            <span className="shrink-0 text-ink-faint">=</span>
+            <span className="tabular flex-1 font-bold text-flare">
+              {term.contribution.toFixed(2)}
+            </span>
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 flex items-baseline justify-between border-t border-line pt-2">
+        <span className="text-[12px] font-medium text-ink-mute">五分量合计</span>
+        <span className="tabular text-[16px] font-black text-ink">
+          {ex.sum_of_contributions.toFixed(2)}
+        </span>
+      </div>
+      <p className="mt-1.5 text-[11px] leading-relaxed text-ink-faint">
+        近 {ex.window_days} 天播放 {big(ex.inputs.view)}（前 {ex.window_days} 天{" "}
+        {big(ex.inputs.prev_view)}，增幅 {pct(ex.inputs.growth)}）· 相关视频{" "}
+        {n(ex.inputs.video_count)} 条 · UP 主峰值 {n(ex.inputs.creator_peak)} · 观测{" "}
+        {n(ex.inputs.observed_days)}/{n(ex.inputs.window_days_observed)} 天
+      </p>
+      <p className="mt-1 text-[11px] text-ink-faint">
+        这与快照里记录的 {ex.score} 分一致（快照四舍五入到 0.1 位）。
+      </p>
+    </div>
+  );
+}
+
+/** 热度指数完整公式：主式 → 分量表 → 归一化 → 增长 → 降级 → 算例 → 口径说明。 */
+function HotnessFormula({ spec }: { spec: PipelineHotness }) {
+  return (
+    <div className="mb-4 rounded-tile border-2 border-flare/25 bg-canvas px-4 py-4">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="chip bg-flare !py-[4px] !text-[11px] text-white">核心算法</span>
+        <span className="text-[12px] text-ink-mute">
+          最近 {spec.primary_window} 天 vs 前 {spec.compare_window} 天 · 权重合计{" "}
+          {spec.weights_total.toFixed(2)}
+        </span>
+      </div>
+
+      <div className="mt-3 overflow-x-auto rounded-lg bg-surface px-4 py-3">
+        <code className="tabular block whitespace-nowrap text-[13.5px] font-bold text-ink">
+          {spec.expression}
+        </code>
+      </div>
+
+      <div className="mt-3 flex flex-col gap-1.5">
+        {spec.terms.map((term) => (
+          <div
+            key={term.key}
+            className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-lg bg-surface px-3 py-2"
+          >
+            <span className="w-[72px] shrink-0 text-[12.5px] font-bold text-ink">{term.label}</span>
+            <span className="tabular w-[44px] shrink-0 text-[12.5px] font-black text-flare">
+              ×{term.weight.toFixed(2)}
+            </span>
+            <span className="min-w-0 flex-1 text-[11.5px] text-ink-mute">{term.source}</span>
+            <span className="tabular shrink-0 text-[11px] text-ink-faint">
+              {term.floor == null ? "相对量" : `${big(term.floor)} → ${big(term.ceiling)}`}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 rounded-lg bg-surface px-3.5 py-3">
+        <div className="text-[12.5px] font-black text-ink">{spec.normalization.name}</div>
+        <code className="tabular mt-1 block text-[12.5px] text-nav">{spec.normalization.formula}</code>
+        <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-mute">
+          {spec.normalization.below_floor}
+        </p>
+        <p className="mt-1 text-[11.5px] leading-relaxed text-ink-faint">
+          {spec.normalization.why}
+        </p>
+      </div>
+
+      <div className="mt-3 rounded-lg bg-surface px-3.5 py-3">
+        <div className="text-[12.5px] font-black text-ink">增长子分数</div>
+        <code className="tabular mt-1 block text-[12.5px] text-nav">
+          {spec.growth.score_formula}
+        </code>
+        <code className="tabular mt-1 block text-[12.5px] text-nav">
+          {spec.growth.rate_formula}
+        </code>
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {spec.growth.rate_parts.map((part) => (
+            <span key={part.label} className="chip bg-canvas !py-[4px] !text-[11px] text-ink-soft">
+              {part.label} {part.weight.toFixed(2)}
+            </span>
+          ))}
+        </div>
+        <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-mute">
+          即 {pct(spec.growth.zero_at, 0)} 记 0 分、+{pct(spec.growth.full_at, 0)} 记 100 分。
+          {spec.growth.no_base}
+        </p>
+      </div>
+
+      <div className="mt-3 rounded-lg bg-surface px-3.5 py-3">
+        <div className="text-[12.5px] font-black text-ink">低样本降级</div>
+        <ul className="mt-1.5 flex flex-col gap-1">
+          {spec.damping.rules.map((rule) => (
+            <li key={rule} className="flex gap-2 text-[11.5px] leading-relaxed text-ink-mute">
+              <span className="mt-[6px] h-[4px] w-[4px] shrink-0 rounded-full bg-brand" />
+              {rule}
+            </li>
+          ))}
+        </ul>
+        <p className="mt-1.5 text-[11.5px] leading-relaxed text-ink-faint">{spec.damping.why}</p>
+      </div>
+
+      {spec.example ? <HotnessExample ex={spec.example} /> : null}
+
+      <ul className="mt-3 flex flex-col gap-1.5">
+        {spec.notes.map((note) => (
+          <li key={note} className="flex gap-2 text-[11.5px] leading-relaxed text-ink-faint">
+            <span className="mt-[6px] h-[4px] w-[4px] shrink-0 rounded-full bg-ink-faint" />
+            {note}
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -194,7 +342,9 @@ function Content({ data }: { data: PipelineView }) {
       </Block>
 
       {/* ---------------------------- ③ 分析建模 ---------------------------- */}
-      <Block index="3" title="分析建模" summary={`热度指数同时在 ${modeling.hotness_windows.join("/")} 天窗口上看`}>
+      <Block index="3" title="分析建模" summary="热度指数怎么算，逐项列出来">
+        <HotnessFormula spec={modeling.hotness} />
+
         <div className="flex flex-col gap-3">
           {modeling.items.map((item) => (
             <div key={item.title} className="rounded-tile border border-line bg-surface px-4 py-3">

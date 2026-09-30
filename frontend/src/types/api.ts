@@ -588,9 +588,73 @@ export interface PipelineProcessing {
   derived: { label: string; value: number; hint: string }[];
 }
 
+/** 热度指数的五个分量之一（key/label/权重/归一化区间） */
+export interface PipelineHotnessTerm {
+  key: string;
+  label: string;
+  source: string;
+  weight: number;
+  /** log = 对数区间归一化；linear = 增长分量单独映射 */
+  kind: "log" | "linear";
+  floor: number | null;
+  ceiling: number | null;
+}
+
+/** 真实算例里的一项：得分 × 权重 = 贡献 */
+export interface PipelineHotnessExampleTerm {
+  key: string;
+  label: string;
+  source: string;
+  weight: number;
+  score: number;
+  contribution: number;
+}
+
+export interface PipelineHotnessExample {
+  meme_name: string;
+  score: number;
+  window_days: number;
+  terms: PipelineHotnessExampleTerm[];
+  /** 逐项贡献求和，应与 score 一致（四舍五入前） */
+  sum_of_contributions: number;
+  inputs: {
+    view: number | null;
+    interaction: number | null;
+    video_count: number | null;
+    creator_peak: number | null;
+    growth: number | null;
+    prev_view: number | null;
+    observed_days: number | null;
+    window_days_observed: number | null;
+  };
+}
+
+/** 热度指数完整口径（页面重点） */
+export interface PipelineHotness {
+  expression: string;
+  weights_total: number;
+  primary_window: number;
+  compare_window: number;
+  terms: PipelineHotnessTerm[];
+  normalization: { name: string; formula: string; below_floor: string; why: string };
+  growth: {
+    score_formula: string;
+    rate_formula: string;
+    rate_parts: { label: string; weight: number }[];
+    zero_at: number;
+    full_at: number;
+    no_base: string;
+  };
+  damping: { min_sample: number; factor: number; rules: string[]; why: string };
+  notes: string[];
+  example: PipelineHotnessExample | null;
+}
+
 export interface PipelineModeling {
   window_days: number;
   hotness_windows: number[];
+  /** 热度公式：全项目核心算法，页面上给它最大篇幅 */
+  hotness: PipelineHotness;
   stages: { key: string; label: string }[];
   items: { title: string; detail: string; tag: string }[];
   note: string;

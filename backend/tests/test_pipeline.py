@@ -101,3 +101,84 @@ def test_pipeline_payload_has_no_credentials(client):
     text = client.get("/api/pipeline").text.lower()
     for leaked in ("api_key", "apikey", "admin_token", "password", "secret"):
         assert leaked not in text, f"payload 泄漏了「{leaked}」"
+
+
+# --------------------------------------------------------------------------- #
+# 热度公式：这是页面重点，也是全项目最容易"页面写一套、算法跑另一套"的地方
+# --------------------------------------------------------------------------- #
+def test_hotness_formula_is_complete(client):
+    """五个分量齐全、权重合计为 1，且绝对量分量都带归一化区间。"""
+    spec = client.get("/api/pipeline").json()["modeling"]["hotness"]
+    assert spec["expression"].startswith("Hotness =")
+    assert len(spec["terms"]) == 5
+    assert abs(spec["weights_total"] - 1.0) < 1e-9, "权重合计必须为 1，否则总分到不了 100"
+    assert {item["key"] for item in spec["terms"]} == {
+        "view",
+        "interaction",
+        "content",
+        "creator",
+        "growth",
+    }
+    for item in spec["terms"]:
+        if item["key"] == "growth":
+            # 增长率是相对量，没有绝对量区间
+            assert item["floor"] is None and item["ceiling"] is None
+        else:
+            assert item["floor"] is not None and item["ceiling"] is not None
+            assert item["ceiling"] > item["floor"], f"{item['key']} 的区间上界必须大于下界"
+    assert spec["normalization"]["formula"]
+    assert spec["growth"]["score_formula"]
+    assert spec["growth"]["rate_formula"]
+    assert spec["damping"]["rules"]
+    assert spec["notes"], "口径说明不能为空——页面靠这些说明"
+
+
+def test_hotness_weights_come_from_algorithm_config(client):
+    """页面上的权重与区间必须**现读**自算法配置，不能在前端/服务里另抄一份。"""
+    from app.config import HOTNESS_REFERENCE, HOTNESS_WEIGHTS
+
+    spec = client.get("/api/pipeline").json()["modeling"]["hotness"]
+    by_key = {item["key"]: item for item in spec["terms"]}
+
+    assert by_key["view"]["weight"] == HOTNESS_WEIGHTS.view
+    assert by_key["interaction"]["weight"] == HOTNESS_WEIGHTS.interaction
+    assert by_key["content"]["weight"] == HOTNESS_WEIGHTS.content
+    assert by_key["creator"]["weight"] == HOTNESS_WEIGHTS.creator
+    assert by_key["growth"]["weight"] == HOTNESS_WEIGHTS.growth
+
+    for key in ("view", "interaction", "content", "creator"):
+        assert (by_key[key]["floor"], by_key[key]["ceiling"]) == HOTNESS_REFERENCE[key]
+
+
+def test_hotness_example_is_reconcilable(client):
+    """算例要能对账：逐项「得分 × 权重 = 贡献」，求和等于快照总分。
+
+    这条是给答辩兜底的——被问「权重是不是拍的」时，页面上的算例必须真的算得通。
+    """
+    spec = client.get("/api/pipeline").json()["modeling"]["hotness"]
+    example = spec["example"]
+    if example is None:
+        pytest.skip("库里还没有热度快照，无法对账")
+
+    for item in example["terms"]:
+        expected = item["score"] * item["weight"]
+        assert abs(expected - item["contribution"]) <= 0.01, (
+            f"{item['key']} 的贡献 ≠ 得分 × 权重"
+        )
+
+    total = sum(item["contribution"] for item in example["terms"])
+    assert abs(total - example["sum_of_contributions"]) <= 0.05
+    # 快照把总分四舍五入到 0.1，所以留一点舍入余量
+    assert abs(total - example["score"]) <= 0.15, "逐项求和与快照总分对不上"
+
+
+def test_hotness_example_terms_are_not_duplicated(client):
+    """算例里各分量的得分不应两两雷同——雷同通常说明两个分量算的是同一个东西。"""
+    spec = client.get("/api/pipeline").json()["modeling"]["hotness"]
+    example = spec["example"]
+    if example is None:
+        pytest.skip("库里还没有热度快照")
+
+    scores = [item["score"] for item in example["terms"] if item["key"] != "growth"]
+    assert len(set(scores)) == len(scores), f"绝对量分量得分出现重复 {scores}，检查口径"
+

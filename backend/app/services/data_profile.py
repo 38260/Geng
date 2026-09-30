@@ -25,12 +25,40 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.config import settings
-from app.models import AIInsight, InsightSource, MemeDailyStats, Video
+from app.config import (
+    GROWTH_SCORE_FULL,
+    GROWTH_SCORE_ZERO,
+    HOTNESS_REFERENCE,
+    HOTNESS_WEIGHTS,
+    LOW_SAMPLE_DAMPING,
+    MIN_SAMPLE_VIDEOS,
+    settings,
+)
+from app.models import (
+    AIInsight,
+    HotnessSnapshot,
+    InsightSource,
+    Meme,
+    MemeDailyStats,
+    Video,
+)
 from app.services.meme.query import meta_payload
 
 # 热度指数同时在用的观察窗口（与算法层一致，这里只用于说明"在几个尺度上看"）
 _HOTNESS_WINDOWS = (1, 3, 7, 30)
+
+# 热度指数的基本窗口（见 app/analytics/hotness.py 的 PRIMARY_WINDOW / COMPARE_WINDOW）
+_HOTNESS_PRIMARY = 7
+_HOTNESS_COMPARE = 7
+
+# 五个分量的展示名与输入口径。顺序与权重表一致，页面直接按这个顺序渲染。
+_HOTNESS_TERMS = (
+    ("view", "播放表现", "近 7 天播放量合计"),
+    ("interaction", "互动表现", "近 7 天互动总量（当前实际=评论+弹幕）"),
+    ("content", "内容规模", "近 7 天相关视频数"),
+    ("creator", "参与 UP 主", "近 7 天单日去重峰值"),
+    ("growth", "增长速度", "近 7 天 vs 前 7 天综合增幅"),
+)
 
 # 采集器默认每个检索词翻的页数（见 collectors/bilibili_collector.py 构造参数）
 _PAGES_PER_TERM = 2
@@ -272,7 +300,164 @@ def _processing(session: Session, base: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _modeling(base: dict[str, Any]) -> dict[str, Any]:
+def _hotness_example(session: Session) -> dict[str, Any] | None:
+    """取库里热度最高的那个梗，把五个分量拆开——公式的「活样本」。
+
+    答辩时最容易被追问「权重是不是拍的」，所以摆一个能逐项对上总分的算例：
+    各分量 × 权重求和，正好等于快照里那个分数。数字全部来自库，不是编的。
+    """
+    row = session.execute(
+        select(Meme.name, HotnessSnapshot)
+        .join(Meme, Meme.id == HotnessSnapshot.meme_id)
+        .order_by(HotnessSnapshot.score.desc())
+        .limit(1)
+    ).first()
+    if row is None:
+        return None
+    name, snapshot = row
+    components = snapshot.components or {}
+    if not components:
+        return None
+
+    weight_map = {
+        "view": HOTNESS_WEIGHTS.view,
+        "interaction": HOTNESS_WEIGHTS.interaction,
+        "content": HOTNESS_WEIGHTS.content,
+        "creator": HOTNESS_WEIGHTS.creator,
+        "growth": HOTNESS_WEIGHTS.growth,
+    }
+    terms: list[dict[str, Any]] = []
+    for key, label, source in _HOTNESS_TERMS:
+        if key not in components:
+            continue
+        score = float(components[key] or 0.0)
+        weight = float(weight_map[key])
+        terms.append(
+            {
+                "key": key,
+                "label": label,
+                "source": source,
+                "weight": weight,
+                "score": round(score, 1),
+                "contribution": round(weight * score, 2),
+            }
+        )
+    if not terms:
+        return None
+
+    metrics = snapshot.metrics or {}
+    return {
+        "meme_name": name,
+        "score": round(float(snapshot.score or 0.0), 1),
+        "window_days": snapshot.window_days,
+        "terms": terms,
+        "sum_of_contributions": round(sum(item["contribution"] for item in terms), 2),
+        "inputs": {
+            "view": metrics.get("view"),
+            "interaction": metrics.get("interaction"),
+            "video_count": metrics.get("video_count"),
+            "creator_peak": metrics.get("creator_peak"),
+            "growth": metrics.get("growth"),
+            "prev_view": metrics.get("prev_view"),
+            "observed_days": metrics.get("observed_days"),
+            "window_days_observed": metrics.get("window_days_observed"),
+        },
+    }
+
+
+def _hotness_spec(session: Session) -> dict[str, Any]:
+    """热度指数的完整口径 + 一个真实算例。
+
+    页面上这块是重点，所以参数一律从 :mod:`app.config.algorithms` 现读，
+    不在这里重写一份——阈值改了它跟着变，不会出现「页面写的和算法跑的不是一套」。
+    """
+    weight_map = {
+        "view": HOTNESS_WEIGHTS.view,
+        "interaction": HOTNESS_WEIGHTS.interaction,
+        "content": HOTNESS_WEIGHTS.content,
+        "creator": HOTNESS_WEIGHTS.creator,
+        "growth": HOTNESS_WEIGHTS.growth,
+    }
+
+    terms: list[dict[str, Any]] = []
+    for key, label, source in _HOTNESS_TERMS:
+        weight = float(weight_map[key])
+        floor, ceiling = HOTNESS_REFERENCE.get(key, (None, None))
+        terms.append(
+            {
+                "key": key,
+                "label": label,
+                "source": source,
+                "weight": weight,
+                # growth 是相对量，没有绝对量区间，单独用映射函数
+                "kind": "linear" if key == "growth" else "log",
+                "floor": floor,
+                "ceiling": ceiling,
+            }
+        )
+
+    expression = " + ".join(f"{item['weight']:.2f}·S_{item['key']}" for item in terms)
+
+    return {
+        "expression": f"Hotness = {expression}",
+        "weights_total": round(sum(float(weight_map[key]) for key, _, _ in _HOTNESS_TERMS), 2),
+        "primary_window": _HOTNESS_PRIMARY,
+        "compare_window": _HOTNESS_COMPARE,
+        "terms": terms,
+        "normalization": {
+            "name": "对数区间归一化",
+            "formula": "S = 100 × (ln x − ln floor) ÷ (ln ceiling − ln floor)",
+            "below_floor": (
+                "x ≤ floor 时按 S = 100 × x / floor × 5% 折算，最多给 5 分；x ≤ 0 记 0 分"
+            ),
+            "why": (
+                "绝对量再大也不会让一条爆款视频吃掉整个榜，"
+                "绝对量极小的梗也不会因为噪声上榜——两个极端都被压住。"
+            ),
+        },
+        "growth": {
+            "score_formula": "S_growth = clamp(100 × (r + 0.30) ÷ 1.50, 0, 100)",
+            "rate_formula": "r = 0.35·r_播放 + 0.35·r_讨论 + 0.20·r_视频数 + 0.10·r_UP主数",
+            "rate_parts": [
+                {"label": "播放", "weight": 0.35},
+                {"label": "讨论", "weight": 0.35},
+                {"label": "视频数", "weight": 0.20},
+                {"label": "UP 主数", "weight": 0.10},
+            ],
+            "zero_at": GROWTH_SCORE_ZERO,
+            "full_at": GROWTH_SCORE_FULL,
+            "no_base": (
+                "前 7 天没有基数时记 50 分（不奖也不罚）；"
+                "从 0 起步视为新出现，按 +100% 计。"
+            ),
+        },
+        "damping": {
+            "min_sample": MIN_SAMPLE_VIDEOS,
+            "factor": LOW_SAMPLE_DAMPING,
+            "rules": [
+                f"近 {_HOTNESS_PRIMARY} 天相关视频不足 {MIN_SAMPLE_VIDEOS} 条 → 总分 × {LOW_SAMPLE_DAMPING}",
+                f"前后两个 {_HOTNESS_PRIMARY} 天窗口都不足 {MIN_SAMPLE_VIDEOS} 条 → 增长分记 0",
+            ],
+            "why": (
+                "样本太小时，增长率多半是噪声：考古区冒出一条视频不该被算成 +100% 增长。"
+                "宁可打折，也不给一个虚高的分数。"
+            ),
+        },
+        "notes": [
+            "参与 UP 主分量用「单日去重峰值」而非周累计：采集层给的是当日去重作者数，"
+            "而样本里几乎每条视频来自不同作者，逐日累加会退化成「视频数换了个名字」"
+            "（实测两者相关系数 0.9997，等于把内容规模按 0.16+0.14 数了两遍）。",
+            "互动分量当前实际由评论 + 弹幕构成：B 站逐日搜索只返回播放量/评论/弹幕，"
+            "点赞、投币、收藏不在其中（它们落在视频样本上，不进逐日序列）。"
+            "这是已知局限，页面不假装它覆盖了全部互动。",
+            "所有主量与增长率都在同一条日序列上算，跨梗用同一把尺子；"
+            "权重与参考区间集中在 app/config/algorithms.py，改数值只改那一处。",
+        ],
+        "example": _hotness_example(session),
+    }
+
+
+def _modeling(session: Session, base: dict[str, Any]) -> dict[str, Any]:
     """分析建模：以既有口径为准，不在这里重算一遍算法。"""
     transparency = base.get("transparency") or {}
     stages = [
@@ -282,14 +467,10 @@ def _modeling(base: dict[str, Any]) -> dict[str, Any]:
     return {
         "window_days": base.get("window_days") or settings.analysis_window_days,
         "hotness_windows": list(_HOTNESS_WINDOWS),
+        # 热度公式单独成块：这是全项目的核心算法，页面上给它最大篇幅
+        "hotness": _hotness_spec(session),
         "stages": stages,
         "items": [
-            {
-                "title": "热度指数（0–100）",
-                "detail": transparency.get("hotness_algorithm")
-                or "自定义热度指数，多因子加权后归一到 0–100。",
-                "tag": "存量水平",
-            },
             {
                 "title": "生命周期阶段",
                 "detail": transparency.get("lifecycle_algorithm")
@@ -445,7 +626,7 @@ def data_profile_payload(session: Session) -> dict[str, Any]:
         },
         "acquisition": _acquisition(session, base),
         "processing": _processing(session, base),
-        "modeling": _modeling(base),
+        "modeling": _modeling(session, base),
         "quality": _quality(session, base),
         "ai": _ai(session, base),
     }

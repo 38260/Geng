@@ -49,6 +49,11 @@ def main(argv: list[str] | None = None) -> int:
         f"采集完成：成功 {result['collected']} 个梗 / 窗口内无结果 {result['empty']} 个 / "
         f"被拒 {result['failed']} 个，共写入视频 {result['videos']} 条"
     )
+    if result.get("aborted"):
+        # 硬风控熔断：这种情况必须显著报出来，不要混在"失败 3 个"里被忽略。
+        print()
+        print("⚠ 已中止本次采集：" + str(result.get("abort_reason", "连续被硬风控拦下")))
+        return 4   # 4 = 硬风控熔断，三个采集脚本同义（3 留给 daily_refresh 的"已有刷新在跑"）
     if result["collected"] == 0:
         print("一个都没采到，通常是风控或 Cookie 问题；页面会继续使用现有数据。")
         return 1

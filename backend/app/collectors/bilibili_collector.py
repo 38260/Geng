@@ -52,12 +52,16 @@ class BilibiliCollector:
         *,
         pages_per_term: int = 2,
         enrich_limit: int = 12,
-        request_gap: float = 0.35,
+        request_gap: float | None = None,
     ) -> None:
         self.client = client or get_client()
         self.pages_per_term = pages_per_term
         self.enrich_limit = enrich_limit
-        self.request_gap = request_gap
+        # 默认取配置值（`COLLECT_REQUEST_GAP`，默认 1.2 秒 ≈ 人手动搜索的速率）。
+        # 这里不再写死 0.35 秒——那是 2.9 次/秒，很容易被打进限流。
+        self.request_gap = (
+            settings.collect_request_gap if request_gap is None else request_gap
+        )
 
     # ------------------------------------------------------------------ #
     def is_available(self) -> tuple[bool, str]:

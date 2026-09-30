@@ -161,7 +161,9 @@ def write_markdown(state: dict) -> None:
         f"{state['data_through'] or '未知'}（滞后 {state['data_lag_days']} 天）",
         f"- 采集（scope={state['scope']}）：目标 {collect.get('targets')} / 成功 {collect.get('collected')}"
         f" / 空窗 {collect.get('empty')} / 被拒 {collect.get('failed')}"
-        f" / 跳过纯演示 {collect.get('skipped_demo', 0)}",
+        f" / 跳过纯演示 {collect.get('skipped_demo', 0)}"
+        + (" / ⚠ 采集中止：" + str(collect.get("abort_reason", ""))
+           if collect.get("aborted") else ""),
         f"- 同日沿用更好观测 {collect.get('kept_better_days', 0)} 天；本次更薄的梗 {collect.get('thinned', 0)} 个",
         f"- 指标重算 {state['recompute'].get('computed')} 个梗（跳过 {state['recompute'].get('skipped')}）",
         f"- 介绍浓缩：{condense_line}",
@@ -228,6 +230,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  → 目标 {collected.get('targets')}，成功 {collected['collected']}，"
               f"空窗 {collected['empty']}，被拒 {collected['failed']}，"
               f"跳过演示 {collected.get('skipped_demo', 0)}")
+        if collected.get("aborted"):
+            # 硬风控熔断：整批采集已经停了，必须显眼报出来，
+            # 不能让它混在"被拒 N 个"里被当成常规失败。
+            print("⚠ 已中止本次采集："
+                  + str(collected.get("abort_reason", "连续被 B 站硬风控拦下")))
 
         print("· 重算指标（热度 / 生命周期 / 赶梗判断）…")
         recomputed = recompute_all(window_days=settings.analysis_window_days)
@@ -247,6 +254,10 @@ def main(argv: list[str] | None = None) -> int:
 
         if not collected["ok"]:
             exit_code = 2
+        elif collected.get("aborted"):
+            # 4 = 连续被 B 站硬风控拦下、整批中止。
+            # 不用 3：3 在这个脚本里已经表示"已有一个刷新在跑"（见上面的锁）。
+            exit_code = 4
         elif collected["failed"] or collected["collected"] == 0:
             exit_code = 1
 

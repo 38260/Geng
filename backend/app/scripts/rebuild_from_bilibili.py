@@ -88,6 +88,14 @@ def main(argv: list[str] | None = None) -> int:
         )
         result["collection"] = collected
         log.info("采集结果：%s", collected)
+        if collected.get("aborted"):
+            # 熔断之后这一轮不是"完整重建"：库里只有一半梗拿到新数据。
+            # 重算照做（纯本地计算、不再打接口），但必须把"这是半轮"写在报告和终端上，
+            # 否则人会拿着一份残缺窗口去读指标。
+            result["partial_rebuild"] = True
+            log.error("采集中止：%s", collected.get("abort_reason"))
+            log.error("这一轮是**半轮重建**，指标只反映已经采到的那部分；"
+                      "按提示换小号 Cookie 或把间隔调大后重跑。")
 
     result["recompute"] = recompute_all(window_days=args.days)
     log.info("指标重算：%s", result["recompute"])
@@ -120,6 +128,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"写入真实视频的梗：{result.get('memes_with_real_data')} 个")
     print(f"指标重算：{result.get('recompute')}")
     print(f"报告：{out}")
+    if result.get("partial_rebuild"):
+        print("⚠ 本轮为**半轮重建**：" + str(collection.get("abort_reason", "采集中途被硬风控中止"))
+              + " 指标只覆盖已采到的部分，建议调慢间隔或换小号 Cookie 后重跑。")
+        return 4   # 4 = 硬风控熔断（与 collect_data / daily_refresh 同义）
     return 0
 
 

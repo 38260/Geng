@@ -878,3 +878,74 @@ def test_refresh_rank_tolerates_duplicate_rows_and_demo_sourced_rows(session, ce
     assert set(rows) == {"BV1demo", "BV1dup"}
     assert rows["BV1demo"].search_rank == 1 and rows["BV1demo"].data_source == "mock"
     assert rows["BV1dup"].search_rank == 2, "同名次取第一次出现的位置"
+
+
+# --------------------------------------------------------------------------- #
+# 采集节流与硬风控熔断
+# （settings.collect_request_gap / collect_block_abort_after）
+# --------------------------------------------------------------------------- #
+
+
+class _HardBlockedClient(FakeClient):
+    """probe 说"能用"，一发搜索就抛硬风控（412 / -352）。
+
+    对应实测里"跑着跑着风控升级"：开头通，后面整条会话被拦。
+    用 ``blocked=True`` 的 FakeClient 测不了这个——它连 is_available 都过不了，
+    collect_all 会在发第一个请求之前就返回。
+    """
+
+    def probe(self):
+        return True, "WBI 签名可用"
+
+    def search_videos(self, keyword, **kwargs):
+        self.requested.append(str(keyword))
+        raise BilibiliBlocked("HTTP 412")
+
+    def search_range(self, keyword, **kwargs):
+        self.requested.append(str(keyword))
+        raise BilibiliBlocked("HTTP 412")
+
+
+def test_collector_request_gap_comes_from_settings(monkeypatch):
+    """间隔默认取配置，别在采集器里写死。"""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "collect_request_gap", 4.5)
+    assert BilibiliCollector(client=FakeClient(rows=[])).request_gap == 4.5
+    # 显式传参仍然覆盖配置（测试用 0 跑快）
+    assert BilibiliCollector(client=FakeClient(rows=[]), request_gap=0).request_gap == 0
+
+
+def test_collect_all_aborts_after_consecutive_hard_blocks(session, meme_factory, monkeypatch):
+    """连续 N 个梗被硬风控拦下 → 中止整批，别再往下喂风控。"""
+    from app.config import settings
+
+    memes = [meme_factory() for _ in range(4)]
+    client = _HardBlockedClient()
+    _patch_client(monkeypatch, client)
+    monkeypatch.setattr(settings, "collect_block_abort_after", 3)
+
+    result = collect_all("bilibili", meme_ids=[m.id for m in memes], window_days=1)
+
+    assert result["aborted"] is True
+    assert result["failed"] == 3, "熔断只算前 3 个梗，第 4 个不该被计入失败"
+    assert not any(e.startswith(memes[3].name) for e in client.requested), \
+        "第 4 个梗必须一个请求都没发——中止的意义就在这"
+    assert "中止" in str(result["abort_reason"])
+
+
+def test_collect_all_block_fuse_can_be_switched_off(session, meme_factory, monkeypatch):
+    """设 0 = 关闭保险，退回"这个梗失败就跳过、继续下一个"的旧行为。"""
+    from app.config import settings
+
+    memes = [meme_factory() for _ in range(3)]
+    client = _HardBlockedClient()
+    _patch_client(monkeypatch, client)
+    monkeypatch.setattr(settings, "collect_block_abort_after", 0)
+
+    result = collect_all("bilibili", meme_ids=[m.id for m in memes], window_days=1)
+
+    assert not result.get("aborted"), "关掉保险就不该中止整批"
+    assert result["failed"] == 3
+    assert any(e.startswith(memes[2].name) for e in client.requested), \
+        "最后一个梗仍然被尝试过"

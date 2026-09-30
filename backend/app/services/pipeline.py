@@ -394,13 +394,31 @@ def collect_all(
             memes = memes[:limit]
         summary["targets"] = len(memes)
 
+        # 硬风控连锁计数器：连续多少个梗撞上 BilibiliBlocked（412 / -352 / 需要 Cookie）。
+        # 软限流（v_voucher）只是把结果吞掉，硬风控是风控升级的信号——
+        # 这时继续跑既拿不到数据，又在给风控喂料，所以整批停下来更安全。
+        block_streak = 0
+        abort_after = int(getattr(settings, "collect_block_abort_after", 3) or 0)
+
         for meme in memes:
             try:
                 bundle = collector.collect(meme, window_days=window)
             except BilibiliBlocked as exc:
                 summary["failed"] = int(summary["failed"]) + 1
-                log.warning("梗「%s」采集中断：%s", meme.name, exc)
+                block_streak += 1
+                log.warning("梗「%s」采集中断：%s（连续第 %d 个）",
+                            meme.name, exc, block_streak)
+                if abort_after and block_streak >= abort_after:
+                    summary["aborted"] = True
+                    summary["abort_reason"] = (
+                        f"连续 {block_streak} 个梗被 B 站硬风控拦下"
+                        f"（最后一次：{exc}），已中止本次采集。"
+                        f"继续跑只会加深风控；建议改用小号 Cookie 或降低频率后重试。"
+                    )
+                    log.error(summary["abort_reason"])
+                    break
                 continue
+            block_streak = 0
 
             # 清洗 → 梗匹配：搜索结果里混着无关内容，先按相关性打分过滤，
             # 再用剩下的视频做每日聚合，否则统计会被无关样本灌水。

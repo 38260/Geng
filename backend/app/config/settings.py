@@ -110,6 +110,13 @@ class Settings(BaseSettings):
     #
     # 这里是"首次之外的额外重试次数"，设 0 等于退回旧行为。
     collect_day_retries: int = 2
+    # 采集请求之间的最小间隔（秒）。
+    #
+    # 这同时是**风控安全阀**：默认 1.2 秒 ≈ 0.8 次/秒，大致是"人手动搜索"的速率。
+    # 曾经写死 0.35 秒（2.9 次/秒），那个速率下很容易被打进限流——
+    # 全库重采要发约 3,300 次请求，慢一点只是多花几十分钟，快一点可能直接触发风控。
+    # 想更保守可以调到 2~5 秒。
+    collect_request_gap: float = 1.2
     # 重试间隔（秒），乘上次数递增。贴着打会让风控更紧。
     collect_retry_gap: float = 1.2
     # 命中限流后**整个会话**停多久（秒）再继续。
@@ -125,6 +132,13 @@ class Settings(BaseSettings):
     # 一次静默之后仍然连续被吞这么多天，才认定"等不回来"并放弃这条窗口。
     # 有 cooldown 兜底时这个值不该轻易触发。
     collect_throttle_stop_after: int = 8
+    # 连续多少个梗撞上**硬风控**（412 / -352 / 需要 Cookie，也就是
+    # `BilibiliBlocked`）就中止整个采集任务。
+    #
+    # 软限流（v_voucher）只会被吞掉结果，硬风控是风控升级的信号——
+    # 这时继续跑既拿不到数据，又在给风控喂料。宁可整批停下来让人看一眼。
+    # 设 0 = 关闭这个保险（退回"失败就跳过、继续下一个梗"的旧行为）。
+    collect_block_abort_after: int = 3
     # "7 天窗口里至少观测到几天才允许谈趋势"这条闸门阈值在
     # app/config/algorithms.py 的 LifecycleThresholds.min_observed_days，
     # 跟其它算法阈值放一起，别在这里再写一份。

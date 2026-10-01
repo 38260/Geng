@@ -12,6 +12,45 @@ B站数据 → 采集 → 清洗 → 梗匹配 → 发现层准入（并集）+ 
 
 ---
 
+## 〇、界面速览
+
+下面全部是**本机实跑的真实截图**（数据来自 B 站真实采集，非设计稿、非演示数据）：
+跑起来后由 `bash scripts/readme_shots.sh` 一键重截，页面改了重跑即可刷新。
+
+### 首页 · 今日热榜
+
+Hero、四档筛选（全部 / 正在爆 / 快起飞 / 退潮中）、今日热榜卡片——分数、阶段、近 7 天增幅都来自算法。
+
+![首页：今日热榜](docs/screenshots/home.jpg)
+
+### 梗详情 · 热度趋势与生命周期
+
+一个梗的完整判断链：热度指数 → 观测覆盖度 → 7/30 天趋势 → 生命周期轨道 → 赶梗结论 → 相关视频 → 认证证据。
+
+![梗详情：热度趋势与生命周期](docs/screenshots/detail.jpg)
+
+### 梗库与热度趋势榜
+
+| 梗库（全量已认证梗，可筛选 / 搜索 / 排序） | 热度趋势（相对位置 + 增幅 + 赶梗结论） |
+| --- | --- |
+| ![梗库](docs/screenshots/library.jpg) | ![热度趋势榜](docs/screenshots/trends.jpg) |
+
+### 数据管线与梗管理
+
+| 数据管线（把采集与清洗的真实数字摊开） | 梗管理（人工只维护封面 / 介绍 / 别名 / 关键词） |
+| --- | --- |
+| ![数据管线](docs/screenshots/pipeline.jpg) | ![梗管理](docs/screenshots/manage.jpg) |
+
+### 响应式 · 窄屏
+
+同一套前端在窄屏下自动收成单列；小程序端（`miniprogram/`）与 Web 端共用同一批只读接口。
+
+<p align="center">
+  <img src="docs/screenshots/mobile-home.jpg" width="320" alt="窄屏下的首页" />
+</p>
+
+---
+
 ## 一、快速开始
 
 ### 0. 一键启动（推荐，Windows）
@@ -83,6 +122,7 @@ $env:VITE_API_TARGET="http://127.0.0.1:8010"; npm run dev
 | `python scripts/smoke_api.py` | 对运行中的后端逐个打接口（125 项） |
 | `bash scripts/screenshot.sh` | Chrome 无头截图，做视觉比对 |
 | `bash scripts/ui_shot.sh home "/"` | 截图 + 缩到参考图画板宽度，输出并排图与 50% 叠图（`.shots/cmp-*.png` / `blend-*.png`） |
+| `bash scripts/readme_shots.sh` | 重截 README「界面速览」的实拍图（7 张，宽 1100 JPEG）→ `docs/screenshots/` |
 | `python scripts/extract_ref_assets.py` | 从 `docs/design/reference-ui.png` 重切前端素材（封面、Logo、Hero 装饰带） |
 | `bash scripts/restart-backend.sh` | 重启本地后端 |
 

@@ -43,10 +43,11 @@ Hero、四档筛选（全部 / 正在爆 / 快起飞 / 退潮中）、今日热�
 
 ### 响应式 · 窄屏
 
-同一套前端在窄屏下自动收成单列；小程序端（`miniprogram/`）与 Web 端共用同一批只读接口。
+窄屏（390px，真机视口模拟）下同一套前端自动重排：侧栏换成可横向滑动的顶部标签条，
+热榜收成 **两列**、精选推荐收成 **单列**；小程序端（`miniprogram/`）与 Web 端共用同一批只读接口。
 
 <p align="center">
-  <img src="docs/screenshots/mobile-home.jpg" width="320" alt="窄屏下的首页" />
+  <img src="docs/screenshots/mobile-home.jpg" width="330" alt="窄屏下的首页" />
 </p>
 
 ---

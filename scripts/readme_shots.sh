@@ -49,6 +49,7 @@ echo "① 桌面页（1440 宽抓图）→ $BASE"
 shot "home"     "/"                1440 1180
 shot "detail"   "/meme/${MEME_ID}" 1440 2000
 shot "library"  "/library"         1440 1100
+shot "history"  "/history"         1440 1250
 shot "trends"   "/trends"          1440 1100
 shot "pipeline" "/pipeline"        1440 1500
 shot "manage"   "/manage"          1440 1100

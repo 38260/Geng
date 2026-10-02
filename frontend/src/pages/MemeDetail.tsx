@@ -180,9 +180,10 @@ function IntroCard({
   error: string;
 }) {
   const style = INTRO_STYLE[intro.source];
-  // AI 摘要是"结论"，证据原文是"依据"：有结论时把依据收进折叠区。
-  // 不这样做的话，正文位又会被"CV：… 文案：… 后期：…"这类制作名单占满 —— 等于什么都没说。
-  const collapsed = intro.source === "ai";
+  // AI 摘要这一档只留「标题 + 来源标签 + 正文」：不挂免责小字、不给按钮，
+  // 也不在卡片里铺证据与材料——原始依据在下面的「认证证据」区照样点得开。
+  // 其余四档照旧：对它们来说证据/简介摘录/字幕块本身就是正文内容。
+  const isAi = intro.source === "ai";
   return (
     <section id="intro" className="card p-5">
       <div className="mb-2 flex flex-wrap items-center gap-2.5">
@@ -201,7 +202,9 @@ function IntroCard({
       {intro.text ? (
         <>
           <p className="text-[15px] leading-relaxed text-ink-mute">{intro.text}</p>
-          <p className="mt-2 text-[12px] leading-relaxed text-ink-faint">{intro.note}</p>
+          {isAi ? null : (
+            <p className="mt-2 text-[12px] leading-relaxed text-ink-faint">{intro.note}</p>
+          )}
         </>
       ) : (
         <p className="rounded-xl bg-rail px-4 py-3 text-[13px] leading-relaxed text-ink-faint">
@@ -212,7 +215,8 @@ function IntroCard({
         </p>
       )}
 
-      {intro.source === "manual" ? null : (
+      {/* 生成入口只在"还没有 AI 摘要"时出现；已有摘要的卡片不再挂按钮与提示 */}
+      {isAi || intro.source === "manual" ? null : (
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
           <button
             type="button"
@@ -220,18 +224,15 @@ function IntroCard({
             disabled={regenerating}
             className="btn-ghost rounded-full px-3 py-1 text-[12px] disabled:opacity-60"
           >
-            {regenerating ? "AI 正在写…" : intro.source === "ai" ? "重新生成 AI 摘要" : "让 AI 写一段介绍"}
+            {regenerating ? "AI 正在写…" : "让 AI 写一段介绍"}
           </button>
-          <span className="text-[12px] text-ink-faint">
-            依据已抓到的证据生成，不是原文照抄；核不到出处的事实会让整段作废。
-          </span>
           {error ? <span className="text-[12px] text-brand">{error}</span> : null}
         </div>
       )}
 
-      {collapsed ? null : intro.transcript ? <TranscriptBlock intro={intro} /> : null}
+      {isAi ? null : intro.transcript ? <TranscriptBlock intro={intro} /> : null}
 
-      {collapsed || !intro.excerpt ? null : (
+      {isAi || !intro.excerpt ? null : (
         <div className="mt-3 rounded-xl border border-dashed border-line bg-canvas px-4 py-3">
           <div className="text-[12px] font-bold text-ink-faint">
             简介原文摘录 · 来自《{intro.excerpt.video_title}》（UP：{intro.excerpt.author}）
@@ -241,7 +242,7 @@ function IntroCard({
         </div>
       )}
 
-      {collapsed || !intro.evidence.length ? null : (
+      {isAi || !intro.evidence.length ? null : (
         <ul className="mt-3 space-y-1.5">
           {intro.evidence.map((item) => (
             <li key={`${item.role}-${item.bvid}`} className="flex items-start gap-2 text-[12px]">
@@ -270,56 +271,6 @@ function IntroCard({
         </ul>
       )}
 
-      {collapsed ? (
-        <details className="mt-3 rounded-xl border border-dashed border-line bg-canvas px-4 py-3">
-          <summary className="cursor-pointer list-none text-[12px] font-bold text-ink-faint">
-            查看 AI 用到的依据（原文，可逐条核对）
-          </summary>
-          {intro.evidence.length ? (
-            <ul className="mt-2 space-y-1.5">
-              {intro.evidence.map((item) => (
-                <li key={`${item.role}-${item.bvid}`} className="flex items-start gap-2 text-[12px]">
-                  <span className="chip shrink-0 bg-rail px-2 py-0.5 text-ink-mute">{item.up_label}</span>
-                  <span className="min-w-0 flex-1 text-ink-mute">
-                    {item.published_at ? `${item.published_at} · ` : ""}
-                    {item.video_url ? (
-                      <a
-                        href={item.video_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-flare hover:underline"
-                      >
-                        <LinkIcon className="h-3 w-3" />
-                        <span className="truncate">{item.video_title}</span>
-                      </a>
-                    ) : (
-                      <span className="text-ink-faint">{item.video_title}</span>
-                    )}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {intro.excerpt ? (
-            <div className="mt-3 text-[12px] leading-relaxed text-ink-mute">
-              <span className="font-bold text-ink-faint">
-                简介原文 · 《{intro.excerpt.video_title}》（UP：{intro.excerpt.author}）：
-              </span>
-              {intro.excerpt.text}
-            </div>
-          ) : null}
-          {intro.ai?.material ? (
-            <details className="mt-2">
-              <summary className="cursor-pointer list-none text-[12px] text-flare hover:underline">
-                展开模型看到的完整材料（{intro.ai.material_chars} 字，模型只有这些）
-              </summary>
-              <pre className="mt-1.5 whitespace-pre-wrap font-sans text-[12px] leading-relaxed text-ink-mute">
-                {intro.ai.material}
-              </pre>
-            </details>
-          ) : null}
-        </details>
-      ) : null}
     </section>
   );
 }
@@ -615,6 +566,9 @@ export default function MemeDetail() {
                   <p className="mt-2 text-[11px] text-ink-faint">
                     热度为 0-100 自定义指数（滚动 7 天窗口），不是 B 站官方指数。
                     每根柱子是一天，颜色对应那天所处的阶段（与梗史馆同一套复算）。
+                    {points.length <= 10
+                      ? "折线把每天的热度连起来，看涨跌方向；未观测的那天断开、不连线。"
+                      : ""}
                   </p>
                   {holes > 0 ? (
                     <p className="mt-1 text-[11px] leading-relaxed text-brand">

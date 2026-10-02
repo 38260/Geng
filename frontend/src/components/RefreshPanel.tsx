@@ -99,12 +99,39 @@ export function RefreshPanel({ onDone }: { onDone?: () => void }) {
         </span>
       </div>
 
-      <p className="mt-3 text-[13px] leading-relaxed text-ink-mute">
-        刷新做三件事：翻两位 UP 主的近期投稿发现新梗（并集入池）→ 采集数据 → 重算热度、
-        生命周期与赶梗判断。默认只补"昨天"那一天（每个梗一次请求），全窗口重采会把 30 天
-        逐个日期重看一遍，请求量约 30 倍，建议一周一次。同一天只保留更好的一次观测，
-        所以重复刷新不会把数据越刷越薄。
-      </p>
+      {/* 说明性文字全部收进折叠区：这一屏的主角是状态和按钮，不是三段口径解释 */}
+      <details className="mt-3 rounded-tile border border-line bg-rail px-3.5 py-2.5">
+        <summary className="cursor-pointer list-none text-[13px] font-semibold text-ink-soft">
+          刷新做什么 · 退出码含义 · 定时任务
+        </summary>
+        <div className="mt-2 space-y-2 text-[12px] leading-relaxed text-ink-mute">
+          <p>
+            刷新做三件事：翻两位 UP 主的近期投稿发现新梗（并集入池）→ 采集数据 → 重算热度、
+            生命周期与赶梗判断。默认只补"昨天"那一天（每个梗一次请求），全窗口重采会把 30 天
+            逐个日期重看一遍，请求量约 30 倍，建议一周一次。同一天只保留更好的一次观测，
+            所以重复刷新不会把数据越刷越薄。
+          </p>
+          {last?.exit_code ? (
+            <p>
+              上次退出码 {last.exit_code}：1 = 有梗被拒或一个没采到，2 = 数据源不可用，
+              4 = 连续被 B 站硬风控拦下、采集中途中止（换小号 Cookie 或把
+              COLLECT_REQUEST_GAP 调大再跑）。3 = 当时已有刷新在跑，只打在终端、不写进报告。
+              详情见 docs/data/refresh-report.md
+            </p>
+          ) : null}
+          {schedule?.enabled ? (
+            <p>
+              定时任务：每天 {schedule.at} 自动增量
+              {schedule.full_weekday >= 0
+                ? `，${schedule.weekday_names?.[schedule.full_weekday] ?? "周一"}做全窗口校准`
+                : "（未设周校准）"}
+              {schedule.discovery ? "，含发现新梗" : "，不跑发现层"}。
+              进程不常驻的话请改用系统计划任务：
+              <code>python -m app.scripts.daily_refresh --trigger 定时</code>
+            </p>
+          ) : null}
+        </div>
+      </details>
 
       {last ? (
         <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-[13px] sm:grid-cols-4">
@@ -131,14 +158,6 @@ export function RefreshPanel({ onDone }: { onDone?: () => void }) {
             <div className="text-ink-faint">统计截至</div>
             <div className="font-semibold">{when(last.data_through)}</div>
           </div>
-          {last.exit_code ? (
-            <div className="col-span-2 mt-1 text-[12px] text-brand sm:col-span-4">
-              上次退出码 {last.exit_code}：1 = 有梗被拒或一个没采到，2 = 数据源不可用，
-              4 = 连续被 B 站硬风控拦下、采集中途中止（换小号 Cookie 或把
-              COLLECT_REQUEST_GAP 调大再跑）。3 = 当时已有刷新在跑，只打在终端、不写进报告。
-              详情见 docs/data/refresh-report.md
-            </div>
-          ) : null}
         </div>
       ) : (
         <p className="mt-3 text-[13px] text-ink-faint">
@@ -149,16 +168,6 @@ export function RefreshPanel({ onDone }: { onDone?: () => void }) {
       {!real ? (
         <p className="mt-2 text-[13px] text-brand">
           当前数据源不是真实 B 站数据，刷新按钮不可用；演示模式请用 seed_data 重新生成。
-        </p>
-      ) : null}
-      {schedule?.enabled ? (
-        <p className="mt-2 text-[12px] text-ink-faint">
-          定时任务：每天 {schedule.at} 自动增量
-          {schedule.full_weekday >= 0
-            ? `，${schedule.weekday_names?.[schedule.full_weekday] ?? "周一"}做全窗口校准`
-            : "（未设周校准）"}
-          {schedule.discovery ? "，含发现新梗" : "，不跑发现层"}。
-          进程不常驻的话请改用系统计划任务：<code>python -m app.scripts.daily_refresh --trigger 定时</code>
         </p>
       ) : null}
       {note ? <p className="mt-2 text-[13px] text-flare">{note}</p> : null}

@@ -370,8 +370,6 @@ export default function Manage() {
               共 {list.data.total} 个 · 入池 {list.data.in_pool_count} 个（双 UP{" "}
               {list.data.certified_count} 个）· 未入池 {list.data.out_of_pool_count} 个 · 人工封面{" "}
               {list.data.managed_count} 个
-              <br />
-              准入看并集：任一 UP 主在 {list.data.cert_window_days} 天内介绍过即入池
             </p>
           ) : null}
         </aside>
@@ -456,7 +454,7 @@ export default function Manage() {
                   <div className="min-w-0 flex-1">
                     <div className="mb-2 text-[15px] font-bold">从已采集的视频封面里挑</div>
                     {view.cover_options.length ? (
-                      <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4">
+                      <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
                         {view.cover_options.map((option) => {
                           const active = option.cover === draft.cover_url;
                           return (
@@ -498,17 +496,31 @@ export default function Manage() {
                         placeholder="或粘贴图片地址：https://…／站内 /thumbs/…"
                         className="field h-10 min-w-[240px] flex-1"
                       />
-                      <span className="text-[12px] text-ink-faint">留空 = 自动取播放量最高视频的封面</span>
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* 保存条吸顶：下面字段+视频列表加起来两千多像素，不吸顶就得一路滚到底才能存 */}
+              <div className="card sticky top-[68px] z-20 flex flex-wrap items-center gap-3 p-3">
+                <button type="button" className="btn-primary rounded-full" onClick={save} disabled={!dirty || busy}>
+                  {busy ? "保存中…" : dirty ? "保存修改" : "没有改动"}
+                </button>
+                {dirty ? (
+                  <span className="text-[13px] text-ink-mute">待保存：{Object.keys(patch).join("、")}</span>
+                ) : null}
+                {flash ? (
+                  <span className={`ml-auto text-[13px] ${flash.tone === "ok" ? "text-go" : "text-brand"}`}>
+                    {flash.text}
+                  </span>
+                ) : null}
               </div>
 
               <div className="card space-y-5 p-5">
                 <div>
                   <div className="mb-2 flex items-baseline gap-2">
                     <span className="text-[15px] font-bold">介绍</span>
-                    <span className="text-[12px] text-ink-faint">详情页梗名下方那句话，最长 {MAX_DESC} 字</span>
+                    <span className="text-[12px] text-ink-faint">最长 {MAX_DESC} 字</span>
                   </div>
                   <textarea
                     value={draft.description}
@@ -531,21 +543,21 @@ export default function Manage() {
                 />
                 <TermList
                   label="关键词"
-                  hint="参与相关性判定，影响后续采集与视频筛选"
+                  hint="参与相关性判定"
                   value={draft.keywords}
                   onChange={(next) => setDraft((value) => ({ ...value, keywords: next }))}
                 />
               </div>
 
-              <div className="card p-5">
-                <div className="flex flex-wrap items-baseline gap-2">
-                  <h3 className="text-[18px] font-bold">这个梗采信了哪些视频</h3>
-                  <span className="text-[12px] text-ink-faint">
-                    共 {view.sample_videos.accepted} 条 · 播放合计 {compact(view.sample_videos.views)}
-                    ；列表里的每一条都真的进了热度计算
-                  </span>
-                </div>
-                {view.sample_videos.items.length ? (
+              {/* 采信样本是「查证用」的只读清单，默认收起来；一条都没有时反而要显眼（那是问题态） */}
+              {view.sample_videos.items.length ? (
+                <details className="card p-5">
+                  <summary className="flex cursor-pointer list-none flex-wrap items-baseline gap-2">
+                    <h3 className="text-[18px] font-bold">这个梗采信了哪些视频</h3>
+                    <span className="text-[12px] text-ink-faint">
+                      共 {view.sample_videos.accepted} 条 · 播放合计 {compact(view.sample_videos.views)}
+                    </span>
+                  </summary>
                   <ul className="mt-3 space-y-2">
                     {view.sample_videos.items.map((video) => (
                       <li key={video.bvid} className="flex items-start gap-3 rounded-xl bg-rail px-3 py-2.5">
@@ -574,31 +586,16 @@ export default function Manage() {
                       </li>
                     ))}
                   </ul>
-                ) : (
-                  <p className="mt-3 rounded-xl bg-rail px-3.5 py-3 text-[13px] text-ink-mute">
+                </details>
+              ) : (
+                <div className="card p-5">
+                  <h3 className="text-[18px] font-bold">这个梗采信了哪些视频</h3>
+                  <p className="mt-3 rounded-xl bg-rail px-3.5 py-3 text-[13px] leading-relaxed text-ink-mute">
                     这个梗目前一条采信样本都没有——热度不会计入榜单。多半是梗名/别名太口语，
                     B 站搜回来的都是字面撞车的无关内容；可以在上面改别名或关键词后重采。
                   </p>
-                )}
-              </div>
-
-              <div className="card flex flex-wrap items-center gap-3 p-4">
-                <button type="button" className="btn-primary rounded-full" onClick={save} disabled={!dirty || busy}>
-                  {busy ? "保存中…" : dirty ? "保存修改" : "没有改动"}
-                </button>
-                {dirty ? (
-                  <span className="text-[13px] text-ink-mute">
-                    待保存：{Object.keys(patch).join("、")}
-                  </span>
-                ) : (
-                  <span className="text-[13px] text-ink-faint">改任意字段后即可保存</span>
-                )}
-                {flash ? (
-                  <span className={`ml-auto text-[13px] ${flash.tone === "ok" ? "text-go" : "text-brand"}`}>
-                    {flash.text}
-                  </span>
-                ) : null}
-              </div>
+                </div>
+              )}
 
               <p className="text-[12px] leading-relaxed text-ink-faint">{view.note}。</p>
             </div>

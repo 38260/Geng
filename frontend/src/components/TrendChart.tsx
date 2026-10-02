@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import * as echarts from "echarts/core";
-import { BarChart } from "echarts/charts";
+import { BarChart, LineChart } from "echarts/charts";
 import { GridComponent, MarkLineComponent, TooltipComponent } from "echarts/components";
 import { CanvasRenderer } from "echarts/renderers";
 
@@ -8,7 +8,7 @@ import { useMeta } from "@/hooks/useAppData";
 import type { TrendPoint } from "@/types/api";
 import { BAR_EMPTY, BAR_UNOBSERVED, STAGE_HEX, shortDate } from "@/utils/format";
 
-echarts.use([BarChart, GridComponent, TooltipComponent, MarkLineComponent, CanvasRenderer]);
+echarts.use([BarChart, LineChart, GridComponent, TooltipComponent, MarkLineComponent, CanvasRenderer]);
 
 /**
  * 热度趋势柱状图 —— 与梗史馆的逐日轨迹共用同一套视觉语言。
@@ -19,6 +19,10 @@ echarts.use([BarChart, GridComponent, TooltipComponent, MarkLineComponent, Canva
  *
  * 两种"没东西"的日子画成浅色短柱，**绝不当成"当天热度 0"读**：
  * 更浅的一档 = 观测到了但当天没有相关内容，最浅的一档 = 这天接口没给数据（未观测）。
+ *
+ * 点少（7 天档）时再叠一条折线：柱子回答"每天多高"，折线回答"在涨还是在跌"，
+ * 连起来一眼能看出方向。30 天档柱子已经很薄，叠线只会糊成一片，所以不叠。
+ * 折线在未观测的那天断开（不连线）——连过去等于替接口抖动编了一个平滑趋势。
  */
 export function TrendChart({ points, height = 230 }: { points: TrendPoint[]; height?: number }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -65,6 +69,14 @@ export function TrendChart({ points, height = 230 }: { points: TrendPoint[]; hei
       const stage = point.stage || "insufficient";
       return { value: point.hotness, itemStyle: { color: STAGE_HEX[stage] } };
     });
+    // 7 天时若还沿用 30 天的细柱，7 根柱子会被摊在整幅宽度上、彼此隔着几十像素，
+    // 高度差反而看不出来。点少就把柱子加宽、只留一道窄缝，让一排读成"一组"，
+    // 一眼能比高低；点多了才退回细柱，免得糊成一片。
+    const dense = points.length <= 10;
+    // 未观测的日子给 null：折线在那里断开，与柱子的浅色短柱说的是同一件事
+    const lineData = dense
+      ? points.map((point) => (point.observed === false ? null : point.hotness))
+      : [];
     const peakIndex = points.reduce(
       (best, point, index) => (point.hotness > (points[best]?.hotness ?? -1) ? index : best),
       -1,
@@ -125,7 +137,8 @@ export function TrendChart({ points, height = 230 }: { points: TrendPoint[]; hei
           {
             type: "bar",
             data,
-            barMaxWidth: 28,
+            barMaxWidth: dense ? 96 : 28,
+            barCategoryGap: dense ? "16%" : "8%",
             // 0 值的柱子也要看得见：梗史馆里就是一根 3px 的短柱，不是"什么都没有"
             barMinHeight: 3,
             itemStyle: { borderRadius: [2, 2, 0, 0] },
@@ -139,6 +152,19 @@ export function TrendChart({ points, height = 230 }: { points: TrendPoint[]; hei
                   data: [{ xAxis: dates[peakIndex] }],
                 }
               : undefined,
+          },
+          {
+            // 叠在柱子上的趋势线：用近黑的墨色，彩柱上压一条深线，两边都看得清
+            type: "line",
+            name: "趋势",
+            data: lineData,
+            smooth: 0.3,
+            symbol: "circle",
+            symbolSize: 5,
+            z: 3,
+            lineStyle: { width: 2.2, color: "#000214" },
+            itemStyle: { color: "#000214", borderColor: "#FFFFFF", borderWidth: 1.5 },
+            connectNulls: false,
           },
         ],
       },

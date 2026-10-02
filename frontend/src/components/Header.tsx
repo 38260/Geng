@@ -1,8 +1,7 @@
-import { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 
 import { DemoBadge } from "@/components/States";
-import { CalendarIcon, HomeIcon, SearchIcon } from "@/components/icons";
+import { CalendarIcon, HomeIcon } from "@/components/icons";
 import { useMeta } from "@/hooks/useAppData";
 import { formatDateTime } from "@/utils/format";
 
@@ -31,28 +30,12 @@ function DateChip({ through, updatedAt }: { through?: string | null; updatedAt?:
   );
 }
 
-function SearchBox() {
-  const navigate = useNavigate();
-  const [value, setValue] = useState("");
-  return (
-    <div className="relative w-full max-w-[480px]">
-      <SearchIcon size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-mute" />
-      <input
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && value.trim()) navigate(`/library?q=${encodeURIComponent(value.trim())}`);
-        }}
-        placeholder="搜索梗名、别名、关键词…"
-        className="h-11 w-full rounded-full border border-line bg-surface pl-11 pr-4 text-[15px] outline-none transition placeholder:text-ink-faint focus:border-nav/40 focus:ring-2 focus:ring-nav/12"
-      />
-    </div>
-  );
-}
-
 /**
  * 全站顶部通栏（参考图里它横跨侧栏与内容区，所以放在 AppLayout 而不是各页面）。
- * variant="back" 用于梗详情页：左侧换成返回，搜索框不出现。
+ * variant="back" 用于梗详情页：左侧换成「返回 + 首页」。
+ *
+ * 这里**不再挂全站搜索框**：梗库自己有搜索框（还认 `?q=`），
+ * 顶栏那个只是个重复入口，删掉后头部只剩品牌与数据时间戳，清净很多。
  */
 export function TopBar({
   variant = "search",
@@ -110,9 +93,6 @@ export function TopBar({
             <span className="hidden shrink-0 text-[15px] font-medium text-ink-mute lg:block">
               B站网络梗热度与生命周期分析平台
             </span>
-            <div className="hidden flex-1 justify-center px-4 lg:flex">
-              <SearchBox />
-            </div>
           </>
         )}
 

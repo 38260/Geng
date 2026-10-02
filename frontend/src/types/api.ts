@@ -304,6 +304,11 @@ export interface TrendPoint {
   creator_count: number;
   /** false = 这天接口给了个空壳，画图上必须跟"真的是 0"分开 */
   observed?: boolean;
+  /**
+   * 这天所处的生命周期阶段，用来给柱子着色。
+   * 由后端按管线口径逐日复算，与梗史馆、右上角徽章同源；老接口可能给空串。
+   */
+  stage?: LifecycleStage | "";
 }
 
 export interface Trend {
@@ -339,8 +344,8 @@ export interface InsightBundle {
   catch_up: CatchUp;
 }
 
-/** 介绍来源：人工撰写 / 字幕原文摘录 / 由真实证据原文拼出 / 什么都没有 */
-export type IntroSource = "manual" | "transcript" | "evidence" | "none";
+/** 介绍来源：人工撰写 / AI 摘要 / 字幕原文摘录 / 由真实证据原文拼出 / 什么都没有 */
+export type IntroSource = "manual" | "ai" | "transcript" | "evidence" | "none";
 
 export interface IntroEvidence {
   role: string;
@@ -401,6 +406,27 @@ export interface IntroTranscript {
   summary: IntroSummary | null;
 }
 
+/**
+ * AI 摘要：允许模型写句子，但输出里的数字、书名号专名、英数字串都必须能在
+ * `material` 里找到出处，否则整段作废（界面退回原文摘录）。
+ * `material` 一并带出来，是为了让「依据可核对」这句话在界面上真的可执行。
+ */
+export interface AiIntro {
+  text: string;
+  chars: number;
+  /** 被核对过的事实锚点 */
+  tokens: string[];
+  truncated: boolean;
+  /** 喂给模型的材料原文（模型只看到这些） */
+  material: string;
+  material_chars: number;
+  source: "llm" | "rule" | "cache";
+  model: string;
+  data_version: string;
+  generated_at: string | null;
+  verified: boolean;
+}
+
 export interface MemeIntro {
   text: string;
   source: IntroSource;
@@ -409,6 +435,8 @@ export interface MemeIntro {
   evidence: IntroEvidence[];
   excerpt: IntroExcerpt | null;
   transcript: IntroTranscript | null;
+  /** AI 摘要（通过事实核对才会带 text）；没有就是 null */
+  ai?: AiIntro | null;
 }
 
 export interface MemeDetail {
@@ -738,4 +766,119 @@ export interface PipelineView {
   modeling: PipelineModeling;
   quality: PipelineQuality;
   ai: PipelineAI;
+}
+
+/* ------------------------------ 梗史馆（历史周期） ------------------------------ *
+ * 对应后端 GET /api/history（见 backend/app/services/meme/history.py）。
+ * 这里只描述形状：热度、阶段、周期全部由后端算好，前端不重算、不补齐。
+ */
+
+/** 周期类型：仍在爬升 / 脉冲型（起快落快）/ 长尾型 / 数据不足（不给结论） */
+export type CycleType = "rising" | "pulse" | "long_tail" | "no_data";
+
+export interface HistorySparkPoint {
+  date: string;
+  hotness: number;
+  /** 当天的生命周期阶段（用同一套阈值在"截至那天"的窗口上判出来的） */
+  stage: LifecycleStage;
+  /** false = 这天接口给了空壳，画空档；绝不当作"当天热度 0" */
+  observed: boolean;
+}
+
+/** 入池证据：是梗百科还是梗指南介绍过、哪一期、什么时候发的 */
+export interface HistoryEvidence {
+  role: string;
+  up_name: string;
+  bvid: string;
+  video_title: string;
+  published_at: string | null;
+  /** 只有真实抓到的投稿才给可点开链接 */
+  linkable: boolean;
+  video_url: string;
+}
+
+export interface HistoryItem {
+  id: number;
+  name: string;
+  slug: string;
+  thumbnail: Thumbnail;
+  stage: LifecycleStage;
+  stage_label: string;
+  emoji: string;
+  catch_label: string;
+  hotness: number | null;
+  cert_label: CertLabel;
+  certified_by: string[];
+  double_certified: boolean;
+  verification_state: string;
+  /** 入池日 = 窗口内最早的一条真实解说证据的发布时间 */
+  admitted_at: string | null;
+  evidences: HistoryEvidence[];
+  /** true = 入池早于观测窗起点，周期左端被截断（爬升/半衰期可能被低估） */
+  truncated: boolean;
+  has_metrics: boolean;
+
+  cycle: CycleType;
+  cycle_label: string;
+  cycle_emoji: string;
+  cycle_hint: string;
+
+  obs_from: string | null;
+  obs_to: string | null;
+  window_days: number;
+  observed_days: number;
+  coverage: number;
+  active_days: number;
+
+  peak_date: string | null;
+  peak_hotness: number;
+  current_hotness: number;
+  /** 离开峰值的比例：0 = 正在峰上 */
+  off_peak: number;
+  days_since_peak: number | null;
+  /** null 的含义是"一直没跌到峰位一半"，不是缺数据 */
+  half_life_days: number | null;
+  /** 从第一次有内容到峰值的天数；周期被截断时可能是 null */
+  rise_days: number | null;
+  window_view: number;
+  window_discussion: number;
+  spark: HistorySparkPoint[];
+}
+
+export interface HistorySummary {
+  pool: number;
+  returned: number;
+  days: number;
+  /** 实际画出来的观测窗天数（库里序列不够长时小于请求值） */
+  window_days: number;
+  window_days_requested: number;
+  obs_from: string | null;
+  obs_to: string | null;
+  /** 入池早于观测窗起点、周期左端被截断的梗数 */
+  truncated_count: number;
+  with_series: number;
+  no_metrics: number;
+  by_cycle: { key: CycleType; label: string; emoji: string; hint: string; count: number }[];
+  by_stage: { key: LifecycleStage; label: string; emoji: string; count: number }[];
+  median_days_since_peak: number | null;
+  avg_days_since_peak: number | null;
+  avg_rise_days: number | null;
+  avg_half_life_days: number | null;
+  peak_leader: { id: number; name: string; peak_hotness: number; peak_date: string } | null;
+}
+
+export interface HistoryView {
+  generated_at: string;
+  days: number;
+  window_days: number;
+  window_days_requested: number;
+  sort: string;
+  sort_label: string;
+  filter: { cycle: string; stage: string; cert: string };
+  summary: HistorySummary;
+  items: HistoryItem[];
+  /** 口径原文：入池怎么看、周期怎么算、空档怎么处理 */
+  rule: string;
+  data_source: DataSource;
+  is_demo: boolean;
 }

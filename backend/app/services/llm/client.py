@@ -43,6 +43,11 @@ class ChatResult:
     model: str
     latency_ms: int
     usage: dict[str, Any]
+    # content 为空、只能退回 ``reasoning_content`` 时为 True：这时 text 拿到的是
+    # 模型的**思考过程**而不是答案。调用方必须自己决定怎么办——
+    # 趋势解释那类"短输出"照旧兜底显示即可，而介绍那类需要归纳的任务必须当失败重试，
+    # 否则就会出现"把英文推理当成中文介绍"的情况（实测踩过）。
+    reasoning_only: bool = False
 
 
 def _headers(config: LLMConfig) -> dict[str, str]:
@@ -85,6 +90,7 @@ def chat(
                 choices = data.get("choices") or []
                 if not choices:
                     raise LLMError("模型返回为空", kind="empty", status=200)
+                fell_back_to_reasoning = False
                 message = choices[0].get("message") or {}
                 finish = choices[0].get("finish_reason")
                 text = (message.get("content") or "").strip()
@@ -94,6 +100,7 @@ def chat(
                     # 不接住这两种情况，界面就永远只显示"AI 不可用"，而日志里看不出为什么。
                     reasoning = (message.get("reasoning_content") or "").strip()
                     text = reasoning
+                    fell_back_to_reasoning = True
                     log.warning(
                         "LLM content 为空（finish_reason=%s, usage=%s），改用 reasoning_content %d 字",
                         finish, (data.get("usage") or {}).get("completion_tokens", "?"), len(reasoning),
@@ -109,6 +116,7 @@ def chat(
                     model=data.get("model", config.model),
                     latency_ms=latency,
                     usage=data.get("usage") or {},
+                    reasoning_only=fell_back_to_reasoning,
                 )
 
             last_error = _error_from_response(response)

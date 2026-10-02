@@ -266,3 +266,17 @@ export const PipelineSolidIcon = (p: IconProps) => (
     <rect x="2.6" y="15.8" width="8" height="4.6" rx="2.3" />
   </svg>
 );
+
+/**
+ * 梗史馆：一只带提手的档案盒。
+ * 与「梗库」的书册、「热度趋势」的图表在轮廓上区分得开——
+ * 侧栏图标是实心块，靠 evenodd 挖出白缝，选中态下也透得出底色。
+ */
+export const ArchiveSolidIcon = (p: IconProps) => (
+  <svg {...solid(p)}>
+    <path d="M4.2 6.4h15.6A1.6 1.6 0 0 1 21.4 8v10.4a1.6 1.6 0 0 1-1.6 1.6H4.2a1.6 1.6 0 0 1-1.6-1.6V8a1.6 1.6 0 0 1 1.6-1.6z" />
+    <path d="M9 3.4h6a1.2 1.2 0 0 1 1.2 1.2v1.8H7.8V4.6A1.2 1.2 0 0 1 9 3.4z" />
+    <rect x="6.6" y="11.1" width="7" height="1.9" rx="0.95" fill="#fff" opacity="0.92" />
+    <rect x="6.6" y="14.7" width="4.4" height="1.9" rx="0.95" fill="#fff" opacity="0.75" />
+  </svg>
+);

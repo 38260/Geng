@@ -109,6 +109,19 @@ def meme_videos(
     return q.video_page(session, meme, limit=limit, offset=offset, sort=sort)
 
 
+@router.post("/{meme_id}/intro", dependencies=[Depends(require_admin)])
+def meme_intro(meme_id: int, session: SessionDep, body: RefreshRequest):
+    """重新生成「这个梗是什么」的 AI 摘要。
+
+    与详情接口分工：详情只读缓存（不为一段文案让页面等模型几十秒），
+    生成由这个按钮触发，或由 ``app.scripts.generate_intros`` 批量补。
+    """
+    meme = _require_certified(meme_id, session)
+    q.generate_intro(session, meme, refresh=body.refresh)
+    session.commit()
+    return q.intro_payload(session, meme)
+
+
 @router.post("/{meme_id}/insight", dependencies=[Depends(require_admin)])
 def meme_insight(meme_id: int, session: SessionDep, body: RefreshRequest):
     """重新判断：AI 失败后前端点这个按钮重试。"""

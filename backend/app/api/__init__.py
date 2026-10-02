@@ -9,7 +9,7 @@
 
 from fastapi import APIRouter, Depends
 
-from . import jobs, llm, manage, memes, meta, pipeline, settings as settings_api
+from . import history, jobs, llm, manage, memes, meta, pipeline, settings as settings_api
 from .deps import require_admin
 
 api_router = APIRouter()
@@ -17,6 +17,8 @@ api_router.include_router(meta.router)
 # pipeline 是纯只读的数据流程画像，与 meta 同组：不挂令牌守卫，
 # 也不暴露任何凭据/Key，小程序端将来复用不必带 X-Admin-Token。
 api_router.include_router(pipeline.router)
+# history（梗史馆）同理：只读的复盘视图，数据全部来自库里已算好的快照与逐日序列。
+api_router.include_router(history.router)
 api_router.include_router(memes.router)
 api_router.include_router(llm.router, dependencies=[Depends(require_admin)])
 api_router.include_router(settings_api.router, dependencies=[Depends(require_admin)])

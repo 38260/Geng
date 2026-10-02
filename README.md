@@ -27,6 +27,11 @@ Hero、四档筛选（全部 / 正在爆 / 快起飞 / 退潮中）、今日热�
 
 一个梗的完整判断链：热度指数 → 观测覆盖度 → 7/30 天趋势 → 生命周期轨道 → 赶梗结论 → 相关视频 → 认证证据。
 
+趋势图是**柱状图**：一根柱子一天，颜色是**那天所处的生命周期阶段**——与梗史馆的逐日轨迹
+共用同一份复算（`history.py::stage_path_for_rows`），所以「页面上的颜色」和「右上角徽章」
+永远说的是同一件事。没观测到的日子画成最浅的短柱，观测到但当天没内容的稍深一档，
+都不当成 0 读（`observed=false` 是接口抖动，不是没人做这个梗）。
+
 ![梗详情：热度趋势与生命周期](docs/screenshots/detail.jpg)
 
 ### 梗库与热度趋势榜
@@ -137,10 +142,13 @@ $env:VITE_API_TARGET="http://127.0.0.1:8010"; npm run dev
 | `python -m app.scripts.refresh_video_rank` | 只补 B 站综合排序名次（每梗 1~2 次请求，不重采日序列；`--gap` 默认 3 秒，连打会被回空页） |
 | `python -m app.scripts.fetch_transcripts` | 抓解说视频字幕入库（**要 `BILI_COOKIE`**，没有就直接退出 2） |
 | `python -m app.scripts.condense_intros` | 给字幕生成 AI 浓缩介绍，逐字校验通过才入库 |
+| `python -m app.scripts.generate_intros` | 批量生成「这个梗是什么」的 AI 摘要（`--only-failed` 只补没写成的；默认幂等，`--force` 全量重算） |
 | `python -m app.scripts.list_recent_certified` | 打印两位 UP 主近期投稿里的梗候选（发现层口径核对） |
 | `python -m app.scripts.probe_certification` | 只读探测：某梗在两位 UP 主空间里能不能搜到（受风控限制，需 Cookie） |
 | `python -m app.scripts.dedupe_memes --drop 12,34 --apply` | 删指定重名梗（默认只报告；`--drop-placeholders` 清单占位空壳） |
 | `python -m app.scripts.prune_mock_memes --apply` | 删"纯演示梗"（`data_source=mock` 且库里没有任何 B 站真实证据）；不加 `--apply` 只报告要删哪些行，`--apply` 会先自动备份整库 |
+| `python -m app.scripts.purge_mock_data --apply` | 清掉全库 mock 行（默认只报告；`--apply` 先 `VACUUM INTO` 备份整库，再删假证据并按真证据重推认证） |
+| `python -m app.scripts.history_report` | 梗史馆报告：近 90 天入池梗的周期画像（终端表格 + `docs/data/meme-history.md`，含文本热度轨迹） |
 
 ---
 
@@ -149,9 +157,10 @@ $env:VITE_API_TARGET="http://127.0.0.1:8010"; npm run dev
 | 路由 | 内容 |
 | --- | --- |
 | `/` | Hero + 筛选（全部/正在爆/快起飞/退潮中）+ 今日热榜 5 卡 + 精选推荐 + 数据透明度页脚 |
-| `/meme/:id` | 顶栏「← 返回 ｜ 首页」两个出口；梗头卡（热度/阶段/赶梗状态）、「这个梗是什么」介绍（四档来源，字幕原文可折叠对照）、四项指标带增幅、ECharts 热度趋势 7/30 天（含观测覆盖度）、生命周期轨道、赶梗判断、趋势解释、相关视频（**B站默认排序 / 播放量两档可切**）、认证证据（含认证强度标签） |
+| `/meme/:id` | 顶栏「← 返回 ｜ 首页」两个出口；梗头卡（热度/阶段/赶梗状态）、「这个梗是什么」介绍（五档来源；AI 摘要那档可展开逐条核对依据与模型看到的完整材料）、四项指标带增幅、ECharts 热度趋势**柱状图** 7/30 天（每根柱子按当天所处阶段着色，与梗史馆同源；含观测覆盖度）、生命周期轨道、赶梗判断、趋势解释、相关视频（**B站默认排序 / 播放量两档可切**）、认证证据（含认证强度标签） |
 | `/library` | 全量已认证梗，筛选 + 搜索 + 排序 |
 | `/trends` | 热度榜表格（相对位置 + 增幅 + 赶梗结论） |
+| `/history` | 梗史馆：近 90 天入池的梗逐个摊开——逐日热度 + 阶段轨迹、峰值日 / 距峰天数 / 半衰期 / 周期类型（仍在爬升 / 脉冲型 / 长尾型 / 数据不足），可按周期与认证强度筛选、按入池日 / 峰值 / 当前热度 / 距峰排序 |
 | `/favorites` | 本机 localStorage 收藏，无账号体系 |
 | `/manage` | 梗管理：挑封面（从该梗已采集的真实视频封面里选，或粘贴图片地址）、写介绍、维护别名与关键词；候选梗也能管 |
 | `/settings` | LLM 配置（Provider/BaseURL/Key/Model/Temperature/MaxTokens）+ 测试连接 + 系统信息 |
@@ -320,18 +329,81 @@ LLM 只能润色这句话，**不能改状态**：模型返回的 `status` 与�
 ### 梗介绍：详情页的「这个梗是什么」
 
 真实梗里 31/55 条 `description` 是空的，点进详情页只剩一片空白，用户会以为系统坏了。
-所以介绍按四档来源合成（`app/services/meme/intro.py`），界面用 `intro.source` 标出来：
+所以介绍按**五档**来源合成（`app/services/meme/intro.py`），界面用 `intro.source` 标出来：
 
 | 来源 | 什么时候用 | 界面标注 |
 | --- | --- | --- |
 | `manual` | 梗管理里人工写过介绍 | 「人工撰写」 |
+| `ai` | 有真实证据但没人写稿 → 让模型**依据证据归纳**一段 | 「AI 摘要」 |
 | `transcript` | 没人工介绍，但抓到了解说视频字幕 | 「字幕原文摘录」/「字幕原文（AI 缩短）」 |
-| `evidence` | 前两样都没有，但抓到了真实证据 | 「证据原文拼出」 |
+| `evidence` | 前三样都没有，但抓到了真实证据 | 「证据原文拼出」 |
 | `none` | 全都没有 | 「暂无介绍」+ 去梗管理补的入口，不留白 |
 
-四档的共同点：**每个字都能在 `videos` / `meme_certifications` / `video_transcripts`
-三张表里逐字找到**。摘录只清洗噪声——话题标签、外链/BV 号、"求三连"式刷屏
-（这类占比超过 35% 直接判为不可用），剥完不足 40 字就不摘。
+除 `ai` 之外的几档**一个字都不改写**，拼出来的每个字都能在 `videos` /
+`meme_certifications` / `video_transcripts` 三张表里找到。摘录只清洗噪声：
+话题标签、外链/BV 号、"求三连"式刷屏、**制作人员署名与推广话术**
+（`CV：… 文案：… 后期：…`、`发邮件到…@…`、`▶微博：…`——实测这类文字字数够、
+信息量为零，却最容易被当成"简介摘录"挂到详情页上），剥完不足 40 字就不摘。
+
+#### `ai` 那一档：允许写句子，但每句话都要能被核对（2026-10-02 加）
+
+为什么非加不可：**能说明"这是什么"的信息往往不在简介里**。全库 10,861 条真实视频
+只有 15% 的简介 ≥40 字，而抓到的那些又常是制作人员名单——用户实测反馈，某梗的介绍
+整段就是「这音效小时候抱过我 CV：伊闪闪 文案：灵念卿 后期：MrChenBeta 若发现…发邮件到…@…」，
+看完等于什么都没看到。真正带信息量的是**一大批相关视频的标题**：它们自己就写着这个梗
+被用在哪、以什么形式传播（「循环歌单丨…【冰冰冰の小曲】」「正太扭腰教程」
+「〔刘畅木法沙〕正太扭腰原版」）。把这些摆给模型，它就能归纳出人话。
+
+这与前几档"一个字都不许写"是**有意松绑**，代价用三道措施兜住：
+
+1. **材料里单独拎出「出处线索」块**：标题或简介里**明确写了来源**的那些
+   （`原版视频` / `原曲` / `原作` / `原始素材` / `素材来源：@某某` / `搬运自哪里`）
+   单独列一块，不再混在十几条标题里。实测入池 48 只里 **35 只**有这类线索，
+   而混着的时候模型经常整段跳过来源。
+2. **提示词**（`app/prompts/meme-intro.txt`）：允许归纳、禁止新增事实（年份 / 人名 /
+   作品名 / 地点 / 数字一律不许出现材料里没有的）；不许"据说/可能/一般认为"；
+   `INSUFFICIENT` 只在连"它是什么形式"都判断不出来时才用。
+   摘要按「①它指什么 ②常见叫法 ③**它从哪来**」组织，其中第三项的口径是：
+   **有据可依才写，写了就必须照实转述**——线索里给了具体来源就要写具体
+   （原作者账号、原曲名、平台），**不许泛化成"源自海外动画"这种等于没说的说法**；
+   **没有出处线索时不强求，也不许凭空补**。
+3. **事实锚点核对**（`ai_intro.check_grounded`）：输出里的**数字**、**`《》「」""` 里的专名**、
+   **连续英数字串**，逐个都要能在材料里找得到（比对忽略大小写，平台通用词如
+   `UP主 / emoji / meme / Vlog` 走白名单，不算编造）；再加长度区间、元话语
+   （"根据材料/上述/本文"）、预测口吻三道闸门。**任何一条不过 → 整段作废**，
+   界面退回 `transcript`/`evidence`，并把原因写进 `ai_insights.status=error`。
+4. **如实标注 + 依据可展开**：界面标「AI 摘要」并写明"不是原文照抄、请以证据原文为准"，
+   下面给一个折叠区，能逐条看证据、展开**模型看到的完整材料**。
+
+模型看到的材料只有真实抓取的数据（认证投稿标题、相关视频标题与播放量、清洗过的简介、
+主题标签、字幕摘录、以及从标题/简介里抽出的出处线索），没有任何人工编造的成分——
+所以"可核对"这条底线是能真正执行的。
+
+**出处这一项的实测效果**（`琵琶曲`）：材料里只有「原版油管老师@KotteAnimation」
+「油管原作者是Kotte Animation老师」两条简介原文，摘要写成——
+「该梗的原版素材来源于油管（YouTube）的 Kotte Animation 老师（@KotteAnimation），
+也有简介提到原作者为 R董香e，并由 @MRZJL 代理发布至 B 站。」
+账号名逐个能回材料里找到；反过来，材料没有出处线索的 13 只（牛来、大脚忍者、
+霸之意志…）不会被逼着编一个。
+
+**实测（2026-10-02，48 只入池梗）**：**39 只生成成功（81%），9 只被拦下并退回原文摘录，
+没有一只漏出过编造内容**。被拦下的都是模型确实写了证据里没有的东西：
+「x姆？长月老贼」写了"Re:从零开始的异世界生活"、「六人定律」把标题里的占位符
+`A认识B` 当成事实抄了进来、「闹吃vs古振兴」编了"和谐相处版 / 阶级斗争版"这些版本名。
+
+加上"写出处"这一项后，成功率从 42 只降到 39 只——因为模型会更主动地去补来源，
+而每多写一个具体名字（账号、原曲、平台）就多一次被核对拦下的机会。这是刻意的取舍：
+**宁可少几条，不编一条**。被拦下的梗退回原文摘录，页面照常能读，只是没有那段归纳。
+
+#### 两个踩过的坑（都在真实数据上暴露过）
+
+* **思考型模型在这个任务上必然失败**：`LongCat-2.5-Preview` 会把输出预算全烧在
+  `reasoning_content` 上、`content` 返回空串（实测 900 与 2500 tokens 都被吃光），
+  客户端只好退回 reasoning——**那是思考过程（常常还是英文），不是介绍**。
+  现在单独留了 `LLM_INTRO_MODEL`（默认 `LongCat-2.0`）给它，并让客户端在
+  `ChatResult.reasoning_only` 时加倍预算重试一次；仍失败就放弃这次，绝不把思考过程写进库。
+* **署名/推广噪声必须先清再喂模型**：不清的话模型会把「CV：伊闪闪」当作这个梗的内容
+  写进摘要（实测过）。清洗放在 `intro._strip_credits`，材料与页面摘录共用同一套规则。
 
 #### 字幕这一层是怎么来的（2026-09-29 实测）
 
@@ -367,10 +439,12 @@ AI 字幕要单独标出来（`kind_label`）：机器听写把专有名词听�
 
 ## 四、当前数据集：真实 B 站数据
 
-`backend/.env` 里 `DATA_SOURCE=bilibili`，热榜与梗库展示的指标都来自 B 站真实抓取；
-库里仍留着 12 条演示梗与 108 条演示视频（`data_source=mock`，界面按 `meme_data_source`
-标「演示数据」，不进真实榜单）。下面这些数是 2026-09-29 从 `/api/meta` 与库内实测的，
-统计窗口 30 天：
+`backend/.env` 里 `DATA_SOURCE=bilibili`，热榜与梗库展示的指标都来自 B 站真实抓取。
+**库里已经没有任何 mock 行**（2026-10-01 清理，见本节末）：四张带来源的表
+（`memes` / `videos` / `meme_daily_stats` / `meme_certifications`）全部只有 `bilibili`。
+
+下面这张表是 **2026-09-29 的历史快照**（当时还混着演示数据），统计窗口 30 天；
+采集每天都会动数字，**要当前状态请查 `/api/meta`**，别拿这张表当现状：
 
 | 项目 | 实测结果 |
 | --- | --- |
@@ -444,7 +518,8 @@ python -m app.scripts.rebuild_from_bilibili    # 在线核验 + 逐日真实采�
   命中限流会触发 `collect_throttle_cooldown` 秒的**会话冷却**（缓解，不是解药）；
   同日合并按 `(observed, video_count, view)` 比优劣，一次空返回不许盖掉上次真观测；
   `stale_days` 只数观测到的日子；观测不足 4/7 天时生命周期与赶梗一律判「数据不足」。
-  卡片与趋势接口带 `observed_days` / `coverage`，趋势图把没观测到的日子画成断口/虚线柱。
+  卡片与趋势接口带 `observed_days` / `coverage`，趋势图把没观测到的日子画成**最浅的那种短柱**
+  （既不是 0、也不是断口），观测到但当天没内容的画成稍深一档的短柱，两者分开。
 
   > ⚠️ **全库重采在匿名状态下做不完**：75 梗 × 30 天约 2250 次请求，打到几百次就进处罚。
   > README 后面「最近一轮全量回补耗时 4.6 小时、还剩 25 个空窗」的原因就在这里，
@@ -497,6 +572,40 @@ PYTHONIOENCODING=utf-8 python -m app.scripts.list_recent_certified --ingest   # 
   再跑 `python -m app.scripts.rebuild_from_bilibili --pages 20 --refresh-index`，
   命中的梗会自动升级为「已在线核验」并带上真实投稿链接。
 
+### 演示数据已全部清除（2026-10-01）
+
+库里最后剩下的 mock 数据是 `meme_certifications` 里的 **55 条演示证据行**（涉及 28 只梗）。
+它们是早期手写的；真实采集上线后一直留着，而 `cert_label()` 与 `meme.certified` 只看
+`confirmed`、**不看 `data_source`** —— 也就是说，只要绕过在线核验那道闸门（梗管理页就是），
+就会看到一条由假证据撑起来的「双 UP 认证」。「库里混着模拟数字」这件事本身没法向用户解释。
+
+```bash
+cd backend
+python -m app.scripts.purge_mock_data            # 只报告：删哪些行、影响谁、可见性会不会变
+python -m app.scripts.purge_mock_data --apply    # 先备份整库，再删 + 重算认证
+```
+
+清理结果（实测）：
+
+| 项目 | 清理前 | 清理后 |
+| --- | --- | --- |
+| mock 行 | 55（全在 `meme_certifications`） | **0** |
+| `meme_certifications` | 111（56 真实 + 55 演示） | 56（全真实） |
+| 对外可见（`scope=all` 梗库） | 48 | **48（无变化）** |
+| 梗状态 | 75 certified / 1 candidate | 48 certified / 28 candidate |
+| 真实视频 / 逐日序列 | 10,861 / 2,394 | **一条没动** |
+
+三点刻意为之：
+
+* **只删假证据，真数据一条不删**：那 28 只梗的真实视频与逐日序列全部保留，
+  只是从 `certified` 退回 `candidate`（它们的认证/准入由**剩下那些真实行**重推）。
+* **对外可见性零变化**：它们本来就被 `LEADERBOARD_REQUIRE_VERIFIED` 挡在热榜与梗库之外，
+  这次清理堵的是"梗管理页里那个假徽章"。
+* **备份用 `VACUUM INTO`，不用 `copyfile`**：库跑在 WAL 模式下，只拷主库文件会拿到
+  偏旧甚至撕裂的快照——备份的意义恰在破坏性操作之前，这时候绝不能拷出半份数据。
+  备份落在 `backend/data/backups/gengv1.pre-purge-mock-*.db`。
+
+
 ---
 
 ## 五、数据来源与诚实性
@@ -548,7 +657,7 @@ curl -X POST "http://127.0.0.1:8010/api/jobs/collect?source=bilibili&limit=3"
 ```
 backend/
   app/
-    api/          # FastAPI 路由：memes / llm / settings / jobs / meta
+    api/          # FastAPI 路由：memes / history / llm / settings / jobs / meta
     models/       # SQLAlchemy：Meme, MemeCertification, Video, MemeDailyStats,
                   #           HotnessSnapshot, LifecycleSnapshot, AIInsight, VideoTranscript
     schemas/      # 请求体模型
@@ -556,7 +665,7 @@ backend/
       llm/        # config / client / service（LongCat 走 OpenAI 兼容接口）
       meme/       # certification（准入并集 + 双 UP 徽章）、discovery（发现层并集）、
                   # intro（介绍四档来源 + 字幕规则选段）、summary（AI 浓缩 + 逐字校验）、
-                  # query（读侧组装）、manage（人工四字段）
+                  # query（读侧组装）、manage（人工四字段）、history（梗史馆：近 N 天入池梗的历史周期）
       pipeline.py # 采集 → 匹配 → 聚合 → 热度 → 生命周期
       settings_store.py  # 把前端填的配置写回 .env
     analytics/    # relevance / series / hotness / lifecycle / catch_up / aggregation
@@ -565,8 +674,9 @@ backend/
     config/       # settings(.env) / algorithms(阈值) / logging(带密钥脱敏)
     mock/         # 演示梗库与曲线
     scripts/      # seed_data / run_pipeline / collect_data / daily_refresh / backfill_days /
-                  # refresh_video_rank / fetch_transcripts / condense_intros / rebuild_from_bilibili
-  tests/          # 279 例
+                  # refresh_video_rank / fetch_transcripts / condense_intros / generate_intros /
+                  # purge_mock_data / rebuild_from_bilibili
+  tests/          # 355 例
 frontend/src/
   api/  types/  hooks/  components/  pages/  utils/
 miniprogram/      # 微信小程序端（Taro 4 + React + TS）：一份源码出 weapp / h5
@@ -599,9 +709,11 @@ scripts/          # smoke_api.py / screenshot.sh / restart-backend.sh
 - [x] 演示/真实数据全站明确标注，接口与前端都带 `meme_data_source` 与 `verification_state`
 - [x] 真实数据已替换演示数据：35 个入池梗、5,044 条真实视频、逐日 30 天序列
 - [x] 接口空返回不当成"零活动"：`observed` 标记 + 同日取更好观测 + 观测不足拒给趋势结论
-- [x] 介绍四档来源可核对（人工 > 字幕原文 > 标题简介原文 > 显式暂无介绍），每档都标来源、
-      系统一个字都不改写；AI 只允许整句照抄着缩短，逐字校验不过就整段作废
+- [x] 介绍五档来源可核对（人工 > AI 摘要 > 字幕原文 > 标题简介原文 > 显式暂无介绍），每档都标来源；
+      不写字的四档一个字都不改写（字幕那条只允许整句照抄着缩短，逐字校验不过就整段作废），
+      AI 摘要那档允许写句子，但输出里的数字/《专名》/英数字串必须能在材料里找到，否则整段作废
 - [x] 界面只做反向声明：含演示数据才标「演示数据」，不再挂「B站真实数据」这种自我认证
+- [x] 库里零 mock 行：55 条演示认证证据已清（2026-10-01），四张带来源的表全部只有 `bilibili`，可见性无变化
 
 ### AI
 
@@ -619,11 +731,15 @@ scripts/          # smoke_api.py / screenshot.sh / restart-backend.sh
 
 ### 测试
 
-- [x] `python -m pytest` → 279 passed（认证闸门、算法七态、热度边界与 NaN、相关性阈值、阈值可达性、
-      赶梗三态、观测覆盖度闸门、LLM 降级与缓存、字幕抓取与逐字校验、采集层离线全流程、接口集成）
-- [x] `python scripts/smoke_api.py` → 125/125 通过（对运行中的真实服务）
+- [x] `python -m pytest` → 384 例全部通过（认证闸门、算法七态、热度边界与 NaN、相关性阈值、阈值可达性、
+      赶梗三态、观测覆盖度闸门、梗史馆周期口径与详情页趋势柱
+      （含「轨迹末格 / 最后一根柱子 == 当前阶段」不变量）、
+      AI 介绍的事实锚点核对（含大小写与平台通用词白名单、思考段重试、出处线索块）、LLM 降级与缓存、
+      字幕抓取与逐字校验、采集层离线全流程、接口集成）
+- [x] `python scripts/smoke_api.py` → 140/142 通过（对运行中的真实服务）。未通过的两条是
+      「未配置 Key 时应 400」，而本机 `backend/.env` **配了** LLM Key，所以那两条预期不成立
 - [x] `npm test`（miniprogram）→ 21 passed；两端 `tsc --noEmit` 干净，Web 构建通过
-- [x] `npm run build` 通过；首页 JS 204KB（gzip 66KB），ECharts 拆到详情页
+- [x] `npm run build` 通过；主包 228KB（gzip 74KB），ECharts 拆到详情页、梗史馆与梗管理各自成块
 - [x] 后端停机时前端渲染错误态 + 启动提示 + 重新加载，不白屏
 
 ---

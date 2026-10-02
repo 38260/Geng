@@ -1,20 +1,23 @@
 """梗介绍：详情页「这个梗是什么」这一段的来源与合成规则。
 
-原则只有一条：**不编造**。介绍只有四个来源，优先级从高到低：
+原则：**每一句都要能被核对**。介绍有五个来源，优先级从高到低：
 
 1. ``manual``     —— 人工在梗管理里写好的 ``meme.description``；
-2. ``transcript`` —— 解说视频**字幕原文**里挑出真正在讲这个梗的那几句
+2. ``ai``         —— AI 依据真实证据**归纳**出的一段介绍（见 :mod:`app.services.meme.ai_intro`）。
+   它允许写句子，但输出的每个数字、每处《专名》、每个英数字串都必须在材料里找得到，
+   否则整段作废、退回下一档；界面也必须如实标注「AI 摘要」并保留可展开的原文依据；
+3. ``transcript`` —— 解说视频**字幕原文**里挑出真正在讲这个梗的那几句
    （由 :mod:`app.scripts.fetch_transcripts` 抓进 ``video_transcripts``，需要 BILI_COOKIE）；
-3. ``evidence``   —— 用已经抓到的真实证据原文拼出来：哪位 UP 主、哪一期解说视频
+4. ``evidence``   —— 用已经抓到的真实证据原文拼出来：哪位 UP 主、哪一期解说视频
    （标题是 B 站返回的原文），再附上头部相关视频里字数够长的真实简介摘录；
-4. ``none``       —— 什么都没有。这时界面必须显式说"还没有介绍"并给出补介绍的入口，
+5. ``none``       —— 什么都没有。这时界面必须显式说"还没有介绍"并给出补介绍的入口，
    不能留一片空白让人以为系统坏了。
 
 ``transcript`` 和 ``evidence`` 两条路都刻意不做任何改写和归纳：字幕选段只做
 "按原顺序把命中线索词的句子拼起来"这一件事，挑不出线索句就退回 ``evidence``，
-绝不为了有内容而凑话。LLM 没配 key 时不能凭空写，配了 key 也不该由它来定义
-"这个梗是什么"（V1 约定：AI 只复述算法结论，不生产事实）。
-所以这里拼出来的每个字都能在 ``videos`` / ``meme_certifications`` /
+绝不为了有内容而凑话。**唯一写句子的是 ``ai`` 那一档**，它靠"事实锚点必须可核对"
+加"界面上如实标注"来兜底，而不是靠"一个字都不写"。
+所有档位的原始依据都能在 ``videos`` / ``meme_certifications`` /
 ``video_transcripts`` 三张表里找到出处。
 """
 
@@ -52,6 +55,42 @@ _REPEATED = re.compile(r"(\S{2,}?)(?:\1){2,}")
 _PLEAD_RATIO = 0.35
 # 只由标点/空白/占位符组成的简介（B 站不少 UP 主留的就是一个「-」）
 _NOISE = re.compile(r"^[\s\-—_·、,，.。!！?？/\\*#]*$")
+# 制作人员署名与事务性话术。这类文本**字数够、信息量为零**，却最容易被当成"简介摘录"
+# 挂到详情页上（实测某梗的介绍整段就是「CV：… 文案：… 后期：… 发邮件到 …@…」）。
+# 它们按空白切成独立片段，命中即整段丢弃——不会把一句话啃掉半截。
+_CREDIT_LABEL = re.compile(
+    r"^(?:CV|cv|Cv|声优|配音|文案|后期|剪辑|剪辑师|合成|混音|调音|策划|企划|制作|制片|监制|统筹"
+    r"|字幕|字幕组|翻译|校对|压制|美工|封面|插画|作画|素材|运营|文案策划|BGM|bgm|音乐|配乐"
+    r"|曲|曲名|原标题|搬运|授权|转载)\s*[：:]"
+)
+# 事务性/版权话术：邮箱、商务、纠错、举报、版权声明……
+_CREDIT_KEYWORDS = (
+    "邮箱", "发邮件", "商务合作", "合作请", "版权", "转载", "侵权", "删稿", "纠错", "举报",
+    "投递", "投稿邮箱", "@qq.com", "@163.com", "@sina.com", "@gmail.com", "如有问题",
+    "若发现", "一经查实", "辛苦费", "禁止搬运", "未经授权", "最终解释权",
+    # 社交账号推广："▶bilibili频道：… ▶微博：… ▶网易云：…" 这类整段对"这是什么梗"没用
+    "▶", "微博", "网易云", "公众号", "粉丝群", "QQ群", "求关注", "点个关注",
+    "谢谢喜欢", "谢谢支持", "留言",
+)
+_EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
+
+
+def _strip_credits(text: str) -> str:
+    """把署名段与事务性话术从简介里摘掉，只留真正在说内容的那些片段。"""
+    kept: list[str] = []
+    for chunk in _WS_RUN.split(text or ""):
+        piece = chunk.strip(" \t·-—")
+        if not piece:
+            continue
+        if _CREDIT_LABEL.match(piece) or _EMAIL.search(piece):
+            continue
+        if any(word in piece for word in _CREDIT_KEYWORDS):
+            continue
+        kept.append(piece)
+    return " ".join(kept)
+
+
+_WS_RUN = re.compile(r"\s+")
 # 简介里的句读，用来在超长处断开
 _SENTENCE_END = re.compile(r"[。！？!?；;，\n]")
 
@@ -92,9 +131,13 @@ def _day(value: Any) -> str:
     return value.strftime("%Y-%m-%d") if value else ""
 
 
-def _usable_excerpt(text: str | None) -> str:
-    """把一条真实视频简介裁成可展示的摘录；不可用则返回空串。"""
-    raw = _clean(_LINK.sub(" ", _HASHTAG.sub(" ", text or "")))
+def _usable_excerpt(text: str | None, *, min_chars: int = MIN_EXCERPT_CHARS) -> str:
+    """把一条真实视频简介裁成可展示的摘录；不可用则返回空串。
+
+    ``min_chars`` 可调：详情页那条摘录要够长才值得占位置（默认 40 字），
+    而喂给 AI 的材料宁可短一点也别丢信息（调用方传 8 字）。
+    """
+    raw = _clean(_LINK.sub(" ", _HASHTAG.sub(" ", _strip_credits(text or ""))))
     if not raw:
         return ""
     # 整段大半是求三连话术的简介，剥完也剩不下什么，直接判不可用
@@ -102,7 +145,7 @@ def _usable_excerpt(text: str | None) -> str:
     if plead_chars / len(raw) > _PLEAD_RATIO:
         return ""
     body = _clean(_REPEATED.sub(r"\1", _PLEAD.sub(" ", raw)))
-    if len(body) < MIN_EXCERPT_CHARS or _NOISE.match(body):
+    if len(body) < min_chars or _NOISE.match(body):
         return ""
     if len(body) > MAX_EXCERPT_CHARS:
         head = body[:MAX_EXCERPT_CHARS]
@@ -276,12 +319,14 @@ def compose_intro(
     videos: Iterable[Video] = (),
     transcripts: Iterable[VideoTranscript] = (),
     summary: dict[str, Any] | None = None,
+    ai_intro: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """组装详情页要用的介绍结构体。
 
     ``videos`` 传进来时应当已按播放量降序（取第一条简介够长的做摘录）；
     ``transcripts`` 是这些视频的字幕，只有配了 BILI_COOKIE 才可能有；
     ``summary`` 是字幕的 AI 浓缩版（已通过逐字校验，由调用方从缓存读来），
+    ``ai_intro`` 是 AI 摘要（已通过事实锚点核对，见 :mod:`.ai_intro`），
     没校验过的绝不该传进来。
     """
     evidence = evidence_lines(certifications)
@@ -314,6 +359,26 @@ def compose_intro(
             "evidence": evidence,
             "excerpt": excerpt,
             "transcript": transcript,
+            "ai": ai_intro,
+        }
+
+    if ai_intro and ai_intro.get("text"):
+        # AI 摘要排在人工稿之后、原文摘录之前：它读起来是人话，
+        # 但必须如实标注是模型写的，并把依据留在下面几块里供人核对。
+        return {
+            "text": _clean(ai_intro["text"]),
+            "source": "ai",
+            "source_label": "AI 摘要",
+            "note": (
+                "还没有人工介绍。这段是 AI 依据下面列出的真实证据（解说视频标题、"
+                "相关视频标题与简介）归纳的，不是原文照抄；"
+                "其中的数字与专名已逐条核对过能在证据里找到，但表述仍是模型写的，"
+                "请以证据原文为准。"
+            ),
+            "evidence": evidence,
+            "excerpt": excerpt,
+            "transcript": transcript,
+            "ai": ai_intro,
         }
 
     if transcript:
@@ -336,6 +401,7 @@ def compose_intro(
             "evidence": evidence,
             "excerpt": excerpt,
             "transcript": transcript,
+            "ai": ai_intro,
         }
 
     if evidence or excerpt:
@@ -357,6 +423,7 @@ def compose_intro(
             "evidence": evidence,
             "excerpt": excerpt,
             "transcript": None,
+            "ai": ai_intro,
         }
 
     return {
@@ -370,4 +437,5 @@ def compose_intro(
         "evidence": [],
         "excerpt": None,
         "transcript": None,
+        "ai": None,
     }

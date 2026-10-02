@@ -12,6 +12,8 @@ import Trends from "@/pages/Trends";
 
 // 详情页才用 ECharts、梗管理是运营入口，都不该进首页首屏包，按需拆出去。
 const MemeDetail = lazy(() => import("@/pages/MemeDetail"));
+// 梗史馆是二级页面，静态引入会把主包推高 33KB，所以和详情页/梗管理一样按需拆出去。
+const History = lazy(() => import("@/pages/History"));
 const Manage = lazy(() => import("@/pages/Manage"));
 
 export default function App() {
@@ -21,6 +23,14 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/library" element={<MemeLibrary />} />
         <Route path="/trends" element={<Trends />} />
+        <Route
+          path="/history"
+          element={
+            <Suspense fallback={<div className="p-8"><LoadingCards count={3} /></div>}>
+              <History />
+            </Suspense>
+          }
+        />
         <Route path="/favorites" element={<Favorites />} />
         <Route path="/pipeline" element={<Pipeline />} />
         <Route

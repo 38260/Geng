@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
 
 import {
+  ArchiveSolidIcon,
   BookmarkSolidIcon,
   ChartSolidIcon,
   GearSolidIcon,
@@ -17,6 +18,7 @@ const NAV = [
   { to: "/", label: "首页", icon: HomeSolidIcon, end: true },
   { to: "/library", label: "梗库", icon: LibrarySolidIcon, end: false },
   { to: "/trends", label: "热度趋势", icon: ChartSolidIcon, end: false },
+  { to: "/history", label: "梗史馆", icon: ArchiveSolidIcon, end: false },
   { to: "/favorites", label: "我的收藏", icon: BookmarkSolidIcon, end: false },
   { to: "/pipeline", label: "数据管线", icon: PipelineSolidIcon, end: false },
   { to: "/manage", label: "梗管理", icon: ManageSolidIcon, end: false },

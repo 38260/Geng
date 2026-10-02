@@ -92,6 +92,10 @@ function HeadCard({
 /** 介绍来源决定这句话说得多硬：人工写的可以直接信，证据拼出的只是原文摘录，没内容就明说。 */
 const INTRO_STYLE: Record<IntroSource, { chip: string; hint: string }> = {
   manual: { chip: "bg-go/10 text-go", hint: "这条介绍是人工在梗管理里维护的" },
+  ai: {
+    chip: "bg-flare/10 text-flare",
+    hint: "这段是 AI 依据抓到的真实证据归纳出来的，不是原文照抄；其中的数字与专名已逐条核对能在证据里找到",
+  },
   transcript: {
     chip: "bg-flare/10 text-flare",
     hint: "还没有人工介绍，这段直接摘自解说视频的字幕原文，系统只挑句子、不写句子",
@@ -164,8 +168,21 @@ function TranscriptBlock({ intro }: { intro: MemeIntro }) {
   );
 }
 
-function IntroCard({ intro }: { intro: MemeIntro }) {
+function IntroCard({
+  intro,
+  onRegenerate,
+  regenerating,
+  error,
+}: {
+  intro: MemeIntro;
+  onRegenerate: () => void;
+  regenerating: boolean;
+  error: string;
+}) {
   const style = INTRO_STYLE[intro.source];
+  // AI 摘要是"结论"，证据原文是"依据"：有结论时把依据收进折叠区。
+  // 不这样做的话，正文位又会被"CV：… 文案：… 后期：…"这类制作名单占满 —— 等于什么都没说。
+  const collapsed = intro.source === "ai";
   return (
     <section id="intro" className="card p-5">
       <div className="mb-2 flex flex-wrap items-center gap-2.5">
@@ -182,7 +199,10 @@ function IntroCard({ intro }: { intro: MemeIntro }) {
       </div>
 
       {intro.text ? (
-        <p className="text-[15px] leading-relaxed text-ink-mute">{intro.text}</p>
+        <>
+          <p className="text-[15px] leading-relaxed text-ink-mute">{intro.text}</p>
+          <p className="mt-2 text-[12px] leading-relaxed text-ink-faint">{intro.note}</p>
+        </>
       ) : (
         <p className="rounded-xl bg-rail px-4 py-3 text-[13px] leading-relaxed text-ink-faint">
           {intro.note}
@@ -192,9 +212,26 @@ function IntroCard({ intro }: { intro: MemeIntro }) {
         </p>
       )}
 
-      {intro.transcript ? <TranscriptBlock intro={intro} /> : null}
+      {intro.source === "manual" ? null : (
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={onRegenerate}
+            disabled={regenerating}
+            className="btn-ghost rounded-full px-3 py-1 text-[12px] disabled:opacity-60"
+          >
+            {regenerating ? "AI 正在写…" : intro.source === "ai" ? "重新生成 AI 摘要" : "让 AI 写一段介绍"}
+          </button>
+          <span className="text-[12px] text-ink-faint">
+            依据已抓到的证据生成，不是原文照抄；核不到出处的事实会让整段作废。
+          </span>
+          {error ? <span className="text-[12px] text-brand">{error}</span> : null}
+        </div>
+      )}
 
-      {intro.excerpt ? (
+      {collapsed ? null : intro.transcript ? <TranscriptBlock intro={intro} /> : null}
+
+      {collapsed || !intro.excerpt ? null : (
         <div className="mt-3 rounded-xl border border-dashed border-line bg-canvas px-4 py-3">
           <div className="text-[12px] font-bold text-ink-faint">
             简介原文摘录 · 来自《{intro.excerpt.video_title}》（UP：{intro.excerpt.author}）
@@ -202,9 +239,9 @@ function IntroCard({ intro }: { intro: MemeIntro }) {
           </div>
           <p className="mt-1 text-[13px] leading-relaxed text-ink-mute">{intro.excerpt.text}</p>
         </div>
-      ) : null}
+      )}
 
-      {intro.evidence.length ? (
+      {collapsed || !intro.evidence.length ? null : (
         <ul className="mt-3 space-y-1.5">
           {intro.evidence.map((item) => (
             <li key={`${item.role}-${item.bvid}`} className="flex items-start gap-2 text-[12px]">
@@ -231,6 +268,57 @@ function IntroCard({ intro }: { intro: MemeIntro }) {
             </li>
           ))}
         </ul>
+      )}
+
+      {collapsed ? (
+        <details className="mt-3 rounded-xl border border-dashed border-line bg-canvas px-4 py-3">
+          <summary className="cursor-pointer list-none text-[12px] font-bold text-ink-faint">
+            查看 AI 用到的依据（原文，可逐条核对）
+          </summary>
+          {intro.evidence.length ? (
+            <ul className="mt-2 space-y-1.5">
+              {intro.evidence.map((item) => (
+                <li key={`${item.role}-${item.bvid}`} className="flex items-start gap-2 text-[12px]">
+                  <span className="chip shrink-0 bg-rail px-2 py-0.5 text-ink-mute">{item.up_label}</span>
+                  <span className="min-w-0 flex-1 text-ink-mute">
+                    {item.published_at ? `${item.published_at} · ` : ""}
+                    {item.video_url ? (
+                      <a
+                        href={item.video_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-flare hover:underline"
+                      >
+                        <LinkIcon className="h-3 w-3" />
+                        <span className="truncate">{item.video_title}</span>
+                      </a>
+                    ) : (
+                      <span className="text-ink-faint">{item.video_title}</span>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {intro.excerpt ? (
+            <div className="mt-3 text-[12px] leading-relaxed text-ink-mute">
+              <span className="font-bold text-ink-faint">
+                简介原文 · 《{intro.excerpt.video_title}》（UP：{intro.excerpt.author}）：
+              </span>
+              {intro.excerpt.text}
+            </div>
+          ) : null}
+          {intro.ai?.material ? (
+            <details className="mt-2">
+              <summary className="cursor-pointer list-none text-[12px] text-flare hover:underline">
+                展开模型看到的完整材料（{intro.ai.material_chars} 字，模型只有这些）
+              </summary>
+              <pre className="mt-1.5 whitespace-pre-wrap font-sans text-[12px] leading-relaxed text-ink-mute">
+                {intro.ai.material}
+              </pre>
+            </details>
+          ) : null}
+        </details>
       ) : null}
     </section>
   );
@@ -405,6 +493,22 @@ export default function MemeDetail() {
 
   const bundle = detail.data?.insight ?? EMPTY_BUNDLE;
 
+  // 介绍那一段的重新生成：慢操作（模型要读十几条标题再写），给按钮单独的忙碌态
+  const [introBusy, setIntroBusy] = useState(false);
+  const [introError, setIntroError] = useState("");
+  const regenerateIntro = useCallback(async () => {
+    setIntroBusy(true);
+    setIntroError("");
+    try {
+      const next = await api.regenerateIntro(memeId);
+      if (detail.data) detail.setData({ ...detail.data, intro: next });
+    } catch (err) {
+      setIntroError(err instanceof Error ? err.message : "生成失败，稍后再试");
+    } finally {
+      setIntroBusy(false);
+    }
+  }, [memeId, detail]);
+
   const regenerate = useCallback(async () => {
     const next = await api.regenerateInsight(memeId, true);
     if (detail.data) {
@@ -472,7 +576,12 @@ export default function MemeDetail() {
             <>
               <HeadCard meme={detail.data.meme} bundle={bundle} explanation={explanationText} />
 
-              <IntroCard intro={detail.data.intro} />
+              <IntroCard
+                intro={detail.data.intro}
+                onRegenerate={regenerateIntro}
+                regenerating={introBusy}
+                error={introError}
+              />
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <MetricCard kind="videos" label="视频数" metric={detail.data.metrics.videos} />
@@ -505,10 +614,11 @@ export default function MemeDetail() {
                   <TrendChart points={points} />
                   <p className="mt-2 text-[11px] text-ink-faint">
                     热度为 0-100 自定义指数（滚动 7 天窗口），不是 B 站官方指数。
+                    每根柱子是一天，颜色对应那天所处的阶段（与梗史馆同一套复算）。
                   </p>
                   {holes > 0 ? (
                     <p className="mt-1 text-[11px] leading-relaxed text-brand">
-                      这 {points.length} 天里有 {holes} 天接口没返回结果（图上画成断口，不当成 0）——
+                      这 {points.length} 天里有 {holes} 天接口没返回结果（图上是最浅的那种短柱，不当成 0）——
                       B 站搜索对同一天会随机给空结果，观测不足时算法拒绝给"在涨还是在退"的结论。
                     </p>
                   ) : null}

@@ -75,6 +75,27 @@ export const STAGE_STYLE: Record<LifecycleStage, { chip: string; dot: string; te
   insufficient: { chip: "bg-ink-faint/15 text-ink-mute", dot: "bg-ink-faint", text: "text-ink-mute" },
 };
 
+/**
+ * 阶段色的十六进制值。
+ *
+ * ECharts / canvas 吃不了 Tailwind class，只能喂色值，所以这里必须与上面
+ * `STAGE_STYLE` 的 `dot`、以及 `tailwind.config.ts` 的调色板三处保持一致——
+ * 对不上就会在页面上看到"同一个阶段两种颜色"（趋势柱 vs 阶段徽章）。
+ */
+export const STAGE_HEX: Record<LifecycleStage, string> = {
+  explosive: "#FB3A5E", // brand
+  rising: "#0D8AFE", // flare
+  sprouting: "#FDC069", // gold
+  plateau: "#546F98", // dusk
+  receding: "#546F98", // dusk
+  obsolete: "#B0BAD0", // ink-faint
+  insufficient: "#B0BAD0", // ink-faint
+};
+/** 观测到了、但当天没有相关内容（比"未观测"略深一点，两者不能混为一谈） */
+export const BAR_EMPTY = "rgba(176,186,208,0.45)";
+/** 这天接口没给数据（未观测）：最浅的一档 */
+export const BAR_UNOBSERVED = "#ECF0F6";
+
 /** 「快起飞」这类上升中的梗用绿色徽章，与参考图一致 */
 export function stageChipClass(stage: LifecycleStage, nickname: string): string {
   if (nickname === "快起飞") return "bg-go-soft text-go";

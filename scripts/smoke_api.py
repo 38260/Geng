@@ -139,13 +139,19 @@ if items:
             )
     # 整库扫一遍：点进任何一条详情都不该看到空白介绍
     library = call("GET", "/api/memes?scope=all&limit=100") or {}
-    blank, sources = [], {}
+    blank, sources, ai_bad = [], {}, []
     for row in library.get("items", []):
         intro = call("GET", f"/api/memes/{row['id']}")["intro"]
         sources[intro["source"]] = sources.get(intro["source"], 0) + 1
         if not intro["text"].strip():
             blank.append(row["name"])
+        # AI 摘要那档必须"当场能核对"：正文之外还要带上模型看到的完整材料，
+        # 否则界面上那句「数字与专名已逐条核对」没法验
+        ai = intro.get("ai") or {}
+        if intro["source"] == "ai" and not (ai.get("text") and ai.get("material")):
+            ai_bad.append(row["name"])
     check(not blank, f"梗库 {len(library.get('items', []))} 条详情都有介绍（来源分布 {sources}）")
+    check(not ai_bad, f"AI 摘要那档都带着可核对材料（异常 {len(ai_bad)} 条：{ai_bad[:3]}）")
     check(detail and sum(detail["hotness"]["weights"].values()) == 1.0, "热度权重合计为 1")
     check(detail and sum(1 for s in detail["lifecycle"]["stages"] if s["active"]) == 1, "生命周期只有一个当前阶段")
     check(detail and detail["certification"]["admitted"] is True, "详情梗已通过发现层准入（任一 UP 介绍过）")
@@ -205,6 +211,14 @@ if items:
         advice.get("status") in {"can_catch", "caution", "too_late", "insufficient"},
         f"赶梗状态在枚举内（{advice.get('status')}）",
     )
+
+    # 重新生成介绍：慢操作，成功时给 AI 摘要，失败时**必须**退回原文而不是报 500
+    regen = call("POST", f"/api/memes/{meme_id}/intro", {"refresh": True})
+    check(
+        (regen or {}).get("source") in {"manual", "ai", "transcript", "evidence", "none"},
+        f"重新生成介绍后仍是一个合法来源（{(regen or {}).get('source')}）",
+    )
+    check(bool((regen or {}).get("text")), "介绍正文非空（材料撑不住时退回原文摘录，而不是留白）")
 
     # 刷新状态：接口必须能说出"上次什么时候刷的、自动刷新开没开"
     refresh = call("GET", "/api/jobs/refresh")

@@ -71,6 +71,11 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://api.longcat.chat/openai/v1"
     llm_api_key: str = ""
     llm_model: str = "LongCat-2.5-Preview"
+    # 「这个梗是什么」的 AI 摘要**单独挑一个模型**：写一段介绍要先读十几条标题再归纳，
+    # 而 LongCat-2.5-Preview 会把输出预算全烧在思考段上——实测 900 与 2500 tokens
+    # 都被吃光、content 返回空串、客户端只剩英文推理过程，这个任务在它上面必然失败。
+    # 留空 = 跟随 LLM_MODEL（换成没思考段的模型时这样配）。
+    llm_intro_model: str = "LongCat-2.0"
     llm_temperature: float = 0.3
     # LongCat-2.5-Preview 是带思考段的模型：300 token 会被 reasoning 吃光，
     # 实测 content 返回空串、usage.total_tokens=330，界面就只能退回算法文案。

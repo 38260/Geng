@@ -7,6 +7,7 @@ AI 文案单独走 :mod:`app.services.llm.service`，失败只影响它自己那
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any
 
@@ -42,6 +43,12 @@ from app.mock.catalogue import spec_for
 
 from ..llm.service import generate_catch_up_advice, generate_trend_explanation
 from .collections import collection_member_ids, collection_summary, tag_summary
+from .ai_intro import (
+    build_material,
+    generate_meme_intro,
+    material_digest,
+    read_cached_ai_intro,
+)
 from .intro import compose_intro, transcript_block
 from .summary import read_cached_summary
 from .certification import (
@@ -389,6 +396,10 @@ def list_memes(
     }
 
 
+# 复算逐日阶段时的取行上限：要"尽可能长的历史"，但要有个明确的数
+_ALL_DAYS = 400
+
+
 def _daily_rows(session: Session, meme_id: int, window_days: int) -> list[MemeDailyStats]:
     return list(
         session.scalars(
@@ -422,6 +433,15 @@ def _metric_block(session: Session, meme: Meme, hotness: HotnessSnapshot) -> dic
 
 def trend_payload(session: Session, meme_id: int, window: int) -> dict[str, Any]:
     rows = _daily_rows(session, meme_id, window)
+    # 逐日阶段要在**更长**的历史上复算才能与管线判定一致（管线用的是 30 天窗口），
+    # 只拿 7/30 天去算会让柱子颜色和右上角徽章打架——梗史馆踩过这个坑。
+    # 这里另外取全量日行只为复算，展示的仍然是 window 天那一段。
+    #
+    # 延迟导入：`history` 那边要用本模块的 fresh_cert_ids / thumbnail_for，
+    # 顶层互相 import 会成环；本文件已经 import 了它的一半，所以只能在这里引。
+    from .history import stage_path_for_rows
+
+    stage_by_day = stage_path_for_rows(_daily_rows(session, meme_id, _ALL_DAYS))
     points = [
         {
             "date": row.stat_date.isoformat(),
@@ -432,6 +452,8 @@ def trend_payload(session: Session, meme_id: int, window: int) -> dict[str, Any]
             "creator_count": row.creator_count,
             # false = 这天接口给了个空壳，画图上必须跟"真的是 0"分开画
             "observed": row.observed is not False,
+            # 这天处于哪个阶段：热度柱按它上色，与梗史馆同一份复算结果
+            "stage": stage_by_day.get(row.stat_date, ""),
         }
         for row in rows
     ]
@@ -631,16 +653,85 @@ def meme_transcripts(session: Session, meme: Meme) -> list[VideoTranscript]:
     )
 
 
-def intro_payload(session: Session, meme: Meme) -> dict[str, Any]:
-    """详情页的「这个梗是什么」：人工介绍 > 字幕原文 > 真实证据原文 > 显式空态。
+# 介绍这块最多摊开多少相关视频：喂给 AI 的材料要够宽，展示的摘录只要够用
+MATERIAL_VIDEO_LIMIT = 12
 
-    AI 浓缩版只读缓存，不在详情请求里现调模型——那会让页面为一行文案等几十秒。
-    缓存键是字幕内容指纹，所以要先用同一套选段规则算出页面用的是哪条字幕。
+
+@dataclass(frozen=True)
+class IntroContext:
+    """介绍这一块的全部输入：字幕、摘录、相关视频、AI 材料。
+
+    「读缓存」与「生成」必须用**完全一样**的输入：材料指纹是 AI 摘要的缓存键，
+    两边各建一次材料就会因为细节不同而算出不同的指纹，页面将永远查不到刚生成的那条。
+    所以只在这里建一次，两边共用。
     """
+
+    transcripts: list[VideoTranscript]
+    block: dict[str, Any] | None
+    videos: list[Video]
+    material: str
+
+    @property
+    def material_version(self) -> str:
+        return material_digest(self.material)
+
+    @property
+    def transcript_excerpt(self) -> str:
+        return self.block["excerpt"] if self.block else ""
+
+
+def intro_context(session: Session, meme: Meme) -> IntroContext:
     rows = meme_transcripts(session, meme)
     block = transcript_block(meme, meme.certifications, rows)
-    summary = read_cached_summary(session, meme_id=meme.id, version=block["version"]) if block else None
-    return compose_intro(meme, meme.certifications, kept_videos(session, meme, 6), rows, summary)
+    videos = kept_videos(session, meme, MATERIAL_VIDEO_LIMIT)
+    material = build_material(
+        meme,
+        meme.certifications,
+        videos,
+        transcript_excerpt=block["excerpt"] if block else "",
+    )
+    return IntroContext(transcripts=rows, block=block, videos=videos, material=material)
+
+
+def intro_payload(session: Session, meme: Meme) -> dict[str, Any]:
+    """详情页的「这个梗是什么」：人工介绍 > AI 摘要 > 字幕原文 > 真实证据原文 > 显式空态。
+
+    AI 那两档都**只读缓存**，不在详情请求里现调模型——那会让页面为一段文案等几十秒。
+    """
+    ctx = intro_context(session, meme)
+    summary = (
+        read_cached_summary(session, meme_id=meme.id, version=ctx.block["version"])
+        if ctx.block
+        else None
+    )
+    ai_intro = read_cached_ai_intro(session, meme_id=meme.id, version=ctx.material_version)
+    return compose_intro(
+        meme,
+        meme.certifications,
+        ctx.videos,
+        ctx.transcripts,
+        summary,
+        ai_intro=ai_intro,
+    )
+
+
+def generate_intro(
+    session: Session, meme: Meme, *, refresh: bool = False
+) -> dict[str, Any] | None:
+    """生成/刷新 AI 摘要（**会打模型**，一次调用几十秒）。
+
+    只有前端那个「重新生成」按钮和 ``app.scripts.generate_intros`` 走这里；
+    详情接口永远不调它。
+    """
+    ctx = intro_context(session, meme)
+    return generate_meme_intro(
+        session,
+        meme,
+        certifications=meme.certifications,
+        videos=ctx.videos,
+        transcript_excerpt=ctx.transcript_excerpt,
+        force_refresh=refresh,
+    )
 
 
 def detail_payload(session: Session, meme: Meme) -> dict[str, Any] | None:

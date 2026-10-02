@@ -7,10 +7,12 @@
  */
 
 import type {
+  HistoryView,
   LLMTestResult,
   ManageList,
   ManageView,
   MemeDetail,
+  MemeIntro,
   MemeList,
   MemeMetaPatch,
   MemeMetaResult,
@@ -117,6 +119,11 @@ export const api = {
   /* 数据管线：数据获取/处理/建模/质量/AI 五段实况。只读接口，不需要令牌 */
   pipeline: () => request<PipelineView>("/api/pipeline"),
 
+  /* 梗史馆：近 N 天入池的梗 + 历史周期画像。只读接口，不需要令牌 */
+  history: (
+    params: { days?: number; cycle?: string; cert?: string; sort?: string } = {},
+  ) => request<HistoryView>(`/api/history${query(params)}`),
+
   memes: (params: { filter?: string; search?: string; sort?: string; limit?: number; offset?: number; scope?: "board" | "all"; tag?: string; collection?: string } = {}) =>
     request<MemeList>(`/api/memes${query(params)}`),
 
@@ -135,6 +142,10 @@ export const api = {
       sort_label: string;
       note: string;
     }>(`/api/memes/${id}/videos${query({ limit, sort })}`),
+
+  /* 重新生成「这个梗是什么」的 AI 摘要：慢操作，走 AI 超时 */
+  regenerateIntro: (id: number) =>
+    request<MemeIntro>(`/api/memes/${id}/intro`, { method: "POST", body: JSON.stringify({ refresh: true }) }, AI_TIMEOUT_MS),
 
   regenerateInsight: (id: number, refresh = true) =>
     request<{ trend_explanation: InsightRecord; catch_up_advice: InsightRecord }>(

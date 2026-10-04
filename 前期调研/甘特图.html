@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>赶梗潮 · 项目排期甘特图</title>
+<style>
+  :root{
+    --ink:#1F2430; --ink-2:#5A6478; --ink-3:#8A93A6;
+    --line:#E4E8F0; --canvas:#F7F8FA; --card:#FFFFFF;
+    --coral:#FB3A5E; --navy:#3C5989; --gold:#F5A623;
+    --todo:#C3CCDC; --done:#3C5989; --doing:#FB3A5E;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    background:var(--canvas); color:var(--ink);
+    font-family:"Microsoft YaHei","PingFang SC","Hiragino Sans GB",sans-serif;
+    font-size:14px; line-height:1.6; padding:36px 28px 48px;
+  }
+  .wrap{max-width:1180px;margin:0 auto;}
+
+  header{display:flex;justify-content:space-between;align-items:flex-end;
+    border-bottom:2px solid var(--ink);padding-bottom:16px;margin-bottom:8px;flex-wrap:wrap;gap:12px;}
+  h1{font-family:KaiTi,"STKaiti",serif;font-size:30px;letter-spacing:1px;}
+  h1 small{font-family:inherit;font-size:14px;color:var(--ink-2);font-weight:400;
+    margin-left:12px;letter-spacing:0;}
+  .meta{font-size:12.5px;color:var(--ink-2);text-align:right;line-height:1.8;}
+  .meta b{color:var(--coral);}
+
+  .legend{display:flex;gap:22px;flex-wrap:wrap;margin:18px 0 14px;font-size:12.5px;color:var(--ink-2);}
+  .legend span{display:inline-flex;align-items:center;gap:7px;}
+  .sw{width:22px;height:10px;border-radius:2px;display:inline-block;}
+  .sw.done{background:var(--done);} .sw.doing{background:var(--doing);}
+  .sw.todo{background:var(--todo);}
+  .dia{width:11px;height:11px;background:var(--gold);transform:rotate(45deg);display:inline-block;}
+  .todaymark{width:0;height:12px;border-left:2px dashed var(--coral);display:inline-block;}
+  .board{background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:22px 22px 8px;box-shadow:0 1px 2px rgba(31,36,48,.04);overflow-x:auto;}
+
+  .grid{min-width:900px;position:relative;}
+  .today-line{position:absolute;top:0;bottom:0;
+    left:calc(270px + (100% - 270px) * 4 / 12);
+    border-left:2px dashed var(--coral);opacity:.6;z-index:2;pointer-events:none;}
+  .today-line span{position:absolute;top:62px;left:7px;font-size:10.5px;color:#fff;
+    background:var(--coral);padding:2px 6px;border-radius:3px;white-space:nowrap;font-weight:600;
+    box-shadow:0 1px 3px rgba(251,58,94,.35);}
+  .row{display:grid;grid-template-columns:270px repeat(12,1fr);align-items:center;
+    min-height:38px;border-bottom:1px solid #F1F3F8;}
+  .row:last-child{border-bottom:none;}
+
+  .head{min-height:54px;border-bottom:2px solid var(--line);position:sticky;top:0;
+    background:var(--card);z-index:3;}
+  .head .lbl{font-size:12px;color:var(--ink-3);letter-spacing:.5px;}
+  .wk{text-align:center;font-size:11.5px;color:var(--ink-3);line-height:1.35;}
+  .wk b{display:block;color:var(--ink-2);font-size:12px;font-weight:600;}
+
+  .lbl{padding-right:14px;font-size:13px;color:var(--ink);display:flex;align-items:center;gap:8px;}
+  .lbl .tag{font-size:10.5px;padding:1px 6px;border-radius:3px;font-weight:600;letter-spacing:.3px;}
+  .tag.done{background:#EAF0F9;color:var(--navy);}
+  .tag.doing{background:#FDE9ED;color:var(--coral);}
+  .tag.todo{background:#F0F2F7;color:var(--ink-3);}
+  .lbl.sub{padding-left:22px;color:var(--ink-2);font-size:12.5px;}
+
+  .bar{height:16px;border-radius:3px;align-self:center;}
+  .bar.done{background:var(--done);}
+  .bar.doing{background:var(--doing);}
+  .bar.todo{background:var(--todo);}
+  .bar.doing::after{content:"";display:block;height:100%;border-radius:3px;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.55));
+    animation:sweep 2.2s ease-in-out infinite;}
+  @keyframes sweep{0%{width:0}60%{width:100%}100%{width:100%;opacity:0}}
+
+  .ms{justify-self:center;width:13px;height:13px;background:var(--gold);
+    transform:rotate(45deg);box-shadow:0 0 0 3px #FEF3E2;}
+  .ms-lbl{grid-column:2/14;font-size:11.5px;color:var(--ink-2);padding-left:6px;}
+
+  .group{background:#FBFCFE;border-bottom:1px solid #EDF0F6;}
+
+  footer{margin-top:20px;font-size:12.5px;color:var(--ink-2);line-height:1.9;}
+  footer .k{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--coral);
+    margin-right:6px;vertical-align:middle;}
+  .notes{margin-top:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px 26px;}
+  .note{background:#FFF;border:1px solid var(--line);border-left:3px solid var(--navy);
+    border-radius:0 6px 6px 0;padding:10px 14px;font-size:12.5px;color:var(--ink-2);}
+  .note b{color:var(--ink);}
+  @media print{body{background:#fff;padding:0;} .board{box-shadow:none;} .bar.doing::after{display:none;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>赶梗潮 · 项目排期<small>B 站网络梗热度与生命周期分析</small></h1>
+    <div class="meta">
+      数据科学课程项目 · 12 周计划<br>
+      制图日期 <b>2026-10-05</b>　｜　今日落在 W4 末
+    </div>
+  </header>
+
+  <div class="legend">
+    <span><i class="sw done"></i>已完成</span>
+    <span><i class="sw doing"></i>进行中</span>
+    <span><i class="sw todo"></i>计划中</span>
+    <span><i class="dia"></i>里程碑</span>
+    <span><i class="todaymark"></i>今日位置</span>
+  </div>
+
+  <div class="board">
+    <div class="grid">
+      <div class="today-line"><span>今天 10/05</span></div>
+
+      <!-- 表头 -->
+      <div class="row head">
+        <div class="lbl">工作项</div>
+        <div class="wk"><b>W1</b>09/08</div>
+        <div class="wk"><b>W2</b>09/15</div>
+        <div class="wk"><b>W3</b>09/22</div>
+        <div class="wk"><b>W4</b>09/29</div>
+        <div class="wk"><b>W5</b>10/06</div>
+        <div class="wk"><b>W6</b>10/13</div>
+        <div class="wk"><b>W7</b>10/20</div>
+        <div class="wk"><b>W8</b>10/27</div>
+        <div class="wk"><b>W9</b>11/03</div>
+        <div class="wk"><b>W10</b>11/10</div>
+        <div class="wk"><b>W11</b>11/17</div>
+        <div class="wk"><b>W12</b>11/24</div>
+      </div>
+
+      <!-- 一 -->
+      <div class="row">
+        <div class="lbl">一、调研与立项 <i class="tag done">已完成</i></div>
+        <div class="bar done" style="grid-column:2/4"></div>
+      </div>
+
+      <!-- 二 -->
+      <div class="row">
+        <div class="lbl">二、数据管线搭建 <i class="tag done">已完成</i></div>
+        <div class="bar done" style="grid-column:3/6"></div>
+      </div>
+
+      <!-- 三 -->
+      <div class="row">
+        <div class="lbl">三、指标与算法设计 <i class="tag done">已完成</i></div>
+        <div class="bar done" style="grid-column:3/6"></div>
+      </div>
+
+      <!-- 四 -->
+      <div class="row">
+        <div class="lbl">四、产品实现（Web/小程序/API） <i class="tag done">已完成</i></div>
+        <div class="bar done" style="grid-column:4/6"></div>
+      </div>
+
+      <!-- 里程碑：开题 -->
+      <div class="row">
+        <div class="lbl sub">开题答辩</div>
+        <div class="ms" style="grid-column:4/5"></div>
+      </div>
+
+      <!-- 五 -->
+      <div class="row">
+        <div class="lbl">五、数据质量修复与指标修正 <i class="tag doing">进行中</i></div>
+        <div class="bar doing" style="grid-column:5/6"></div>
+      </div>
+
+      <!-- 六 -->
+      <div class="row">
+        <div class="lbl">六、验证实验①　人工标注一致性 <i class="tag todo">计划</i></div>
+        <div class="bar todo" style="grid-column:6/7"></div>
+      </div>
+
+      <!-- 七 -->
+      <div class="row">
+        <div class="lbl">七、验证实验②　权重消融 + 敏感性 <i class="tag todo">计划</i></div>
+        <div class="bar todo" style="grid-column:7/8"></div>
+      </div>
+
+      <!-- 八 -->
+      <div class="row">
+        <div class="lbl">八、基线对比（ARIMA / 线性外推） <i class="tag todo">计划</i></div>
+        <div class="bar todo" style="grid-column:8/9"></div>
+      </div>
+
+      <!-- 九 -->
+      <div class="row">
+        <div class="lbl">九、用户实验（20 人对照） <i class="tag todo">计划</i></div>
+        <div class="bar todo" style="grid-column:9/10"></div>
+      </div>
+
+      <!-- 十 -->
+      <div class="row">
+        <div class="lbl">十、数据补齐 + 脉冲型梗建模 <i class="tag todo">计划</i></div>
+        <div class="bar todo" style="grid-column:10/11"></div>
+      </div>
+
+      <!-- 十一 -->
+      <div class="row">
+        <div class="lbl">十一、论文撰写 <i class="tag todo">计划</i></div>
+        <div class="bar todo" style="grid-column:11/13"></div>
+      </div>
+
+      <!-- 十二 -->
+      <div class="row">
+        <div class="lbl">十二、代码整理与可复现说明 <i class="tag todo">计划</i></div>
+        <div class="bar todo" style="grid-column:12/14"></div>
+      </div>
+
+      <!-- 里程碑：结题 -->
+      <div class="row">
+        <div class="lbl sub">结题答辩</div>
+        <div class="ms" style="grid-column:13/14"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>
+    <div><span class="k"></span>红色虚线是今天（2026-10-05）的位置：W4 的最后一天，前四类工作已完成，第五类正在收尾。</div>
+    <div class="notes">
+      <div class="note"><b>已经交出的东西</b><br>10,861 条真实视频、2,394 行逐日统计、355 项后端测试、29 篇已核验文献。</div>
+      <div class="note"><b>最近的一个硬结论</b><br>阈值可达性检验抓到一条从未执行过的规则（<code>heat ≥ 85</code>，全库最高只有 80.4）。</div>
+      <div class="note"><b>W5–W8 是验证窗口</b><br>四项实验（标注一致性、权重消融、基线对比、用户实验）的结论都还没有数据，答辩时不要现编。</div>
+      <div class="note"><b>主要风险</b><br>平台风控与合规环境变化——2026 年已有两个主流 B 站 API 开源库因律师函关停。</div>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>
